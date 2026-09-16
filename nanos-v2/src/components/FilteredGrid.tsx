@@ -6,42 +6,45 @@ import { ProductCard } from "@/components/ProductCard";
 
 interface FilteredGridProps {
   products: Product[];
+  hideFilter?: boolean;
 }
 
-export function FilteredGrid({ products }: FilteredGridProps) {
+export function FilteredGrid({ products, hideFilter = false }: FilteredGridProps) {
   const [activeCategory, setActiveCategory] = useState<"all" | "crocs" | "trousers">("all");
 
   const filteredProducts = products.filter((product) => {
-    if (activeCategory === "all") return true;
+    if (hideFilter || activeCategory === "all") return true;
     return product.category.toLowerCase() === activeCategory;
   });
 
   return (
-    <div className="space-y-6">
-      {/* Category Filter Tabs */}
-      <div className="flex items-center gap-2 border-b border-neutral-200 pb-3">
-        {(["all", "crocs", "trousers"] as const).map((cat) => (
-          <button
-            key={cat}
-            onClick={() => setActiveCategory(cat)}
-            className={`px-4 py-2 text-sm font-medium rounded-lg capitalize transition-colors ${
-              activeCategory === cat
-                ? "bg-black text-white"
-                : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900"
-            }`}
-          >
-            {cat === "all" ? "All Products" : cat}
-          </button>
-        ))}
-      </div>
+    <div style={{ marginBottom: 64 }}>
+      {/* Category Filter Chips */}
+      {!hideFilter && (
+        <div className="category-toolbar">
+          <div className="filter-chips">
+            {(["all", "crocs", "trousers"] as const).map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setActiveCategory(cat)}
+                className={`chip ${activeCategory === cat ? "active" : ""}`}
+              >
+                {cat === "all" ? "All Products" : cat === "crocs" ? "Crocs" : "Trousers"}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Grid */}
       {filteredProducts.length === 0 ? (
-        <div className="py-12 text-center text-neutral-500">
-          No products found in this category.
+        <div className="empty-state">
+          <h2>No products found</h2>
+          <p>Try switching categories to view available items.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+        <div className="product-grid">
           {filteredProducts.map((product) => (
             <ProductCard
               key={product.id}
@@ -54,6 +57,8 @@ export function FilteredGrid({ products }: FilteredGridProps) {
               tag={product.tag}
               isSale={product.isSale}
               category={product.category}
+              colors={product.colors}
+              sizes={product.sizes}
             />
           ))}
         </div>

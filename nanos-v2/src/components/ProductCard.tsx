@@ -1,6 +1,9 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
-import { fmtPrice } from "@/lib/format";
+import { useCart } from "@/context/CartContext";
+import { fmtPrice } from "@/lib/cart";
 
 export interface ProductCardProps {
   id: string;
@@ -12,6 +15,8 @@ export interface ProductCardProps {
   tag?: string | null;
   isSale?: boolean;
   category: string;
+  colors?: { name: string; hex: string }[];
+  sizes?: string[];
 }
 
 export function ProductCard({
@@ -23,75 +28,104 @@ export function ProductCard({
   tag,
   isSale,
   category,
+  colors = [],
+  sizes = [],
 }: ProductCardProps) {
-  return (
-    <div className="group relative flex flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-xs transition-all hover:shadow-md">
-      {/* Image Container */}
-      <Link href={`/products/${id}`} className="relative aspect-square w-full overflow-hidden bg-neutral-100">
-        <Image
-          src={hero}
-          alt={name}
-          fill
-          sizes="(max-width: 768px) 50vw, 33vw"
-          className="object-cover object-center transition-transform duration-300 group-hover:scale-105"
-        />
+  const [wished, setWished] = useState(false);
+  const [added, setAdded] = useState(false);
+  const cart = useCart();
 
-        {/* Badges Container */}
-        <div className="absolute top-2 left-2 flex flex-wrap gap-1 z-10">
-          {tag && (
-            <span className="rounded-md bg-black px-2 py-0.5 text-[10px] font-semibold tracking-wider text-white uppercase">
-              {tag}
-            </span>
-          )}
-          {isSale && (
-            <span className="rounded-md bg-rose-600 px-2 py-0.5 text-[10px] font-semibold tracking-wider text-white uppercase">
-              SALE
-            </span>
-          )}
+  function handleQuickAdd(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const selectedColor = colors[0]?.name || "Standard";
+    const selectedSize = sizes[0] || "Standard";
+
+    cart.addItem(
+      {
+        productId: id,
+        name,
+        color: selectedColor,
+        size: selectedSize,
+        price,
+        img: hero,
+      },
+      1
+    );
+
+    setAdded(true);
+    setTimeout(() => setAdded(false), 1500);
+  }
+
+  return (
+    <div className="product-card">
+      <div className="product-thumb">
+        <Link href={`/product/${id}`} className="w-full h-full block">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={hero} alt={name} />
+        </Link>
+
+        {/* Badges */}
+        <div className="badges">
+          {tag === "NEW" && <span className="badge badge-new">NEW</span>}
+          {tag === "BESTSELLER" && <span className="badge badge-bestseller">BESTSELLER</span>}
+          {isSale && <span className="badge badge-sale">SALE</span>}
         </div>
 
-        {/* Wishlist Heart Icon */}
+        {/* Wishlist Button */}
         <button
           type="button"
-          aria-label="Add to wishlist"
+          aria-label={wished ? "Remove from wishlist" : "Add to wishlist"}
+          className={`wish-btn ${wished ? "active" : ""}`}
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
+            setWished(!wished);
           }}
-          className="absolute top-2 right-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/80 backdrop-blur-xs text-neutral-700 hover:text-rose-600 hover:bg-white transition-colors"
         >
-          <svg
-            className="h-4 w-4 fill-none stroke-current stroke-2"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z"
-            />
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z" />
           </svg>
         </button>
-      </Link>
+      </div>
 
-      {/* Content */}
-      <div className="flex flex-1 flex-col p-4">
-        <span className="text-xs uppercase tracking-wider text-neutral-400 font-medium mb-1">
-          {category}
-        </span>
-        <Link href={`/products/${id}`} className="group-hover:text-neutral-700 transition-colors">
-          <h3 className="text-sm font-semibold text-neutral-900 line-clamp-1">{name}</h3>
-        </Link>
+      <div className="product-info">
+        <h3>
+          <Link href={`/product/${id}`}>{name}</Link>
+        </h3>
+        <div className="variant">
+          {category === "crocs" ? "Crocs" : "Trousers"}
+          {colors.length > 0 ? ` · ${colors.length} colors` : ""}
+        </div>
 
-        <div className="mt-2 flex items-baseline gap-2">
-          <span className="text-base font-bold text-neutral-900">
-            {fmtPrice(price)}
-          </span>
+        <div className="price-row">
+          <span className="price">{fmtPrice(price)}</span>
           {isSale && oldPrice && (
-            <span className="text-xs text-neutral-400 line-through">
-              {fmtPrice(oldPrice)}
-            </span>
+            <span className="price-old">{fmtPrice(oldPrice)}</span>
           )}
         </div>
+
+        {colors.length > 0 && (
+          <div className="swatches">
+            {colors.slice(0, 4).map((c) => (
+              <div
+                key={c.name}
+                className="swatch"
+                style={{ background: c.hex }}
+                title={c.name}
+              />
+            ))}
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={handleQuickAdd}
+          className={`quick-add ${added ? "added" : ""}`}
+        >
+          {added ? "Added ✓" : "+ Quick Add"}
+        </button>
       </div>
     </div>
   );

@@ -1,138 +1,286 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { useCart } from "@/context/CartContext";
+import { fmtPrice } from "@/lib/cart";
 import type { ProductColor } from "@/lib/types";
 
-interface PdpActionsProps {
+interface ProductData {
+  id: string;
+  sku: string;
+  name: string;
+  category: string;
+  price: number;
+  oldPrice?: number | null;
+  description: string;
+  rating: number;
+  reviews: number;
+  hero: string;
+  isSale: boolean;
+  tag?: string | null;
   colors: ProductColor[];
   sizes: string[];
+  gallery: string[];
 }
 
-export function PdpActions({ colors, sizes }: PdpActionsProps) {
-  const [selectedColor, setSelectedColor] = useState<string>(
-    colors[0]?.name || ""
-  );
-  const [selectedSize, setSelectedSize] = useState<string>(
-    sizes[0] || ""
-  );
-  const [quantity, setQuantity] = useState<number>(1);
+export function PdpActions({ product: p }: { product: ProductData }) {
+  const [mounted, setMounted] = useState(false);
+  const [imgIdx, setImgIdx] = useState(0);
+  const [activeImage, setActiveImage] = useState<string | null>(null);
+  const [color, setColor] = useState<string>(p.colors[0]?.name || "");
+  const [size, setSize] = useState<string | null>(null);
+  const [qty, setQty] = useState(1);
+  const [added, setAdded] = useState(false);
+  const [wished, setWished] = useState(false);
+  const cart = useCart();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const gallery = p.gallery && p.gallery.length > 0 ? p.gallery : [p.hero];
+  const displayedImage = activeImage || gallery[imgIdx] || p.hero;
+
+  function handleAdd() {
+    if (!size) return;
+
+    cart.addItem(
+      {
+        productId: p.id,
+        name: p.name,
+        color,
+        size,
+        price: p.price,
+        img: displayedImage,
+      },
+      qty
+    );
+
+    setAdded(true);
+    setTimeout(() => setAdded(false), 1500);
+  }
+
+  function handleColorSelect(c: ProductColor) {
+    setColor(c.name);
+    if (c.image && c.image.trim() !== "") {
+      setActiveImage(c.image);
+    } else {
+      setActiveImage(null);
+      setImgIdx(0);
+    }
+  }
+
+  if (!mounted) {
+    return (
+      <div className="pdp" suppressHydrationWarning>
+        <div className="pdp-gallery">
+          <div className="pdp-main-image"><img src={p.hero} alt={p.name} /></div>
+        </div>
+        <div className="pdp-info">
+          <h1>{p.name}</h1>
+          <div className="pdp-sub">{p.category === 'crocs' ? 'Crocs' : 'Trousers'} · {p.colors.length} colors available</div>
+          <div className="pdp-price-row"><span className="price">{fmtPrice(p.price)}</span></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6 pt-4 border-t border-neutral-200">
-      {/* Color Selector */}
-      {colors.length > 0 && (
-        <div>
-          <label className="block text-sm font-semibold text-neutral-900 mb-2">
-            Color: <span className="font-normal text-neutral-600">{selectedColor}</span>
-          </label>
-          <div className="flex items-center gap-3">
-            {colors.map((c) => (
-              <button
-                key={c.name}
-                type="button"
-                onClick={() => setSelectedColor(c.name)}
-                className={`relative flex h-9 w-9 items-center justify-center rounded-full border-2 transition-all ${
-                  selectedColor === c.name
-                    ? "border-black ring-2 ring-black ring-offset-2"
-                    : "border-neutral-300 hover:border-neutral-500"
-                }`}
-                title={c.name}
+    <div className="pdp" suppressHydrationWarning>
+      {/* Left: Gallery */}
+      <div className="pdp-gallery">
+        <div className="pdp-main-image">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={displayedImage} alt={p.name} />
+        </div>
+        {gallery.length > 1 && (
+          <div className="pdp-thumbs">
+            {gallery.map((g, i) => (
+              <div
+                key={`${g}-${i}`}
+                className={`pdp-thumb ${!activeImage && i === imgIdx ? "active" : ""}`}
+                onClick={() => {
+                  setActiveImage(null);
+                  setImgIdx(i);
+                }}
               >
-                <span
-                  className="h-7 w-7 rounded-full border border-black/10"
-                  style={{ backgroundColor: c.hex }}
-                />
-              </button>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={g} alt="" />
+              </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Size Selector */}
-      {sizes.length > 0 && (
-        <div>
-          <label className="block text-sm font-semibold text-neutral-900 mb-2">
-            Size: <span className="font-normal text-neutral-600">{selectedSize}</span>
-          </label>
-          <div className="flex flex-wrap gap-2">
-            {sizes.map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setSelectedSize(s)}
-                className={`px-4 py-2 text-sm font-medium rounded-lg border transition-all ${
-                  selectedSize === s
-                    ? "border-black bg-black text-white"
-                    : "border-neutral-300 bg-white text-neutral-700 hover:border-neutral-500"
-                }`}
-              >
-                {s}
-              </button>
-            ))}
+      {/* Right: Info Panel */}
+      <div className="pdp-info">
+        <h1>{p.name}</h1>
+        <div className="pdp-sub">
+          {p.category === "crocs" ? "Crocs" : "Trousers"} · {p.colors.length} colors available
+        </div>
+
+        <div className="pdp-price-row">
+          <span className="price">{fmtPrice(p.price)}</span>
+          {p.oldPrice && (
+            <>
+              <span className="price-old">{fmtPrice(p.oldPrice)}</span>
+              <span className="badge badge-sale">SALE</span>
+            </>
+          )}
+        </div>
+
+        <div className="pdp-rating">
+          <span>★ {p.rating}</span>
+          <span>({p.reviews} reviews)</span>
+        </div>
+
+        {/* Color Option Group */}
+        {p.colors.length > 0 && (
+          <div className="option-group">
+            <div className="label-row">
+              <label className="title">Color</label>
+              <span className="selected-val">{color}</span>
+            </div>
+            <div className="color-options">
+              {p.colors.map((c) => (
+                <div
+                  key={c.name}
+                  title={c.name}
+                  className={`color-opt ${color === c.name ? "selected" : ""}`}
+                  onClick={() => handleColorSelect(c)}
+                >
+                  <span className="swatch-inner" style={{ background: c.hex }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Size Option Group */}
+        {p.sizes.length > 0 && (
+          <div className="option-group">
+            <div className="label-row">
+              <label className="title">Size</label>
+              <span className="selected-val">{size ?? "Select a size"}</span>
+            </div>
+            <div className="size-options">
+              {p.sizes.map((s) => (
+                <div
+                  key={s}
+                  className={`size-opt ${size === s ? "selected" : ""}`}
+                  onClick={() => setSize(s)}
+                >
+                  {s}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Quantity Row */}
+        <div className="qty-row">
+          <label className="title">Quantity</label>
+          <div className="qty-stepper">
+            <button
+              type="button"
+              onClick={() => setQty(Math.max(1, qty - 1))}
+            >
+              −
+            </button>
+            <span className="qty-val">{qty}</span>
+            <button type="button" onClick={() => setQty(qty + 1)}>
+              +
+            </button>
           </div>
         </div>
-      )}
 
-      {/* Quantity Stepper */}
-      <div>
-        <label className="block text-sm font-semibold text-neutral-900 mb-2">
-          Quantity
-        </label>
-        <div className="inline-flex items-center rounded-lg border border-neutral-300 bg-white">
+        {/* PDP Actions */}
+        <div className="pdp-actions">
           <button
             type="button"
-            onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-            className="px-3 py-2 text-neutral-600 hover:text-black font-semibold"
+            className="btn btn-primary"
+            disabled={!size}
+            onClick={handleAdd}
           >
-            -
+            {added
+              ? "Added ✓"
+              : !size
+              ? "Select a size"
+              : `Add to Cart — ${fmtPrice(p.price * qty)}`}
           </button>
-          <span className="w-10 text-center text-sm font-semibold text-neutral-900">
-            {quantity}
-          </span>
           <button
             type="button"
-            onClick={() => setQuantity((q) => q + 1)}
-            className="px-3 py-2 text-neutral-600 hover:text-black font-semibold"
+            className={`wish-toggle ${wished ? "active" : ""}`}
+            onClick={() => setWished(!wished)}
+            aria-label="Wishlist toggle"
           >
-            +
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z" />
+            </svg>
           </button>
         </div>
-      </div>
 
-      {/* Action Buttons */}
-      <div className="flex flex-col sm:flex-row gap-3 pt-2">
-        <button
-          type="button"
-          className="flex-1 rounded-xl bg-black py-4 text-center text-sm font-semibold text-white shadow-md transition-all hover:bg-neutral-800 active:scale-98"
-        >
-          Add to Cart
-        </button>
-        <button
-          type="button"
-          className="inline-flex items-center justify-center rounded-xl border border-neutral-300 bg-white px-6 py-4 text-sm font-semibold text-neutral-700 shadow-2xs transition-all hover:bg-neutral-50 hover:border-neutral-400"
-        >
-          Add to Wishlist
-        </button>
-      </div>
-
-      {/* Stock & Delivery Note */}
-      <div className="rounded-xl bg-neutral-50 p-4 border border-neutral-200">
-        <p className="text-xs font-medium text-neutral-700 flex items-center gap-2">
-          <svg
-            className="h-4 w-4 text-emerald-600"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth="2"
+        {added && (
+          <div
+            style={{
+              fontSize: 13,
+              color: "#5a8f00",
+              marginTop: -16,
+              marginBottom: 24,
+              fontWeight: 600,
+            }}
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M5 13l4 4L19 7"
-            />
-          </svg>
-          Cash on Delivery only — Free shipping across Pakistan
-        </p>
+            Added to cart ✓ — <Link href="/cart">view cart</Link>
+          </div>
+        )}
+
+        {/* Perks Box */}
+        <div className="pdp-perks">
+          <div className="pdp-perk">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="1" y="3" width="15" height="13" />
+              <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
+              <circle cx="5.5" cy="18.5" r="2.5" />
+              <circle cx="18.5" cy="18.5" r="2.5" />
+            </svg>
+            Free delivery on orders over PKR 5,000
+          </div>
+          <div className="pdp-perk">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="1 4 1 10 7 10" />
+              <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+            </svg>
+            Easy 14-day returns
+          </div>
+          <div className="pdp-perk">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+              <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
+            </svg>
+            Customer support 7 days a week
+          </div>
+        </div>
+
+        {/* Accordion */}
+        <div className="pdp-accordion">
+          <details open>
+            <summary>Description</summary>
+            <p>{p.description}</p>
+          </details>
+          <details>
+            <summary>Size &amp; Fit</summary>
+            <p>
+              True to size for most. If you are between sizes, we recommend sizing up for a roomier fit.
+            </p>
+          </details>
+          <details>
+            <summary>Shipping &amp; Returns</summary>
+            <p>
+              Orders ship within 1-2 business days. Delivery takes 2-5 business days across Pakistan. Unworn items can be returned within 14 days of delivery.
+            </p>
+          </details>
+        </div>
       </div>
     </div>
   );
