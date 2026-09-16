@@ -789,9 +789,9 @@ export default function AdminPage() {
                             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                               {p.hero ? (
                                 /* eslint-disable-next-line @next/next/no-img-element */
-                                <img src={p.hero} alt="" className="product-thumb" />
+                                <img src={p.hero} alt="" className="admin-product-thumb" />
                               ) : (
-                                <div className="product-thumb" />
+                                <div className="admin-product-thumb" />
                               )}
                               <div>
                                 <div style={{ fontWeight: 600 }}>{p.name}</div>

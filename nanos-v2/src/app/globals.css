@@ -346,7 +346,7 @@ img { max-width: 100%; display: block; }
 .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .toolbar { display: flex; gap: 12px; align-items: center; }
 .toolbar input, .toolbar select { padding: 8px 12px; border: 1px solid var(--admin-border); border-radius: 6px; font-size: 13px; background: var(--admin-surface); color: var(--admin-text); }
-.product-thumb { width: 42px; height: 42px; border-radius: 6px; object-fit: cover; background: var(--admin-surface-2); flex-shrink: 0; }
+.admin-product-thumb { width: 42px; height: 42px; border-radius: 6px; object-fit: cover; background: var(--admin-surface-2); flex-shrink: 0; }
 .low-stock-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--admin-border); font-size: 13.5px; }
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px; }
 .modal { background: var(--admin-surface); border-radius: var(--admin-radius); width: 100%; max-width: 540px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); overflow: hidden; display: flex; flex-direction: column; max-height: 90vh; }
