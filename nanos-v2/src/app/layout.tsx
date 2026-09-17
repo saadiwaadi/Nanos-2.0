@@ -4,6 +4,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { CartProvider } from "@/context/CartContext";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { CartDrawer } from "@/components/CartDrawer";
 
 export const metadata: Metadata = {
   title: "nanos.pk — Keep it simple. Wear it your way.",
@@ -23,6 +24,7 @@ export default function RootLayout({
             <Navbar />
             {children}
             <Footer />
+            <CartDrawer />
           </CartProvider>
         </AuthProvider>
       </body>

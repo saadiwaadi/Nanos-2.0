@@ -24,10 +24,14 @@ export interface Product {
 
 export interface AdminProduct {
   id: string;
+  sku: string;
   name: string;
   slug: string;
   category: string;
+  tag?: string | null;
   price: number;
+  oldPrice?: number | null;
+  isSale?: boolean;
   description: string | null;
   hero: string | null;
   gallery: string[];

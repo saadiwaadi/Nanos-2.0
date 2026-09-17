@@ -56,14 +56,19 @@ export async function POST(request: Request) {
       );
     }
 
-    if (userRow.passwordHash) {
-      const match = await bcrypt.compare(password, userRow.passwordHash);
-      if (!match) {
-        return NextResponse.json(
-          { error: { code: "UNAUTHORIZED", message: "Invalid email or password." } },
-          { status: 401 }
-        );
-      }
+    if (!userRow.passwordHash) {
+      return NextResponse.json(
+        { error: { code: "UNAUTHORIZED", message: "Invalid email or password." } },
+        { status: 401 }
+      );
+    }
+
+    const match = await bcrypt.compare(password, userRow.passwordHash);
+    if (!match) {
+      return NextResponse.json(
+        { error: { code: "UNAUTHORIZED", message: "Invalid email or password." } },
+        { status: 401 }
+      );
     }
 
     const token = await new SignJWT({ sub: userRow.id, role: userRow.role })

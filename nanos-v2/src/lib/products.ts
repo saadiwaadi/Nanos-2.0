@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import type { Product } from "@/lib/types";
+import type { Product, ProductColor } from "@/lib/types";
 
 const CLOG_BLACK_IMG =
   "https://res.cloudinary.com/tp1vyxi3/image/upload/v1789376228/ChatGPT_Image_Sep_14_2026_01_04_47_AM.png";
@@ -222,31 +222,40 @@ function parseJson<T>(val: string): T[] {
   }
 }
 
+function parseProduct(row: any): Product {
+  return {
+    id: row.id,
+    sku: row.sku,
+    name: row.name,
+    category: row.category,
+    tag: row.tag,
+    price: row.price,
+    oldPrice: row.oldPrice,
+    description: row.description,
+    rating: row.rating,
+    reviews: row.reviews,
+    hero: row.hero,
+    isSale: row.isSale,
+    colors: parseJson<ProductColor>(row.colors),
+    sizes: parseJson<string>(row.sizes),
+    gallery: parseJson<string>(row.gallery),
+  };
+}
+
+let dbWarned = false;
+
 export async function getProducts(): Promise<Product[]> {
   try {
     const rows = await prisma.product.findMany();
     if (rows && rows.length > 0) {
-      return rows.map((row) => ({
-        id: row.id,
-        sku: row.sku,
-        name: row.name,
-        category: row.category,
-        tag: row.tag,
-        price: row.price,
-        oldPrice: row.oldPrice,
-        description: row.description,
-        rating: row.rating,
-        reviews: row.reviews,
-        hero: row.hero,
-        isSale: row.isSale,
-        colors: parseJson<{ name: string; hex: string }>(row.colors),
-        sizes: parseJson<string>(row.sizes),
-        gallery: parseJson<string>(row.gallery),
-      }));
+      return rows.map(parseProduct);
     }
     return FALLBACK_PRODUCTS;
-  } catch (error) {
-    console.warn("DB unavailable, returning fallback products.");
+  } catch {
+    if (!dbWarned) {
+      console.warn("[nanos] DB unavailable — using fallback products");
+      dbWarned = true;
+    }
     return FALLBACK_PRODUCTS;
   }
 }
@@ -255,26 +264,14 @@ export async function getProductById(id: string): Promise<Product | null> {
   try {
     const row = await prisma.product.findUnique({ where: { id } });
     if (row) {
-      return {
-        id: row.id,
-        sku: row.sku,
-        name: row.name,
-        category: row.category,
-        tag: row.tag,
-        price: row.price,
-        oldPrice: row.oldPrice,
-        description: row.description,
-        rating: row.rating,
-        reviews: row.reviews,
-        hero: row.hero,
-        isSale: row.isSale,
-        colors: parseJson<{ name: string; hex: string }>(row.colors),
-        sizes: parseJson<string>(row.sizes),
-        gallery: parseJson<string>(row.gallery),
-      };
+      return parseProduct(row);
     }
-  } catch (error) {
-    console.warn(`DB unavailable, checking fallback products for ${id}.`);
+    return FALLBACK_PRODUCTS.find((p) => p.id === id) ?? null;
+  } catch {
+    if (!dbWarned) {
+      console.warn("[nanos] DB unavailable — using fallback products");
+      dbWarned = true;
+    }
+    return FALLBACK_PRODUCTS.find((p) => p.id === id) ?? null;
   }
-  return FALLBACK_PRODUCTS.find((p) => p.id === id) || null;
 }

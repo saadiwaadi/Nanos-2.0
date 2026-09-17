@@ -63,8 +63,12 @@ export async function POST(request: Request) {
           role: "customer",
         },
       });
-    } catch {
-      // DB offline fallback
+    } catch (dbErr) {
+      console.error("Prisma user.create error during registration:", dbErr);
+      return NextResponse.json(
+        { error: { code: "SERVER_ERROR", message: "Failed to create account. Please try again." } },
+        { status: 500 }
+      );
     }
 
     const token = await new SignJWT({ sub: userId, role: "customer" })

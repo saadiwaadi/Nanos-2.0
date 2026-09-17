@@ -81,6 +81,11 @@ export default function AdminPage() {
   const [colorHex, setColorHex] = useState("#111111");
   const [colorImage, setColorImage] = useState("");
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
+  const [formSku, setFormSku] = useState("");
+  const [formTag, setFormTag] = useState("");
+  const [formOldPrice, setFormOldPrice] = useState("");
+  const [formIsSale, setFormIsSale] = useState(false);
+  const [formStock, setFormStock] = useState("");
 
   const showToast = useCallback((message: string, type: "success" | "error" = "success") => {
     setToast({ message, type });
@@ -170,6 +175,11 @@ export default function AdminPage() {
     setFormSizes([]);
     setFormColors([]);
     setFormErrors({});
+    setFormSku("");
+    setFormTag("");
+    setFormOldPrice("");
+    setFormIsSale(false);
+    setFormStock("0");
     setShowProductPanel(true);
   }
 
@@ -185,6 +195,11 @@ export default function AdminPage() {
     setFormSizes(Array.isArray(p.sizes) ? p.sizes : []);
     setFormColors(Array.isArray(p.colors) ? p.colors : []);
     setFormErrors({});
+    setFormSku(p.sku || "");
+    setFormTag(p.tag || "");
+    setFormOldPrice(p.oldPrice ? String(p.oldPrice) : "");
+    setFormIsSale(p.isSale || false);
+    setFormStock(String(p.stockLevel?.quantity ?? 0));
     setShowProductPanel(true);
   }
 
@@ -230,6 +245,10 @@ export default function AdminPage() {
       gallery: formGallery,
       sizes: formSizes,
       colors: formColors,
+      tag: formTag || null,
+      oldPrice: formOldPrice ? Number(formOldPrice) : null,
+      isSale: formIsSale,
+      stock: formStock ? Number(formStock) : 0,
     };
 
     const isEdit = !!editingProduct;
@@ -450,7 +469,7 @@ export default function AdminPage() {
           </div>
 
           <div className="topbar-right">
-            <button type="button" className="icon-btn" onClick={toggleTheme} title="Toggle theme">
+            <button type="button" className="admin-icon-btn" onClick={toggleTheme} title="Toggle theme">
               {theme === "light" ? "◐" : "☀️"}
             </button>
           </div>
@@ -954,190 +973,226 @@ export default function AdminPage() {
       {showProductPanel && (
         <>
           <div className="admin-panel-overlay" onClick={closeProductPanel} />
-          <div className="admin-panel">
-            <div className="modal-head">
-              <h3>{editingProduct ? "Edit product" : "Add product"}</h3>
-              <button type="button" className="modal-close" onClick={closeProductPanel}>
-                ✕
-              </button>
+          <div
+            className="admin-panel"
+            style={{
+              width: "100%",
+              maxWidth: "100%",
+              top: 0,
+              right: 0,
+              bottom: 0,
+              left: 0,
+              borderRadius: 0,
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            <div className="modal-head" style={{ padding: "20px 32px", borderBottom: "1px solid var(--admin-border)" }}>
+              <h3 style={{ fontSize: 18 }}>{editingProduct ? "Edit product" : "Add product"}</h3>
+              <button type="button" className="modal-close" onClick={closeProductPanel}>✕</button>
             </div>
-            <form onSubmit={handleSaveProduct} style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-              <div style={{ padding: 24, overflowY: "auto", flex: 1 }}>
-                <div className={`field ${formErrors.name ? "has-error" : ""}`}>
-                  <label>Name *</label>
-                  <input
-                    type="text"
-                    value={formName}
-                    onChange={(e) => {
-                      setFormName(e.target.value);
-                      if (!editingProduct) {
-                        setFormSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "-"));
-                      }
-                    }}
-                  />
-                  {formErrors.name && <div className="field-error">{formErrors.name}</div>}
-                </div>
 
-                <div className="field">
-                  <label>Slug</label>
-                  <input type="text" value={formSlug} onChange={(e) => setFormSlug(e.target.value)} />
-                </div>
+            <form onSubmit={handleSaveProduct} style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
+              <div style={{ flex: 1, overflowY: "auto", padding: "28px 32px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 40, maxWidth: 1100 }}>
 
-                <div className="field">
-                  <label>Category</label>
-                  <select value={formCategory} onChange={(e) => setFormCategory(e.target.value)}>
-                    <option value="crocs">Crocs</option>
-                    <option value="trousers">Trousers</option>
-                  </select>
-                </div>
+                  {/* LEFT COLUMN */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
-                <div className={`field ${formErrors.price ? "has-error" : ""}`}>
-                  <label>Price (PKR) *</label>
-                  <input type="number" value={formPrice} onChange={(e) => setFormPrice(e.target.value)} />
-                  {formErrors.price && <div className="field-error">{formErrors.price}</div>}
-                </div>
+                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "var(--admin-text-soft)", marginBottom: -8 }}>Core details</div>
 
-                <div className="field">
-                  <label>Description</label>
-                  <textarea rows={3} value={formDesc} onChange={(e) => setFormDesc(e.target.value)} />
-                </div>
-
-                <div className="field">
-                  <label>Hero URL</label>
-                  <div style={{ display: "flex", gap: 12 }}>
-                    <input type="text" style={{ flex: 1 }} value={formHero} onChange={(e) => setFormHero(e.target.value)} />
-                    {formHero && (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={formHero} alt="" style={{ width: 42, height: 42, objectFit: "cover", borderRadius: 4 }} />
-                    )}
-                  </div>
-                </div>
-
-                {/* Gallery */}
-                <div className="field">
-                  <label>Gallery URLs</label>
-                  {formGallery.map((g, idx) => (
-                    <div key={idx} style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+                    <div className={`field ${formErrors.name ? "has-error" : ""}`}>
+                      <label>Name *</label>
                       <input
                         type="text"
-                        style={{ flex: 1 }}
-                        value={g}
+                        value={formName}
                         onChange={(e) => {
-                          const next = [...formGallery];
-                          next[idx] = e.target.value;
-                          setFormGallery(next);
+                          setFormName(e.target.value);
+                          if (!editingProduct) {
+                            setFormSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "-"));
+                          }
                         }}
                       />
-                      <button
-                        type="button"
-                        className="btn btn-outline btn-sm"
-                        onClick={() => setFormGallery(formGallery.filter((_, i) => i !== idx))}
-                      >
-                        ×
-                      </button>
+                      {formErrors.name && <div className="field-error">{formErrors.name}</div>}
                     </div>
-                  ))}
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-sm"
-                    style={{ marginTop: 4, alignSelf: "flex-start" }}
-                    onClick={() => setFormGallery([...formGallery, ""])}
-                  >
-                    + Add image
-                  </button>
-                </div>
 
-                {/* Sizes Tag Input */}
-                <div className="field">
-                  <label>Sizes</label>
-                  <div>
-                    {formSizes.map((s) => (
-                      <span key={s} className="tag">
-                        {s}
-                        <button type="button" className="tag-remove" onClick={() => setFormSizes(formSizes.filter((x) => x !== s))}>
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                  <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
-                    <input
-                      type="text"
-                      placeholder="Type size and press Enter"
-                      value={sizeInput}
-                      onChange={(e) => setSizeInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if ((e.key === "Enter" || e.key === ",") && sizeInput.trim()) {
-                          e.preventDefault();
-                          if (!formSizes.includes(sizeInput.trim())) {
-                            setFormSizes([...formSizes, sizeInput.trim()]);
-                          }
-                          setSizeInput("");
-                        }
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {/* Colors Input */}
-                <div className="field">
-                  <label>Colours</label>
-                  <div style={{ marginBottom: 8 }}>
-                    {formColors.map((c, idx) => (
-                      <div key={idx} className="tag" style={{ background: "var(--admin-surface)" }}>
-                        <span className="colour-swatch" style={{ background: c.hex }} />
-                        <span>{c.name}</span>
-                        <button type="button" className="tag-remove" onClick={() => setFormColors(formColors.filter((_, i) => i !== idx))}>
-                          ×
-                        </button>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                      <div className="field">
+                        <label>SKU</label>
+                        <input type="text" value={formSku} onChange={(e) => setFormSku(e.target.value)} placeholder="Auto-generated if blank" />
                       </div>
-                    ))}
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: 12, background: "var(--admin-surface-2)", borderRadius: 6 }}>
-                    <div style={{ display: "flex", gap: 8 }}>
+                      <div className="field">
+                        <label>Slug</label>
+                        <input type="text" value={formSlug} onChange={(e) => setFormSlug(e.target.value)} />
+                      </div>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                      <div className="field">
+                        <label>Category</label>
+                        <select value={formCategory} onChange={(e) => setFormCategory(e.target.value)}>
+                          <option value="crocs">Crocs</option>
+                          <option value="trousers">Trousers</option>
+                        </select>
+                      </div>
+                      <div className="field">
+                        <label>Tag</label>
+                        <select value={formTag} onChange={(e) => setFormTag(e.target.value)}>
+                          <option value="">None</option>
+                          <option value="NEW">NEW</option>
+                          <option value="SALE">SALE</option>
+                          <option value="BESTSELLER">BESTSELLER</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+                      <div className={`field ${formErrors.price ? "has-error" : ""}`}>
+                        <label>Price (PKR) *</label>
+                        <input type="number" value={formPrice} onChange={(e) => setFormPrice(e.target.value)} />
+                        {formErrors.price && <div className="field-error">{formErrors.price}</div>}
+                      </div>
+                      <div className="field">
+                        <label>Original price</label>
+                        <input type="number" value={formOldPrice} onChange={(e) => setFormOldPrice(e.target.value)} placeholder="Optional" />
+                      </div>
+                      <div className="field">
+                        <label>Stock qty</label>
+                        <input type="number" value={formStock} onChange={(e) => setFormStock(e.target.value)} min={0} />
+                      </div>
+                    </div>
+
+                    <div className="field" style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                      <input
+                        type="checkbox"
+                        id="isSale"
+                        checked={formIsSale}
+                        onChange={(e) => setFormIsSale(e.target.checked)}
+                        style={{ width: 16, height: 16, accentColor: "var(--admin-accent)" }}
+                      />
+                      <label htmlFor="isSale" style={{ margin: 0, fontWeight: 500 }}>Mark as sale item</label>
+                    </div>
+
+                    <div className="field">
+                      <label>Description</label>
+                      <textarea rows={4} value={formDesc} onChange={(e) => setFormDesc(e.target.value)} />
+                    </div>
+
+                    {/* Sizes */}
+                    <div className="field">
+                      <label>Sizes</label>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+                        {formSizes.map((s) => (
+                          <span key={s} className="tag">
+                            {s}
+                            <button type="button" className="tag-remove" onClick={() => setFormSizes(formSizes.filter((x) => x !== s))}>×</button>
+                          </span>
+                        ))}
+                      </div>
                       <input
                         type="text"
-                        placeholder="Colour name"
-                        style={{ flex: 1 }}
-                        value={colorName}
-                        onChange={(e) => setColorName(e.target.value)}
+                        placeholder="Type size and press Enter"
+                        value={sizeInput}
+                        onChange={(e) => setSizeInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if ((e.key === "Enter" || e.key === ",") && sizeInput.trim()) {
+                            e.preventDefault();
+                            if (!formSizes.includes(sizeInput.trim())) {
+                              setFormSizes([...formSizes, sizeInput.trim()]);
+                            }
+                            setSizeInput("");
+                          }
+                        }}
                       />
-                      <input type="color" value={colorHex} onChange={(e) => setColorHex(e.target.value)} style={{ width: 40, padding: 0 }} />
                     </div>
-                    <input
-                      type="text"
-                      placeholder="Image URL for this colour (optional)"
-                      value={colorImage}
-                      onChange={(e) => setColorImage(e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-dark btn-sm"
-                      style={{ alignSelf: "flex-start" }}
-                      onClick={() => {
-                        if (colorName.trim()) {
-                          setFormColors([
-                            ...formColors,
-                            { name: colorName.trim(), hex: colorHex, image: colorImage.trim() || undefined },
-                          ]);
-                          setColorName("");
-                          setColorImage("");
-                        }
-                      }}
-                    >
-                      + Add colour
-                    </button>
+                  </div>
+
+                  {/* RIGHT COLUMN */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+
+                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "var(--admin-text-soft)", marginBottom: -8 }}>Media & variants</div>
+
+                    <div className="field">
+                      <label>Hero URL</label>
+                      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                        <input type="text" style={{ flex: 1 }} value={formHero} onChange={(e) => setFormHero(e.target.value)} />
+                        {formHero && (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img src={formHero} alt="" style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 6, border: "1px solid var(--admin-border)" }} />
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="field">
+                      <label>Gallery URLs</label>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        {formGallery.map((g, idx) => (
+                          <div key={idx} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                            {g && (
+                              /* eslint-disable-next-line @next/next/no-img-element */
+                              <img src={g} alt="" style={{ width: 36, height: 36, objectFit: "cover", borderRadius: 4, border: "1px solid var(--admin-border)", flexShrink: 0 }} />
+                            )}
+                            <input
+                              type="text"
+                              style={{ flex: 1 }}
+                              value={g}
+                              onChange={(e) => {
+                                const next = [...formGallery];
+                                next[idx] = e.target.value;
+                                setFormGallery(next);
+                              }}
+                            />
+                            <button type="button" className="btn btn-outline btn-sm" onClick={() => setFormGallery(formGallery.filter((_, i) => i !== idx))}>×</button>
+                          </div>
+                        ))}
+                        <button type="button" className="btn btn-outline btn-sm" style={{ alignSelf: "flex-start" }} onClick={() => setFormGallery([...formGallery, ""])}>
+                          + Add image
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Colours */}
+                    <div className="field">
+                      <label>Colours</label>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+                        {formColors.map((c, idx) => (
+                          <div key={idx} className="tag" style={{ background: "var(--admin-surface)" }}>
+                            <span className="colour-swatch" style={{ background: c.hex }} />
+                            <span>{c.name}</span>
+                            <button type="button" className="tag-remove" onClick={() => setFormColors(formColors.filter((_, i) => i !== idx))}>×</button>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: 12, background: "var(--admin-surface-2)", borderRadius: 6 }}>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <input type="text" placeholder="Colour name" style={{ flex: 1 }} value={colorName} onChange={(e) => setColorName(e.target.value)} />
+                          <input type="color" value={colorHex} onChange={(e) => setColorHex(e.target.value)} style={{ width: 40, padding: 0 }} />
+                        </div>
+                        <input type="text" placeholder="Image URL for this colour (optional)" value={colorImage} onChange={(e) => setColorImage(e.target.value)} />
+                        <button
+                          type="button"
+                          className="btn btn-dark btn-sm"
+                          style={{ alignSelf: "flex-start" }}
+                          onClick={() => {
+                            if (colorName.trim()) {
+                              setFormColors([...formColors, { name: colorName.trim(), hex: colorHex, image: colorImage.trim() || undefined }]);
+                              setColorName("");
+                              setColorImage("");
+                            }
+                          }}
+                        >
+                          + Add colour
+                        </button>
+                      </div>
+                    </div>
+
                   </div>
                 </div>
               </div>
 
-              <div className="modal-foot">
-                <button type="button" className="btn btn-outline btn-sm" onClick={closeProductPanel}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-dark btn-sm">
-                  {editingProduct ? "Save" : "Add product"}
-                </button>
+              <div className="modal-foot" style={{ padding: "16px 32px", borderTop: "1px solid var(--admin-border)" }}>
+                <button type="button" className="btn btn-outline btn-sm" onClick={closeProductPanel}>Cancel</button>
+                <button type="submit" className="btn btn-dark btn-sm">{editingProduct ? "Save changes" : "Add product"}</button>
               </div>
             </form>
           </div>

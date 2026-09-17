@@ -35,10 +35,14 @@ export async function GET(request: Request) {
       const totalQty = p.stockLevels.reduce((sum, s) => sum + s.quantity, 0);
       return {
         id: p.id,
+        sku: p.sku,
         name: p.name,
         slug: p.id,
         category: p.category,
+        tag: p.tag ?? null,
         price: p.price,
+        oldPrice: p.oldPrice ?? null,
+        isSale: p.isSale,
         description: p.description,
         hero: p.hero,
         gallery: parseJson<string>(p.gallery),
