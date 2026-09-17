@@ -48,6 +48,7 @@ function formatDate(iso: string): string {
 
 export default function AdminPage() {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
   const [activeView, setActiveView] = useState<"dashboard" | "products" | "orders" | "settings">("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
@@ -140,6 +141,7 @@ export default function AdminPage() {
   }, [router]);
 
   useEffect(() => {
+    setMounted(true);
     if (typeof window !== "undefined") {
       const savedTheme = localStorage.getItem("nanosAdminTheme_v1") as "light" | "dark" | null;
       if (savedTheme) {
@@ -356,6 +358,10 @@ export default function AdminPage() {
     const matchCat = productFilters.category === "ALL" || p.category.toLowerCase() === productFilters.category.toLowerCase();
     return matchQ && matchCat;
   });
+
+  if (!mounted) {
+    return null;
+  }
 
   return (
     <div className="admin-layout-shell">
