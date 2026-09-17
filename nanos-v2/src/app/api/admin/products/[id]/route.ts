@@ -3,6 +3,41 @@ import { requireAdmin } from "@/lib/auth-server";
 import { prisma } from "@/lib/prisma";
 import { memoryAdminProducts } from "../route";
 
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const auth = await requireAdmin(request);
+  if ("error" in auth) {
+    const status = auth.error === "403" ? 403 : 401;
+    return NextResponse.json({ error: "Unauthorized" }, { status });
+  }
+
+  const { id } = await params;
+
+  try {
+    const product = await prisma.product.findUnique({
+      where: { id },
+      include: {
+        variants: true,
+        productColors: true,
+        stockLevels: true,
+      },
+    });
+
+    if (!product) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ product });
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: err.message || "Failed to fetch product" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -44,6 +79,11 @@ export async function PATCH(
       const updated = await prisma.product.update({
         where: { id },
         data: updateData,
+        include: {
+          variants: true,
+          productColors: true,
+          stockLevels: true,
+        },
       });
 
       return NextResponse.json({ product: updated });

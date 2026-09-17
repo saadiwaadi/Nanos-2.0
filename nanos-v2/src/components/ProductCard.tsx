@@ -33,33 +33,60 @@ export function ProductCard({
 }: ProductCardProps) {
   const [wished, setWished] = useState(false);
   const [added, setAdded] = useState(false);
+  const [animating, setAnimating] = useState(false);
+  const [animCoords, setAnimCoords] = useState<{ startX: number; startY: number } | null>(null);
   const cart = useCart();
 
   function handleQuickAdd(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
 
+    if (animating) return;
+
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setAnimCoords({
+      startX: rect.left + rect.width / 2,
+      startY: rect.top + rect.height / 2,
+    });
+    setAnimating(true);
+
     const selectedColor = colors[0]?.name || "Standard";
     const selectedSize = sizes[0] || "Standard";
 
-    cart.addItem(
-      {
-        productId: id,
-        name,
-        color: selectedColor,
-        size: selectedSize,
-        price,
-        img: hero,
-      },
-      1
-    );
-
-    setAdded(true);
-    setTimeout(() => setAdded(false), 1500);
+    // 600ms flight animation delay before cart badge count increments
+    setTimeout(() => {
+      cart.addItem(
+        {
+          productId: id,
+          name,
+          color: selectedColor,
+          size: selectedSize,
+          price,
+          img: hero,
+        },
+        1
+      );
+      setAdded(true);
+      setAnimating(false);
+      setAnimCoords(null);
+      setTimeout(() => setAdded(false), 1500);
+    }, 600);
   }
 
   return (
     <div className="product-card">
+      {animating && animCoords && (
+        <div
+          className="fly-to-cart-dot"
+          style={
+            {
+              "--start-x": `${animCoords.startX}px`,
+              "--start-y": `${animCoords.startY}px`,
+            } as React.CSSProperties
+          }
+        />
+      )}
+
       <div className="product-thumb">
         <Link href={`/product/${id}`} className="w-full h-full block">
           {/* eslint-disable-next-line @next/next/no-img-element */}

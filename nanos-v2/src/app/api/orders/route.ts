@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth-server";
 import { getProductById } from "@/lib/products";
 import { prisma } from "@/lib/prisma";
+import { isAutoBookCity } from "@/lib/postex";
 
 // In-memory fallback order store for dev when DB is offline
 export const memoryOrders = new Map<string, any>();
@@ -73,6 +74,9 @@ export async function POST(request: Request) {
     const orderId = "ord_" + Math.random().toString(36).substring(2, 11);
     const now = new Date().toISOString();
 
+    const isAuto = await isAutoBookCity(shippingInfo.city || "");
+    const courierBookingStatus = isAuto ? "pending_auto" : "pending_manual_review";
+
     const orderData = {
       id: orderId,
       userId,
@@ -85,6 +89,7 @@ export async function POST(request: Request) {
       shippingInfo: JSON.stringify(shippingInfo),
       payment: "cod",
       status: "processing",
+      courierBookingStatus,
       createdAt: now,
       updatedAt: now,
       items: resolvedItems,
@@ -108,6 +113,7 @@ export async function POST(request: Request) {
           shippingInfo: JSON.stringify(shippingInfo),
           payment: "cod",
           status: "processing",
+          courierBookingStatus,
           items: {
             create: resolvedItems.map((i) => ({
               productId: i.productId,

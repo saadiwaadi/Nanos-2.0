@@ -38,6 +38,10 @@ export interface AdminProduct {
   sizes: string[];
   colors: ProductColor[];
   stockLevel?: { quantity: number };
+  variantCount?: number;
+  totalStock?: number;
+  productColors?: any[];
+  variants?: any[];
 }
 
 export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';

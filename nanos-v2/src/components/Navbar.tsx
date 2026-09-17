@@ -50,8 +50,8 @@ export function Navbar() {
             position: "relative",
           }}
         >
-          {/* Left: Hamburger Button */}
-          <div style={{ display: "flex", alignItems: "center" }}>
+          {/* Left: Hamburger Button & Logo */}
+          <div className="header-left" style={{ display: "flex", alignItems: "center", gap: 20 }}>
             <button
               type="button"
               className="icon-btn"
@@ -64,31 +64,29 @@ export function Navbar() {
                 <line x1="3" y1="18" x2="21" y2="18" />
               </svg>
             </button>
+
+            <Link
+              href="/"
+              className="logo"
+              aria-label="nanos.pk home"
+              style={{
+                display: "flex",
+                alignItems: "center",
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="https://res.cloudinary.com/tp1vyxi3/image/upload/v1789301766/ChatGPT_Image_Sep_13__2026__05_15_23_AM-removebg-preview.png"
+                alt="nanos.pk"
+                width={160}
+                height={44}
+                className="logo-img"
+              />
+            </Link>
           </div>
 
-          {/* Center: Absolutely Centered Logo */}
-          <Link
-            href="/"
-            className="logo"
-            aria-label="nanos.pk home"
-            style={{
-              position: "absolute",
-              left: "50%",
-              transform: "translateX(-50%)",
-            }}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="https://res.cloudinary.com/tp1vyxi3/image/upload/v1789301766/ChatGPT_Image_Sep_13__2026__05_15_23_AM-removebg-preview.png"
-              alt="nanos.pk"
-              width={120}
-              height={32}
-              className="logo-img"
-            />
-          </Link>
-
           {/* Right: Header Actions */}
-          <div className="header-actions" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div className="header-actions" style={{ display: "flex", alignItems: "center", gap: 16 }}>
             {/* Account Icon */}
             <Link
               href={isLoggedIn ? "/account" : "/login"}
