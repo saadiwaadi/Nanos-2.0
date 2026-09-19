@@ -1,6 +1,19 @@
+"use client";
+
+import { useState, FormEvent } from "react";
 import Link from "next/link";
 
 export function Footer() {
+  const [email, setEmail] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    if (email.trim()) {
+      setSubmitted(true);
+    }
+  };
+
   return (
     <footer className="site-footer">
       <div className="wrap">
@@ -37,15 +50,27 @@ export function Footer() {
           </div>
 
           {/* Newsletter Col */}
-          <div className="footer-col">
+          <div className="footer-col footer-newsletter-col">
             <h4>STAY IN THE LOOP</h4>
             <p style={{ fontSize: 13, color: "#999" }}>
               Get 10% off your first order plus early access to drops.
             </p>
-            <div className="newsletter-form">
-              <input type="email" placeholder="Your email address" />
-              <button type="button">JOIN</button>
-            </div>
+            {submitted ? (
+              <div className="newsletter-success-msg">
+                ✓ You&apos;re subscribed! Use code <strong style={{ color: "var(--lime)" }}>NANOS10</strong> for 10% off.
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="newsletter-form">
+                <input
+                  type="email"
+                  placeholder="Your email address"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+                <button type="submit">JOIN</button>
+              </form>
+            )}
           </div>
         </div>
 
