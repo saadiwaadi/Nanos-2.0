@@ -12,7 +12,7 @@ export default async function HomePage() {
 
   const crocsImg1 =
     crocsProducts[0]?.hero ||
-    "https://res.cloudinary.com/tp1vyxi3/image/upload/v1789376228/ChatGPT_Image_Sep_14_2026_01_04_47_AM.png";
+    "https://res.cloudinary.com/tp1vyxi3/image/upload/v1789791756/ChatGPT_Image_Sep_18_2026_09_22_00_PM.png";
   const crocsImg2 =
     crocsProducts[1]?.hero ||
     crocsProducts[0]?.gallery[1] ||
@@ -20,7 +20,7 @@ export default async function HomePage() {
 
   const trouserImg1 =
     trouserProducts[0]?.hero ||
-    "https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=800&h=800&fit=crop";
+    "https://res.cloudinary.com/tp1vyxi3/image/upload/v1789791884/High_Waist_Wide_Leg_Pants_Women_s_Loose_Fit_Straight_Casual_Long_Trousers_with_Slimming_Effect.jpg";
   const trouserImg2 =
     trouserProducts[1]?.hero ||
     trouserProducts[0]?.gallery[1] ||
@@ -40,12 +40,7 @@ export default async function HomePage() {
             Everyday Crocs &amp; Trousers built for your rotation. Premium quality, cash on delivery across Pakistan.
           </p>
         </div>
-        <div
-          className="hero-image"
-          style={{
-            backgroundImage: `url('https://res.cloudinary.com/tp1vyxi3/image/upload/v1789376228/ChatGPT_Image_Sep_14_2026_01_04_47_AM.png')`,
-          }}
-        />
+        <div className="hero-image" />
       </section>
 
       {/* Featured Products */}
@@ -86,7 +81,7 @@ export default async function HomePage() {
             <div
               className="category-box-bg"
               style={{
-                backgroundImage: `url('https://res.cloudinary.com/tp1vyxi3/image/upload/v1789376228/ChatGPT_Image_Sep_14_2026_01_04_47_AM.png')`,
+                backgroundImage: `url('https://res.cloudinary.com/tp1vyxi3/image/upload/v1789791756/ChatGPT_Image_Sep_18_2026_09_22_00_PM.png')`,
               }}
             />
             <div className="category-box-overlay">
@@ -100,7 +95,7 @@ export default async function HomePage() {
             <div
               className="category-box-bg"
               style={{
-                backgroundImage: `url('https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=800&h=800&fit=crop')`,
+                backgroundImage: `url('https://res.cloudinary.com/tp1vyxi3/image/upload/v1789791884/High_Waist_Wide_Leg_Pants_Women_s_Loose_Fit_Straight_Casual_Long_Trousers_with_Slimming_Effect.jpg')`,
               }}
             />
             <div className="category-box-overlay">
