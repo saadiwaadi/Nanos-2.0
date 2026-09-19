@@ -30,21 +30,11 @@ export async function PATCH(
 
     const decodedCategory = decodeURIComponent(category);
 
-    const updated = await prisma.categorySettings.upsert({
+    const updated = await prisma.categorySetting.upsert({
       where: { category: decodedCategory },
       update: { lowStockThreshold },
       create: { category: decodedCategory, lowStockThreshold },
     });
-
-    try {
-      await prisma.categorySetting.upsert({
-        where: { category: decodedCategory },
-        update: { lowStockThreshold },
-        create: { category: decodedCategory, lowStockThreshold },
-      });
-    } catch {
-      // Ignore secondary upsert
-    }
 
     return NextResponse.json(updated);
   } catch (err: any) {

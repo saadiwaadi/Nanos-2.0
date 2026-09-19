@@ -10,22 +10,9 @@ export async function GET(request: Request) {
   }
 
   try {
-    let rows = await prisma.categorySettings.findMany({
+    const rows = await prisma.categorySetting.findMany({
       orderBy: { category: "asc" },
     });
-
-    if (rows.length === 0) {
-      try {
-        const altRows = await prisma.categorySetting.findMany({
-          orderBy: { category: "asc" },
-        });
-        if (altRows.length > 0) {
-          rows = altRows;
-        }
-      } catch {
-        // Ignore fallback error
-      }
-    }
 
     return NextResponse.json(rows);
   } catch (err: any) {

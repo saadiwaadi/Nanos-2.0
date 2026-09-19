@@ -15,15 +15,24 @@ export async function GET(
   const { id } = await params;
 
   try {
-    const variants = await prisma.productVariant.findMany({
+    const stockLevels = await prisma.stockLevel.findMany({
       where: { productId: id },
     });
 
-    const grouped = variants.reduce((acc, v) => {
+    const mapped = stockLevels.map((s) => ({
+      id: s.id,
+      productId: s.productId,
+      color: s.color,
+      size: s.size,
+      stock: s.quantity,
+      quantity: s.quantity,
+    }));
+
+    const grouped = mapped.reduce((acc: Record<string, typeof mapped>, v) => {
       if (!acc[v.color]) acc[v.color] = [];
       acc[v.color].push(v);
       return acc;
-    }, {} as Record<string, typeof variants>);
+    }, {});
 
     return NextResponse.json(grouped);
   } catch (err: any) {
@@ -48,16 +57,17 @@ export async function POST(
 
   try {
     const body = await request.json();
-    const { color, size, stock } = body;
+    const { color, size } = body;
+    const qty = typeof body.stock === "number" ? body.stock : body.quantity;
 
-    if (!color || !size || typeof stock !== "number") {
+    if (!color || !size || typeof qty !== "number") {
       return NextResponse.json(
-        { error: "color, size, and stock (number) are required" },
+        { error: "color, size, and stock/quantity (number) are required" },
         { status: 400 }
       );
     }
 
-    const variant = await prisma.productVariant.upsert({
+    const stockLevel = await prisma.stockLevel.upsert({
       where: {
         productId_color_size: {
           productId: id,
@@ -65,16 +75,19 @@ export async function POST(
           size,
         },
       },
-      update: { stock },
+      update: { quantity: qty },
       create: {
         productId: id,
         color,
         size,
-        stock,
+        quantity: qty,
       },
     });
 
-    return NextResponse.json(variant);
+    return NextResponse.json({
+      ...stockLevel,
+      stock: stockLevel.quantity,
+    });
   } catch (err: any) {
     return NextResponse.json(
       { error: err.message || "Failed to upsert variant" },

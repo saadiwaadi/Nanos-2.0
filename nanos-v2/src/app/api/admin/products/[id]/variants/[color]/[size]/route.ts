@@ -18,16 +18,16 @@ export async function PATCH(
 
   try {
     const body = await request.json();
-    const { stock } = body;
+    const qty = typeof body.stock === "number" ? body.stock : body.quantity;
 
-    if (typeof stock !== "number") {
+    if (typeof qty !== "number") {
       return NextResponse.json(
-        { error: "stock (number) is required" },
+        { error: "stock/quantity (number) is required" },
         { status: 400 }
       );
     }
 
-    const variant = await prisma.productVariant.update({
+    const stockLevel = await prisma.stockLevel.upsert({
       where: {
         productId_color_size: {
           productId: id,
@@ -35,13 +35,22 @@ export async function PATCH(
           size,
         },
       },
-      data: { stock },
+      update: { quantity: qty },
+      create: {
+        productId: id,
+        color,
+        size,
+        quantity: qty,
+      },
     });
 
-    return NextResponse.json(variant);
+    return NextResponse.json({
+      ...stockLevel,
+      stock: stockLevel.quantity,
+    });
   } catch (err: any) {
     return NextResponse.json(
-      { error: err.message || "Failed to update variant" },
+      { error: err.message || "Failed to update variant stock" },
       { status: 500 }
     );
   }
@@ -62,7 +71,7 @@ export async function DELETE(
   const size = decodeURIComponent(rawSize);
 
   try {
-    await prisma.productVariant.delete({
+    await prisma.stockLevel.delete({
       where: {
         productId_color_size: {
           productId: id,
@@ -75,7 +84,7 @@ export async function DELETE(
     return NextResponse.json({ success: true });
   } catch (err: any) {
     return NextResponse.json(
-      { error: err.message || "Failed to delete variant" },
+      { error: err.message || "Failed to delete variant stock" },
       { status: 500 }
     );
   }

@@ -57,8 +57,8 @@ export async function PATCH(
             await prisma.postexBookingLog.create({
               data: {
                 orderId: id,
-                requestPayload: { action: "cancelOrder", trackingNumber },
-                responsePayload: (cancelRes || {}) as any,
+                requestPayload: JSON.stringify({ action: "cancelOrder", trackingNumber }),
+                responsePayload: JSON.stringify(cancelRes || {}),
                 success: Boolean(isSuccess),
                 errorMessage: errMsg,
               },
@@ -77,8 +77,8 @@ export async function PATCH(
               await prisma.postexBookingLog.create({
                 data: {
                   orderId: id,
-                  requestPayload: { action: "cancelOrder", trackingNumber },
-                  responsePayload: { error: errMsg },
+                  requestPayload: JSON.stringify({ action: "cancelOrder", trackingNumber }),
+                  responsePayload: JSON.stringify({ error: errMsg }),
                   success: false,
                   errorMessage: errMsg,
                 },

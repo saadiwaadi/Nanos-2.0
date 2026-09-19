@@ -19,7 +19,6 @@ export async function GET(
     const product = await prisma.product.findUnique({
       where: { id },
       include: {
-        variants: true,
         productColors: true,
         stockLevels: true,
       },
@@ -57,6 +56,8 @@ export async function PATCH(
     if (body.name !== undefined) updateData.name = body.name;
     if (body.category !== undefined) updateData.category = body.category;
     if (body.price !== undefined) updateData.price = Number(body.price);
+    if (body.oldPrice !== undefined) updateData.oldPrice = body.oldPrice !== null ? Number(body.oldPrice) : null;
+    if (body.tag !== undefined) updateData.tag = body.tag;
     if (body.description !== undefined) updateData.description = body.description;
     if (body.hero !== undefined) updateData.hero = body.hero;
     if (body.gallery !== undefined) updateData.gallery = JSON.stringify(body.gallery);
@@ -80,14 +81,13 @@ export async function PATCH(
         where: { id },
         data: updateData,
         include: {
-          variants: true,
           productColors: true,
           stockLevels: true,
         },
       });
 
       return NextResponse.json({ product: updated });
-    } catch {
+    } catch (dbErr: any) {
       return NextResponse.json({ product: memoryAdminProducts.get(id) || updateData });
     }
   } catch (err: any) {
@@ -111,6 +111,7 @@ export async function DELETE(
 
   try {
     await prisma.stockLevel.deleteMany({ where: { productId: id } });
+    await prisma.productColor.deleteMany({ where: { productId: id } });
     await prisma.product.delete({ where: { id } });
   } catch {
     // Memory fallback

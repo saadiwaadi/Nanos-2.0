@@ -9,7 +9,7 @@ const prisma = new PrismaClient({
 });
 
 async function main() {
-  console.log("Seeding CategorySettings and SizeChart rows...");
+  console.log("Seeding CategorySetting and SizeChart rows...");
 
   // 1. Seed CategorySetting (singular)
   try {
@@ -30,26 +30,7 @@ async function main() {
     console.log("CategorySetting singular note:", err.message);
   }
 
-  // 2. Seed CategorySettings (plural)
-  try {
-    const css1 = await prisma.categorySettings.upsert({
-      where: { category: "crocs" },
-      update: { lowStockThreshold: 5 },
-      create: { category: "crocs", lowStockThreshold: 5 },
-    });
-    console.log("✓ CategorySettings crocs:", css1);
-
-    const css2 = await prisma.categorySettings.upsert({
-      where: { category: "trousers" },
-      update: { lowStockThreshold: 5 },
-      create: { category: "trousers", lowStockThreshold: 5 },
-    });
-    console.log("✓ CategorySettings trousers:", css2);
-  } catch (err: any) {
-    console.log("CategorySettings plural note:", err.message);
-  }
-
-  // 3. Seed SizeChart rows
+  // 2. Seed SizeChart rows
   const crocsSizes = [
     { size: "UK 6" },
     { size: "UK 7" },
@@ -80,7 +61,7 @@ async function main() {
   });
   console.log("✓ SizeChart trousers:", trousersChart);
 
-  console.log("Successfully seeded CategorySettings and SizeChart data!");
+  console.log("Successfully seeded CategorySetting and SizeChart data!");
 }
 
 main()

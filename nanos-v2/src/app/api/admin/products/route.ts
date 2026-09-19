@@ -27,7 +27,6 @@ export async function GET(request: Request) {
     const rows = await prisma.product.findMany({
       orderBy: { createdAt: "desc" },
       include: {
-        variants: true,
         stockLevels: true,
         productColors: true,
       },
@@ -35,8 +34,6 @@ export async function GET(request: Request) {
 
     const products = rows.map((p) => {
       const stockLevelQty = p.stockLevels.reduce((sum, s) => sum + s.quantity, 0);
-      const variantTotalStock = p.variants.reduce((sum, v) => sum + v.stock, 0);
-      const totalQty = p.variants.length > 0 ? variantTotalStock : stockLevelQty;
 
       return {
         id: p.id,
@@ -54,10 +51,9 @@ export async function GET(request: Request) {
         sizes: parseJson<string>(p.sizes),
         colors: parseJson<any>(p.colors),
         productColors: p.productColors,
-        variants: p.variants,
-        variantCount: p.variants.length,
-        totalStock: variantTotalStock,
-        stockLevel: { quantity: totalQty },
+        stockLevels: p.stockLevels,
+        totalStock: stockLevelQty,
+        stockLevel: { quantity: stockLevelQty },
       };
     });
 
@@ -108,7 +104,6 @@ export async function POST(request: Request) {
       gallery: Array.isArray(gallery) ? gallery : [],
       sizes: Array.isArray(sizes) ? sizes : [],
       colors: Array.isArray(colors) ? colors : [],
-      variantCount: 0,
       totalStock: 0,
       stockLevel: { quantity: 0 },
     };
@@ -116,7 +111,7 @@ export async function POST(request: Request) {
     memoryAdminProducts.set(productId, productData);
 
     try {
-      await prisma.product.create({
+      const created = await prisma.product.create({
         data: {
           id: productId,
           sku,
@@ -136,7 +131,12 @@ export async function POST(request: Request) {
             },
           },
         },
+        include: {
+          stockLevels: true,
+          productColors: true,
+        },
       });
+      return NextResponse.json({ product: created }, { status: 201 });
     } catch {
       // Memory fallback
     }

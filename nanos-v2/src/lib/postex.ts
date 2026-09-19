@@ -229,8 +229,8 @@ export async function bookSingleOrder(
   const log = await prisma.postexBookingLog.create({
     data: {
       orderId: order.id,
-      requestPayload: payload as any,
-      responsePayload: (responseData || {}) as any,
+      requestPayload: JSON.stringify(payload),
+      responsePayload: JSON.stringify(responseData || {}),
       success,
       errorMessage,
     },
@@ -313,11 +313,11 @@ export async function processBatchTracking() {
         await prisma.postexBookingLog.create({
           data: {
             orderId: order.id,
-            requestPayload: {
+            requestPayload: JSON.stringify({
               action: "trackOrder",
               trackingNumber: order.postexTrackingNumber,
-            },
-            responsePayload: trackData as any,
+            }),
+            responsePayload: JSON.stringify(trackData || {}),
             success: true,
           },
         });
