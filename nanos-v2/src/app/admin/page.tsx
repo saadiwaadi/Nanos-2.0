@@ -988,10 +988,18 @@ export default function AdminPage() {
       {/* SIDEBAR NAVIGATION */}
       <aside className={`admin-sidebar ${sidebarOpen ? "open" : ""}`}>
         <div>
-          <div className="sidebar-header">
+          <div className="sidebar-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <Link href="/" className="brand-font">
               nanos.pk
             </Link>
+            <button
+              type="button"
+              className="admin-sidebar-close"
+              onClick={() => setSidebarOpen(false)}
+              aria-label="Close sidebar"
+            >
+              ✕
+            </button>
           </div>
 
           <div className="sidebar-section-label">Overview</div>
@@ -1422,7 +1430,7 @@ export default function AdminPage() {
                             {isExpanded && (
                               <tr>
                                 <td colSpan={8} style={{ background: "var(--admin-surface-2)", padding: 20 }}>
-                                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 20, fontSize: 13, marginBottom: 16 }}>
+                                  <div className="order-details-grid">
                                     <div>
                                       <div style={{ fontWeight: 700, marginBottom: 6 }}>Customer Info</div>
                                       <div>Name: {o.customerName}</div>
@@ -1790,7 +1798,7 @@ export default function AdminPage() {
               {/* Main Fields Form */}
               <div className="panel" style={{ padding: 24 }}>
                 <h3 style={{ marginBottom: 16 }}>Main Product Details</h3>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+                <div className="admin-form-grid-2" style={{ gap: 20 }}>
                   <div className="field">
                     <label>Name</label>
                     <input type="text" value={editFormName} onChange={(e) => setEditFormName(e.target.value)} />
@@ -2044,7 +2052,7 @@ export default function AdminPage() {
           ) : activeTab === "courier" ? (
             /* TAB 6: POSTEX COURIER QUEUE */
             <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
                 <div>
                   <h3 style={{ margin: 0 }}>PostEx Courier Batch Queue</h3>
                   <p style={{ margin: 0, fontSize: 13, color: "var(--admin-text-soft)" }}>
@@ -2396,7 +2404,7 @@ export default function AdminPage() {
                   <label>Name *</label>
                   <input type="text" value={addForm.name} onChange={(e) => setAddForm({ ...addForm, name: e.target.value })} required />
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div className="admin-form-grid-2" style={{ gap: 12, marginBottom: 0 }}>
                   <div className="field">
                     <label>Category *</label>
                     <select value={addForm.category} onChange={(e) => setAddForm({ ...addForm, category: e.target.value })}>
@@ -2409,7 +2417,7 @@ export default function AdminPage() {
                     <input type="text" placeholder="e.g. NEW" value={addForm.tag} onChange={(e) => setAddForm({ ...addForm, tag: e.target.value })} />
                   </div>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div className="admin-form-grid-2" style={{ gap: 12, marginBottom: 0 }}>
                   <div className="field">
                     <label>Price (PKR) *</label>
                     <input type="number" value={addForm.price} onChange={(e) => setAddForm({ ...addForm, price: e.target.value })} required />

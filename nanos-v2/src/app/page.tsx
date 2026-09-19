@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getProducts } from "@/lib/products";
-import { ProductCard } from "@/components/ProductCard";
+import { FeaturedScrollRow } from "@/components/FeaturedScrollRow";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +8,6 @@ export default async function HomePage() {
   const products = await getProducts();
 
   const crocsProducts = products.filter((p) => p.category === "crocs");
-  const trouserProducts = products.filter((p) => p.category === "trousers");
 
   const crocsImg1 =
     crocsProducts[0]?.hero ||
@@ -17,14 +16,6 @@ export default async function HomePage() {
     crocsProducts[1]?.hero ||
     crocsProducts[0]?.gallery[1] ||
     "https://res.cloudinary.com/tp1vyxi3/image/upload/v1789371558/ChatGPT_Image_Sep_13_2026_05_44_14_AM.png";
-
-  const trouserImg1 =
-    trouserProducts[0]?.hero ||
-    "https://res.cloudinary.com/tp1vyxi3/image/upload/v1789791884/High_Waist_Wide_Leg_Pants_Women_s_Loose_Fit_Straight_Casual_Long_Trousers_with_Slimming_Effect.jpg";
-  const trouserImg2 =
-    trouserProducts[1]?.hero ||
-    trouserProducts[0]?.gallery[1] ||
-    "https://images.unsplash.com/photo-1473966968600-fa801b869a1a?w=800&h=800&fit=crop";
 
   return (
     <div className="page">
@@ -114,24 +105,7 @@ export default async function HomePage() {
             </Link>
           </div>
 
-          <div className="product-grid">
-            {products.slice(0, 4).map((product) => (
-              <ProductCard
-                key={product.id}
-                id={product.id}
-                sku={product.sku}
-                name={product.name}
-                price={product.price}
-                oldPrice={product.oldPrice}
-                hero={product.hero}
-                tag={product.tag}
-                isSale={product.isSale}
-                category={product.category}
-                colors={product.colors}
-                sizes={product.sizes}
-              />
-            ))}
-          </div>
+          <FeaturedScrollRow products={products.slice(0, 10)} />
         </section>
       </div>
 
@@ -168,7 +142,7 @@ export default async function HomePage() {
         </section>
       </div>
 
-      {/* Editorial Image Grid */}
+      {/* Editorial Image Grid (2x2) */}
       <div className="wrap" style={{ marginBottom: 64 }}>
         <div className="editorial-grid">
           {/* Card 1: Dark Logo Card */}
@@ -203,27 +177,7 @@ export default async function HomePage() {
             </div>
           </div>
 
-          {/* Card 4: Trousers / Slides Image Card */}
-          <div className="editorial-card">
-            <div
-              className="editorial-card-bg"
-              style={{ backgroundImage: `url('${trouserImg1}')` }}
-            />
-            <div className="editorial-card-overlay">
-              <div className="line1">SIMPLE STYLES.</div>
-              <div className="line2">BIGGER DAYS.</div>
-            </div>
-          </div>
-
-          {/* Card 5: Trousers Image Card (no text) */}
-          <div className="editorial-card">
-            <div
-              className="editorial-card-bg"
-              style={{ backgroundImage: `url('${trouserImg2}')` }}
-            />
-          </div>
-
-          {/* Card 6: Lime Card */}
+          {/* Card 4: Lime Card */}
           <div className="editorial-card editorial-card-lime">
             <div className="line1">KEEP IT SIMPLE.</div>
             <div className="line2">WEAR IT YOUR WAY.</div>
