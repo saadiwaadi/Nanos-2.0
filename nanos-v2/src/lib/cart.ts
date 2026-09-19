@@ -93,6 +93,20 @@ export function useCart() {
         cur.items.push({ ...item, qty });
       }
       save(cur);
+
+      try {
+        if (typeof window !== "undefined" && (window as any).fbq) {
+          (window as any).fbq("track", "AddToCart", {
+            content_ids: [item.productId],
+            content_name: item.name,
+            value: item.price * qty,
+            currency: "PKR",
+            quantity: qty,
+          });
+        }
+      } catch {
+        // Ignore tracking errors
+      }
     },
 
     updateQty(productId: string, color: string, size: string, delta: number) {

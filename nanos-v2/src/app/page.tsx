@@ -32,15 +32,76 @@ export default async function HomePage() {
       <section className="hero">
         <div className="hero-copy">
           <div className="hero-eyebrow">
-            <span className="lime-tick" />
-            FRESH DROP 2026
+            <span className="eyebrow-accent">Comfort</span>
+            <span className="eyebrow-divider">x</span>
+            <span className="eyebrow-light">Style</span>
           </div>
-          <h1>Comfort.<br />Redefined.</h1>
-          <p>
-            Everyday Crocs &amp; Trousers built for your rotation. Premium quality, cash on delivery across Pakistan.
+
+          <h1 className="hero-title">EVERYDAY COMFORT.</h1>
+
+          <p className="hero-subtext">
+            Crocs designed for your daily rotation. Comfort meets style.
           </p>
+
+          <div className="hero-ctas">
+            <Link href="/crocs" className="btn btn-hero-outline">
+              SHOP ALL CROCS
+            </Link>
+            <Link href="/products?tag=NEW" className="btn btn-hero-filled">
+              SHOP NEW BLACKS
+            </Link>
+          </div>
+
+          <div className="hero-features">
+            <div className="feature-item">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="feature-icon">
+                <path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2" />
+                <path d="M15 18H9" />
+                <path d="M19 18h2a1 1 0 0 0 1-1v-5l-3-4h-4v10" />
+                <circle cx="7" cy="18" r="2" />
+                <circle cx="17" cy="18" r="2" />
+              </svg>
+              <div className="feature-label">
+                <span>Fast</span>
+                <span>Delivery</span>
+              </div>
+            </div>
+
+            <div className="feature-item">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="feature-icon">
+                <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.8 17 5 19 5a1 1 0 0 1 1 1z" />
+                <path d="m9 12 2 2 4-4" />
+              </svg>
+              <div className="feature-label">
+                <span>Secure</span>
+                <span>Shopping</span>
+              </div>
+            </div>
+
+            <div className="feature-item">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="feature-icon">
+                <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+                <path d="M21 3v5h-5" />
+                <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+                <path d="M3 21v-5h5" />
+              </svg>
+              <div className="feature-label">
+                <span>Easy</span>
+                <span>Returns</span>
+              </div>
+            </div>
+
+            <div className="feature-item">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="feature-icon">
+                <path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3" />
+              </svg>
+              <div className="feature-label">
+                <span>Customer</span>
+                <span>Support</span>
+              </div>
+            </div>
+          </div>
         </div>
-        <div className="hero-image" />
       </section>
 
       {/* Featured Products */}

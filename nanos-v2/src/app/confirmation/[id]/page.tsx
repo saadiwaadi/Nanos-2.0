@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { fmtPrice } from "@/lib/cart";
+import { event as trackEvent } from "@/lib/fpixel";
 
 interface OrderItemData {
   name: string;
@@ -71,6 +72,22 @@ export default function ConfirmationPage({
 
         const data = await res.json();
         setOrder(data);
+
+        // Fire Purchase Meta Pixel Event
+        try {
+          const storageKey = `meta_purchase_fired_${data.id}`;
+          if (typeof window !== "undefined" && !sessionStorage.getItem(storageKey)) {
+            sessionStorage.setItem(storageKey, "true");
+            trackEvent("Purchase", {
+              value: data.total,
+              currency: "PKR",
+              content_type: "product",
+              content_ids: data.items?.map((i: any) => i.sku || i.name) || [],
+            });
+          }
+        } catch {
+          // Ignore tracking error
+        }
       } catch {
         setError(true);
       } finally {

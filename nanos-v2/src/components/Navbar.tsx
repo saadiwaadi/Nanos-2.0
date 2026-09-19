@@ -12,6 +12,28 @@ export function Navbar() {
   const { isLoggedIn } = useAuth();
   const cart = useCart();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [scrolledPastHero, setScrolledPastHero] = useState(false);
+
+  // Scroll listener for hero threshold header visibility
+  useEffect(() => {
+    if (pathname !== "/") {
+      setScrolledPastHero(true);
+      return;
+    }
+
+    const checkScroll = () => {
+      if (window.scrollY > 80) {
+        setScrolledPastHero(true);
+      }
+    };
+
+    if (window.scrollY > 80) {
+      setScrolledPastHero(true);
+    }
+
+    window.addEventListener("scroll", checkScroll, { passive: true });
+    return () => window.removeEventListener("scroll", checkScroll);
+  }, [pathname]);
 
   // Lock body scroll when left drawer is open
   useEffect(() => {
@@ -38,9 +60,12 @@ export function Navbar() {
 
   const closeDrawer = () => setDrawerOpen(false);
 
+  const isHomepage = pathname === "/";
+  const hideHeader = isHomepage && !scrolledPastHero;
+
   return (
     <>
-      <header className="site-header">
+      <header className={`site-header ${hideHeader ? "header-hidden-hero" : ""}`}>
         <div
           className="header-inner"
           style={{

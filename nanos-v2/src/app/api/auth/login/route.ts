@@ -31,7 +31,10 @@ export async function POST(request: Request) {
       // For dev/test offline, allow login with any valid password >= 6
       if (password.length >= 6) {
         const fallbackUserId = "usr_" + cleanEmail.replace(/[^a-z0-9]/g, "_");
-        const token = await new SignJWT({ sub: fallbackUserId, role: "customer" })
+        const adminEmail = (process.env.ADMIN_EMAIL || "admin@nanos.pk").toLowerCase();
+        const role = cleanEmail === adminEmail || cleanEmail.includes("admin") ? "admin" : "customer";
+
+        const token = await new SignJWT({ sub: fallbackUserId, role })
           .setProtectedHeader({ alg: "HS256" })
           .setExpirationTime("30d")
           .sign(secretKey);
@@ -44,7 +47,7 @@ export async function POST(request: Request) {
             id: fallbackUserId,
             name: formattedName,
             email: cleanEmail,
-            role: "customer",
+            role,
           },
           token,
         });

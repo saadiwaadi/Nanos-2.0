@@ -34,6 +34,14 @@ export async function GET(request: Request) {
 
     const products = rows.map((p) => {
       const stockLevelQty = p.stockLevels.reduce((sum, s) => sum + s.quantity, 0);
+      const variants = p.stockLevels.map((s) => ({
+        id: s.id,
+        productId: s.productId,
+        color: s.color,
+        size: s.size,
+        stock: s.quantity,
+        quantity: s.quantity,
+      }));
 
       return {
         id: p.id,
@@ -54,11 +62,14 @@ export async function GET(request: Request) {
         stockLevels: p.stockLevels,
         totalStock: stockLevelQty,
         stockLevel: { quantity: stockLevelQty },
+        variantCount: p.stockLevels.length,
+        variants,
       };
     });
 
     return NextResponse.json({ products });
-  } catch {
+  } catch (err: any) {
+    console.error("GET /api/admin/products error:", err);
     // Memory fallback
     const products = Array.from(memoryAdminProducts.values());
     return NextResponse.json({ products });

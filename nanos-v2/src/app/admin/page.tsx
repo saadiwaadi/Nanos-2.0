@@ -168,7 +168,7 @@ export default function AdminPage() {
   >("dashboard");
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   // Data states
@@ -461,10 +461,11 @@ export default function AdminPage() {
     setMounted(true);
     if (typeof window !== "undefined") {
       const savedTheme = localStorage.getItem("nanosAdminTheme_v1") as "light" | "dark" | null;
-      if (savedTheme) {
-        setTheme(savedTheme);
-        document.documentElement.setAttribute("data-theme", savedTheme);
-      }
+      const initialTheme = savedTheme || "dark";
+      setTheme(initialTheme);
+      document.documentElement.setAttribute("data-theme", initialTheme);
+    } else {
+      document.documentElement.setAttribute("data-theme", "dark");
     }
     loadMainData();
   }, [loadMainData]);
@@ -999,7 +1000,7 @@ export default function AdminPage() {
             className={`nav-item ${activeTab === "dashboard" ? "active" : ""}`}
             onClick={() => switchTab("dashboard")}
           >
-            <span>◆ Dashboard</span>
+            <span>Dashboard</span>
           </button>
 
           <div className="sidebar-section-label">Orders</div>
@@ -1008,7 +1009,7 @@ export default function AdminPage() {
             className={`nav-item ${activeTab === "orders" ? "active" : ""}`}
             onClick={() => switchTab("orders")}
           >
-            <span>▤ Orders</span>
+            <span>Orders</span>
             {orders.filter((o) => o.status.toLowerCase() === "processing").length > 0 && (
               <span className="nav-badge">
                 {orders.filter((o) => o.status.toLowerCase() === "processing").length}
@@ -1020,14 +1021,14 @@ export default function AdminPage() {
             className={`nav-item ${activeTab === "delivered" ? "active" : ""}`}
             onClick={() => switchTab("delivered")}
           >
-            <span>✓ Delivered Orders</span>
+            <span>Delivered Orders</span>
           </button>
           <button
             type="button"
             className={`nav-item ${activeTab === "courier" ? "active" : ""}`}
             onClick={() => switchTab("courier")}
           >
-            <span>🚚 Courier Queue</span>
+            <span>Courier Queue</span>
           </button>
 
           <div className="sidebar-section-label">Catalog</div>
@@ -1036,14 +1037,14 @@ export default function AdminPage() {
             className={`nav-item ${activeTab === "products" || activeTab === "edit-product" ? "active" : ""}`}
             onClick={() => switchTab("products")}
           >
-            <span>▦ Products</span>
+            <span>Products</span>
           </button>
           <button
             type="button"
             className={`nav-item ${activeTab === "size-charts" ? "active" : ""}`}
             onClick={() => switchTab("size-charts")}
           >
-            <span>📏 Size Charts</span>
+            <span>Size Charts</span>
           </button>
 
           <div className="sidebar-section-label">System</div>
@@ -1052,7 +1053,7 @@ export default function AdminPage() {
             className={`nav-item ${activeTab === "settings" ? "active" : ""}`}
             onClick={() => switchTab("settings")}
           >
-            <span>⚙ Settings</span>
+            <span>Settings</span>
           </button>
         </div>
 
@@ -1067,9 +1068,10 @@ export default function AdminPage() {
           <button
             type="button"
             onClick={handleLogout}
-            style={{ color: "var(--admin-danger)", background: "none", border: "none", cursor: "pointer", fontSize: 14, fontWeight: 700 }}
+            title="Log out"
+            style={{ color: "var(--admin-danger)", background: "none", border: "none", cursor: "pointer", fontSize: 12, fontWeight: 700 }}
           >
-            ⏻
+            Logout
           </button>
         </div>
       </aside>

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { fmtPrice } from "@/lib/cart";
+import { event as trackEvent } from "@/lib/fpixel";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -32,8 +33,15 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (cart.items.length === 0) {
       router.push("/");
+    } else {
+      trackEvent("InitiateCheckout", {
+        value: cart.total,
+        currency: "PKR",
+        num_items: cart.count,
+        content_ids: cart.items.map((i) => i.productId),
+      });
     }
-  }, [cart.items.length, router]);
+  }, [cart.items.length, cart.total, cart.count, router]);
 
   useEffect(() => {
     if (auth.user) {

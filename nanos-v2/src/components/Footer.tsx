@@ -20,39 +20,109 @@ export function Footer() {
         <div className="footer-grid">
           {/* Brand Col */}
           <div className="footer-col">
-            <h4 style={{ fontSize: 18, fontFamily: "var(--font-head)" }}>nanos.pk</h4>
-            <p style={{ fontSize: 13, color: "#999", lineHeight: 1.6, marginTop: 12 }}>
+            <h4 className="footer-brand-title">nanos.pk</h4>
+            <p className="footer-brand-desc">
               Everyday essentials engineered for utility and effortless style. Delivered across Pakistan.
             </p>
           </div>
 
-          {/* Help Col */}
+          {/* Categories Col */}
           <div className="footer-col">
-            <h4>HELP &amp; INFO</h4>
+            <h4>CATEGORIES</h4>
             <ul>
-              <li><Link href="#">Track Order</Link></li>
-              <li><Link href="#">Shipping Policy</Link></li>
-              <li><Link href="#">Returns &amp; Exchanges</Link></li>
-              <li><Link href="#">Size Guide</Link></li>
-              <li><Link href="#">Contact Support</Link></li>
+              <li>
+                <Link href="/crocs">
+                  <span className="footer-link-text">Crocs</span>
+                  <span className="footer-link-arrow">→</span>
+                </Link>
+              </li>
+              <li>
+                <Link href="/trousers">
+                  <span className="footer-link-text">Trousers</span>
+                  <span className="footer-link-arrow">→</span>
+                </Link>
+              </li>
+              <li>
+                <Link href="/products?sale=true">
+                  <span className="footer-link-text">Sale Items</span>
+                  <span className="footer-link-arrow">→</span>
+                </Link>
+              </li>
+              <li>
+                <Link href="/products">
+                  <span className="footer-link-text">All Products</span>
+                  <span className="footer-link-arrow">→</span>
+                </Link>
+              </li>
             </ul>
           </div>
 
-          {/* Categories Col */}
+          {/* Account Col */}
           <div className="footer-col">
-            <h4>COLLECTIONS</h4>
+            <h4>ACCOUNT</h4>
             <ul>
-              <li><Link href="/crocs">Crocs</Link></li>
-              <li><Link href="/trousers">Trousers</Link></li>
-              <li><Link href="/products?sale=true">Sale Items</Link></li>
-              <li><Link href="/products">All Products</Link></li>
+              <li>
+                <Link href="/login">
+                  <span className="footer-link-text">Log In / Register</span>
+                  <span className="footer-link-arrow">→</span>
+                </Link>
+              </li>
+              <li>
+                <Link href="/account">
+                  <span className="footer-link-text">My Account</span>
+                  <span className="footer-link-arrow">→</span>
+                </Link>
+              </li>
+              <li>
+                <Link href="/account">
+                  <span className="footer-link-text">Order History</span>
+                  <span className="footer-link-arrow">→</span>
+                </Link>
+              </li>
+              <li>
+                <Link href="/cart">
+                  <span className="footer-link-text">Shopping Cart</span>
+                  <span className="footer-link-arrow">→</span>
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Help & Info Col */}
+          <div className="footer-col">
+            <h4>HELP &amp; INFO</h4>
+            <ul>
+              <li>
+                <Link href="#">
+                  <span className="footer-link-text">Track Order</span>
+                  <span className="footer-link-arrow">→</span>
+                </Link>
+              </li>
+              <li>
+                <Link href="#">
+                  <span className="footer-link-text">Shipping Policy</span>
+                  <span className="footer-link-arrow">→</span>
+                </Link>
+              </li>
+              <li>
+                <Link href="#">
+                  <span className="footer-link-text">Returns &amp; Exchanges</span>
+                  <span className="footer-link-arrow">→</span>
+                </Link>
+              </li>
+              <li>
+                <Link href="#">
+                  <span className="footer-link-text">Contact Support</span>
+                  <span className="footer-link-arrow">→</span>
+                </Link>
+              </li>
             </ul>
           </div>
 
           {/* Newsletter Col */}
           <div className="footer-col footer-newsletter-col">
             <h4>STAY IN THE LOOP</h4>
-            <p style={{ fontSize: 13, color: "#999" }}>
+            <p style={{ fontSize: 13, color: "#999", lineHeight: 1.5, marginBottom: 14 }}>
               Get 10% off your first order plus early access to drops.
             </p>
             {submitted ? (

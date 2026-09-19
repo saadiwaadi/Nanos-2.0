@@ -28,7 +28,26 @@ export async function GET(
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ product });
+    const stockLevelQty = product.stockLevels.reduce((sum, s) => sum + s.quantity, 0);
+    const formatted = {
+      ...product,
+      gallery: typeof product.gallery === "string" ? JSON.parse(product.gallery) : product.gallery,
+      sizes: typeof product.sizes === "string" ? JSON.parse(product.sizes) : product.sizes,
+      colors: typeof product.colors === "string" ? JSON.parse(product.colors) : product.colors,
+      totalStock: stockLevelQty,
+      stockLevel: { quantity: stockLevelQty },
+      variantCount: product.stockLevels.length,
+      variants: product.stockLevels.map((s) => ({
+        id: s.id,
+        productId: s.productId,
+        color: s.color,
+        size: s.size,
+        stock: s.quantity,
+        quantity: s.quantity,
+      })),
+    };
+
+    return NextResponse.json({ product: formatted });
   } catch (err: any) {
     return NextResponse.json(
       { error: err.message || "Failed to fetch product" },
@@ -86,9 +105,32 @@ export async function PATCH(
         },
       });
 
-      return NextResponse.json({ product: updated });
+      const stockLevelQty = updated.stockLevels.reduce((sum, s) => sum + s.quantity, 0);
+      const formatted = {
+        ...updated,
+        gallery: typeof updated.gallery === "string" ? JSON.parse(updated.gallery) : updated.gallery,
+        sizes: typeof updated.sizes === "string" ? JSON.parse(updated.sizes) : updated.sizes,
+        colors: typeof updated.colors === "string" ? JSON.parse(updated.colors) : updated.colors,
+        totalStock: stockLevelQty,
+        stockLevel: { quantity: stockLevelQty },
+        variantCount: updated.stockLevels.length,
+        variants: updated.stockLevels.map((s) => ({
+          id: s.id,
+          productId: s.productId,
+          color: s.color,
+          size: s.size,
+          stock: s.quantity,
+          quantity: s.quantity,
+        })),
+      };
+
+      return NextResponse.json({ product: formatted });
     } catch (dbErr: any) {
-      return NextResponse.json({ product: memoryAdminProducts.get(id) || updateData });
+      console.error("DB update error in PATCH /api/admin/products/[id]:", dbErr);
+      return NextResponse.json(
+        { error: dbErr.message || "Failed to update product in database" },
+        { status: 500 }
+      );
     }
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "Failed to update product" }, { status: 500 });
