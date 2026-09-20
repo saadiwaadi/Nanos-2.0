@@ -130,27 +130,28 @@ export default function AccountPage() {
 
   return (
     <div className="page">
-      <div className="wrap" style={{ padding: "40px 32px 80px" }}>
+      <div className="wrap account-wrap">
         {/* Account Header */}
         <div
           style={{
             display: "flex",
             alignItems: "center",
             gap: 20,
-            paddingBottom: 32,
+            paddingBottom: 28,
             borderBottom: "1px solid var(--stone)",
-            marginBottom: 36,
+            marginBottom: 32,
           }}
         >
           <div
             style={{
-              width: 64,
-              height: 64,
+              width: 56,
+              height: 56,
+              minWidth: 56,
               borderRadius: "50%",
               background: "var(--black)",
               color: "var(--lime)",
               fontFamily: "var(--font-head)",
-              fontSize: 22,
+              fontSize: 20,
               fontWeight: 700,
               display: "flex",
               alignItems: "center",
@@ -160,36 +161,23 @@ export default function AccountPage() {
             {initials}
           </div>
           <div>
-            <h1 style={{ fontFamily: "var(--font-head)", fontSize: 26, fontWeight: 700 }}>
+            <h1 style={{ fontFamily: "var(--font-head)", fontSize: 24, fontWeight: 700 }}>
               {auth.user.name}
             </h1>
-            <p style={{ color: "#666", fontSize: 14 }}>{auth.user.email}</p>
+            <p style={{ color: "#666", fontSize: 13.5 }}>{auth.user.email}</p>
           </div>
         </div>
 
         {/* Account Grid */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "220px 1fr",
-            gap: 48,
-            alignItems: "start",
-          }}
-        >
+        <div className="account-grid">
           {/* Sidebar Nav */}
-          <nav
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 6,
-            }}
-          >
+          <nav className="account-nav">
             <button
               type="button"
               onClick={() => setActiveTab("orders")}
               style={{
                 textAlign: "left",
-                padding: "12px 16px",
+                padding: "10px 16px",
                 borderRadius: 4,
                 fontSize: 14,
                 fontWeight: 600,
@@ -205,7 +193,7 @@ export default function AccountPage() {
               onClick={() => setActiveTab("wishlist")}
               style={{
                 textAlign: "left",
-                padding: "12px 16px",
+                padding: "10px 16px",
                 borderRadius: 4,
                 fontSize: 14,
                 fontWeight: 600,
@@ -221,7 +209,7 @@ export default function AccountPage() {
               onClick={() => setActiveTab("details")}
               style={{
                 textAlign: "left",
-                padding: "12px 16px",
+                padding: "10px 16px",
                 borderRadius: 4,
                 fontSize: 14,
                 fontWeight: 600,
@@ -237,12 +225,11 @@ export default function AccountPage() {
               onClick={handleLogout}
               style={{
                 textAlign: "left",
-                padding: "12px 16px",
+                padding: "10px 16px",
                 borderRadius: 4,
                 fontSize: 14,
                 fontWeight: 600,
                 color: "#c0392b",
-                marginTop: 12,
               }}
             >
               Log Out

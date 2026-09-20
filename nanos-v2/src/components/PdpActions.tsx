@@ -152,14 +152,16 @@ export function PdpActions({ product: p }: { product: ProductData }) {
             </div>
             <div className="color-options">
               {p.colors.map((c) => (
-                <div
+                <button
                   key={c.name}
+                  type="button"
                   title={c.name}
+                  aria-label={`Select color ${c.name}`}
                   className={`color-opt ${color === c.name ? "selected" : ""}`}
                   onClick={() => handleColorSelect(c)}
                 >
                   <span className="swatch-inner" style={{ background: c.hex }} />
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -174,13 +176,15 @@ export function PdpActions({ product: p }: { product: ProductData }) {
             </div>
             <div className="size-options">
               {p.sizes.map((s) => (
-                <div
+                <button
                   key={s}
+                  type="button"
+                  aria-label={`Select size ${s}`}
                   className={`size-opt ${size === s ? "selected" : ""}`}
                   onClick={() => setSize(s)}
                 >
                   {s}
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -192,12 +196,17 @@ export function PdpActions({ product: p }: { product: ProductData }) {
           <div className="qty-stepper">
             <button
               type="button"
+              aria-label="Decrease quantity"
               onClick={() => setQty(Math.max(1, qty - 1))}
             >
               −
             </button>
             <span className="qty-val">{qty}</span>
-            <button type="button" onClick={() => setQty(qty + 1)}>
+            <button
+              type="button"
+              aria-label="Increase quantity"
+              onClick={() => setQty(qty + 1)}
+            >
               +
             </button>
           </div>

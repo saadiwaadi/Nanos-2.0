@@ -161,7 +161,7 @@ export default function ConfirmationPage({
         </div>
 
         {/* Actions */}
-        <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+        <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
           <Link
             href={auth.isLoggedIn ? "/account" : "/login"}
             className="btn btn-secondary"

@@ -109,80 +109,93 @@ export default async function HomePage() {
         </section>
       </div>
 
-      {/* Category Showcase */}
+      {/* Categories & Editorial Showcase (6 Square Tiles) */}
       <div className="wrap" style={{ marginBottom: 64 }}>
-        <section className="category-showcase">
-          <Link href="/crocs" className="category-box">
+        <section className="category-showcase-grid grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+          {/* Tile 1: Crocs Category Link */}
+          <Link href="/crocs" className="cat-tile cat-tile-clickable aspect-square w-full">
             <div
-              className="category-box-bg"
+              className="cat-tile-bg"
               style={{
                 backgroundImage: `url('https://res.cloudinary.com/tp1vyxi3/image/upload/v1789791756/ChatGPT_Image_Sep_18_2026_09_22_00_PM.png')`,
+                backgroundPosition: "center",
               }}
             />
-            <div className="category-box-overlay">
-              <span className="category-box-eyebrow">Category</span>
-              <h3>Crocs</h3>
-              <span className="category-box-link">Explore Collection &rarr;</span>
+            <div className="cat-tile-overlay">
+              <span className="cat-tile-eyebrow">Category</span>
+              <h3 className="cat-tile-title">Crocs</h3>
+              <span className="cat-tile-link">
+                Explore Collection <span className="cat-tile-arrow">&rarr;</span>
+              </span>
             </div>
           </Link>
 
-          <Link href="/trousers" className="category-box">
+          {/* Tile 2: Trousers Category Link */}
+          <Link href="/trousers" className="cat-tile cat-tile-clickable aspect-square w-full">
             <div
-              className="category-box-bg"
+              className="cat-tile-bg"
               style={{
                 backgroundImage: `url('https://res.cloudinary.com/tp1vyxi3/image/upload/v1789791884/High_Waist_Wide_Leg_Pants_Women_s_Loose_Fit_Straight_Casual_Long_Trousers_with_Slimming_Effect.jpg')`,
+                backgroundPosition: "center 25%",
               }}
             />
-            <div className="category-box-overlay">
-              <span className="category-box-eyebrow">Category</span>
-              <h3>Trousers</h3>
-              <span className="category-box-link">Explore Collection &rarr;</span>
+            <div className="cat-tile-overlay">
+              <span className="cat-tile-eyebrow">Category</span>
+              <h3 className="cat-tile-title">Trousers</h3>
+              <span className="cat-tile-link">
+                Explore Collection <span className="cat-tile-arrow">&rarr;</span>
+              </span>
             </div>
           </Link>
-        </section>
-      </div>
 
-      {/* Editorial Image Grid (2x2) */}
-      <div className="wrap" style={{ marginBottom: 64 }}>
-        <div className="editorial-grid">
-          {/* Card 1: Dark Logo Card */}
-          <div className="editorial-card editorial-card-dark">
-            <div className="brand">nanos.pk</div>
-            <div className="sub">CROCS / TROUSERS</div>
+          {/* Tile 3: Dark Logo Card */}
+          <div className="cat-tile cat-tile-dark aspect-square w-full">
+            <div className="cat-tile-overlay">
+              <div className="cat-brand">nanos.pk</div>
+              <div className="cat-sub">CROCS / TROUSERS</div>
+            </div>
           </div>
 
-          {/* Card 2: Crocs Image Card */}
-          <div className="editorial-card">
+          {/* Tile 4: Comfort Image Card */}
+          <div className="cat-tile aspect-square w-full">
             <div
-              className="editorial-card-bg"
-              style={{ backgroundImage: `url('${crocsImg1}')` }}
+              className="cat-tile-bg"
+              style={{
+                backgroundImage: `url('${crocsImg1}')`,
+                backgroundPosition: "center",
+              }}
             />
-            <div className="editorial-card-overlay">
-              <div className="line1">COMFORT</div>
-              <div className="line2" style={{ fontWeight: 400 }}>
+            <div className="cat-tile-overlay">
+              <div className="cat-line1">COMFORT</div>
+              <div className="cat-line2" style={{ fontWeight: 400 }}>
                 IN EVERY STEP.
               </div>
             </div>
           </div>
 
-          {/* Card 3: Crocs Image Card */}
-          <div className="editorial-card">
+          {/* Tile 5: Better Basics Image Card */}
+          <div className="cat-tile aspect-square w-full">
             <div
-              className="editorial-card-bg"
-              style={{ backgroundImage: `url('${crocsImg2}')` }}
+              className="cat-tile-bg"
+              style={{
+                backgroundImage: `url('${crocsImg2}')`,
+                backgroundPosition: "center",
+              }}
             />
-            <div className="editorial-card-overlay">
-              <div className="line1">BETTER</div>
-              <div className="line2">BASICS.</div>
+            <div className="cat-tile-overlay">
+              <div className="cat-line1">BETTER</div>
+              <div className="cat-line2">BASICS.</div>
             </div>
           </div>
 
-          {/* Card 4: Lime Card */}
-          <div className="editorial-card editorial-card-lime">
-            <div className="line1">KEEP IT SIMPLE.</div>
-            <div className="line2">WEAR IT YOUR WAY.</div>
+          {/* Tile 6: Lime Card */}
+          <div className="cat-tile cat-tile-lime aspect-square w-full">
+            <div className="cat-tile-overlay">
+              <div className="cat-line1">KEEP IT SIMPLE.</div>
+              <div className="cat-line2">WEAR IT YOUR WAY.</div>
+            </div>
           </div>
-        </div>
+        </section>
       </div>
 
       {/* Editorial Banner */}

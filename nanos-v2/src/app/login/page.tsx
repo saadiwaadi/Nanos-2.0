@@ -140,7 +140,11 @@ export default function LoginPage() {
                 <div className="form-group">
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <label htmlFor="login-password">Password</label>
-                    <a href="#" onClick={(e) => e.preventDefault()} style={{ fontSize: 12, color: "#777" }}>
+                    <a
+                      href="#"
+                      onClick={(e) => e.preventDefault()}
+                      style={{ fontSize: 12, color: "#777", minHeight: 44, display: "inline-flex", alignItems: "center" }}
+                    >
                       Forgot password?
                     </a>
                   </div>

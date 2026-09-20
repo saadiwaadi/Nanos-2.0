@@ -22,14 +22,10 @@ export function Navbar() {
     }
 
     const checkScroll = () => {
-      if (window.scrollY > 80) {
-        setScrolledPastHero(true);
-      }
+      setScrolledPastHero(window.scrollY > 80);
     };
 
-    if (window.scrollY > 80) {
-      setScrolledPastHero(true);
-    }
+    checkScroll();
 
     window.addEventListener("scroll", checkScroll, { passive: true });
     return () => window.removeEventListener("scroll", checkScroll);
@@ -65,7 +61,9 @@ export function Navbar() {
 
   return (
     <>
-      <header className={`site-header ${hideHeader ? "header-hidden-hero" : ""}`}>
+      <header
+        className={`site-header ${isHomepage ? "header-overlay" : ""} ${hideHeader ? "header-hidden-hero" : ""}`}
+      >
         <div
           className="header-inner"
           style={{

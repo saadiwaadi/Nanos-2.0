@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { CartProvider } from "@/context/CartContext";
@@ -8,6 +8,11 @@ import { CartDrawer } from "@/components/CartDrawer";
 import { ScrollRestoration } from "@/components/ScrollRestoration";
 
 import { MetaPixel } from "@/components/MetaPixel";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
 
 export const metadata: Metadata = {
   title: "nanos.pk — Keep it simple. Wear it your way.",
@@ -20,8 +25,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body>
+    <html lang="en" suppressHydrationWarning>
+      <body suppressHydrationWarning>
         <MetaPixel />
         <AuthProvider>
           <CartProvider>
