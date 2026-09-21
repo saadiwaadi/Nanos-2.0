@@ -1,10 +1,25 @@
 import "dotenv/config";
 import { prisma } from "../src/lib/prisma";
 
-async function main() {
-  console.log("=== Backfilling Order Statuses & Courier Booking Statuses ===");
+function parseShippingInfo(val: any) {
+  if (!val) return {};
+  if (typeof val === "object") return val;
+  if (typeof val === "string") {
+    try {
+      return JSON.parse(val);
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
 
-  const orders = await prisma.order.findMany();
+async function main() {
+  console.log("=== Backfilling Order Statuses & Customer Info ===");
+
+  const orders = await prisma.order.findMany({
+    include: { user: true },
+  });
   console.log(`Found ${orders.length} total orders to process.`);
 
   let updatedCount = 0;
@@ -33,12 +48,18 @@ async function main() {
       newCourierBookingStatus = tracking ? "booked" : "not_booked";
     }
 
+    const sInfo = parseShippingInfo(o.shippingInfo);
+    const cName = o.customerName || sInfo.name || o.user?.name || o.guestName || "Guest";
+    const cEmail = o.customerEmail || sInfo.email || o.user?.email || o.guestEmail || "No email";
+
     await prisma.order.update({
       where: { id: o.id },
       data: {
         status: newStatus,
         courierBookingStatus: newCourierBookingStatus,
         trackingNumber: tracking || o.trackingNumber,
+        customerName: cName,
+        customerEmail: cEmail,
       },
     });
 
@@ -46,6 +67,9 @@ async function main() {
   }
 
   console.log(`Backfill completed. Updated ${updatedCount} orders.`);
+
+  const nullCountRes: any = await prisma.$queryRaw`SELECT count(*)::int FROM "Order" WHERE "customerName" IS NULL`;
+  console.log("Null customerName count result:", nullCountRes);
 }
 
 main()

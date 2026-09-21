@@ -23,8 +23,8 @@ async function runOrderManagementTests() {
   const placedNext = allowedNext("placed");
   assert(placedNext.includes("confirmed") && placedNext.includes("cancelled"), "placed allows confirmed & cancelled");
 
-  const deadEndNext = allowedNext("delivered");
-  assert(deadEndNext.length === 0, "delivered status returns empty allowedNext list (dead-end)");
+  const deliveredNext = allowedNext("delivered");
+  assert(deliveredNext.includes("returned") && deliveredNext.length === 1, "delivered status allows returned");
 
   const cancelledNext = allowedNext("cancelled");
   assert(cancelledNext.length === 0, "cancelled status returns empty allowedNext list (dead-end)");

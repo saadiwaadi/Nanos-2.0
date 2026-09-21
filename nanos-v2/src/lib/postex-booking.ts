@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { postexFetch, PostexError } from "@/lib/postex-client";
-import { transitionOrder } from "@/lib/order-state";
+import { transitionOrder, AppError } from "@/lib/order-state";
 
 const STALE_LOCK_MS = 10 * 60_000;
 
@@ -167,8 +167,8 @@ export async function bookOne(id: string, actor = "system:batch") {
       }
 
       await prisma.$transaction(async (tx) => {
-        await tx.order.update({
-          where: { id },
+        const updateRes = await tx.order.updateMany({
+          where: { id, version: order.version },
           data: {
             courierBookingStatus: "booked",
             trackingNumber: tracking,
@@ -179,6 +179,9 @@ export async function bookOne(id: string, actor = "system:batch") {
             version: { increment: 1 },
           },
         });
+        if (updateRes.count === 0) {
+          throw new AppError("STALE", "Order version changed during booking.", 409);
+        }
         await tx.orderEvent.create({
           data: {
             orderId: id,

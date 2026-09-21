@@ -30,19 +30,40 @@ export async function POST(
       );
     }
 
+    let expectedVersion: number | undefined;
+    try {
+      const b = await request.json();
+      expectedVersion = b?.expectedVersion;
+    } catch {}
+
+    if (expectedVersion !== undefined && expectedVersion !== order.version) {
+      return NextResponse.json(
+        { error: "STALE", message: "Order was updated by another request. Reload and try again." },
+        { status: 409 }
+      );
+    }
+
     const tracking = order.trackingNumber || (order as any).postexTrackingNumber;
 
     try {
       const postexRes: any = await callCancelOrderApi(tracking);
 
       if (postexRes?.statusCode === "200" || postexRes?.dist?.orderStatus === "Cancelled") {
-        await prisma.order.update({
-          where: { id },
+        const res = await prisma.order.updateMany({
+          where: { id, version: order.version },
           data: {
             courierBookingStatus: "cancelled",
             courierStatusRaw: "Cancelled",
+            version: { increment: 1 },
           },
         });
+
+        if (res.count === 0) {
+          return NextResponse.json(
+            { error: "STALE", message: "Order was updated by another request. Reload and try again." },
+            { status: 409 }
+          );
+        }
 
         await prisma.orderEvent.create({
           data: {

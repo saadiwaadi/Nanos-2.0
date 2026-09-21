@@ -194,8 +194,8 @@ export async function PATCH(
         }
       }
 
-      const updated = await tx.order.update({
-        where: { id },
+      const r = await tx.order.updateMany({
+        where: { id, version: order.version },
         data: {
           customerName: customerName ?? order.customerName,
           customerEmail: email ?? order.customerEmail,
@@ -210,6 +210,18 @@ export async function PATCH(
           bookingError,
           version: { increment: 1 },
         },
+      });
+
+      if (r.count === 0) {
+        throw new AppError(
+          "STALE",
+          "Order was modified by another request. Please reload.",
+          409
+        );
+      }
+
+      const updated = await tx.order.findUnique({
+        where: { id },
         include: { items: { include: { product: true } } },
       });
 

@@ -15,7 +15,7 @@ const MANUAL: Record<OrderStatus, OrderStatus[]> = {
   confirmed: ["shipped", "on_hold", "cancelled"],
   on_hold: ["confirmed", "cancelled"],
   shipped: ["delivered", "returned"],
-  delivered: [],
+  delivered: ["returned"],
   returned: [],
   cancelled: [],
 };

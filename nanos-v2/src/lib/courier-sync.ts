@@ -38,19 +38,20 @@ export async function syncCourierStatus(limit = 500, concurrency = 5) {
         const dist = trackRes?.dist;
         const rawStatus = dist?.transactionStatus || dist?.orderStatus || "";
 
-        await prisma.order.update({
-          where: { id: order.id },
+        await prisma.order.updateMany({
+          where: { id: order.id, version: order.version },
           data: {
             courierStatusRaw: rawStatus || "Unknown",
             courierSyncedAt: new Date(),
+            version: { increment: 1 },
           },
         });
 
         const rawLower = rawStatus.toLowerCase();
         if (rawLower.includes("cancel")) {
-          await prisma.order.update({
-            where: { id: order.id },
-            data: { courierBookingStatus: "cancelled" },
+          await prisma.order.updateMany({
+            where: { id: order.id, version: order.version + 1 },
+            data: { courierBookingStatus: "cancelled", version: { increment: 1 } },
           });
           results.push({ id: order.id, status: rawStatus, action: "marked_courier_cancelled" });
           continue;
