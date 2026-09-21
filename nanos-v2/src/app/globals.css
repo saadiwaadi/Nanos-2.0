@@ -25,6 +25,7 @@ textarea {
 }
 ul { list-style: none; }
 img { max-width: 100%; height: auto; display: block; }
+noscript { display: none !important; }
 
 /* Utilities */
 .w-full { width: 100%; }
@@ -529,8 +530,8 @@ img { max-width: 100%; height: auto; display: block; }
 .account-nav button { min-height: 44px; display: flex; align-items: center; white-space: nowrap; }
 
 /* Editorial Banner */
-.editorial-banner { background: var(--black); color: var(--white); padding: 72px 24px; text-align: center; display: flex; justify-content: center; align-items: center; width: 100%; }
-.editorial-content { max-width: 680px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.editorial-banner { background: var(--black); color: var(--white); padding: 72px 0; text-align: center; display: flex; justify-content: center; align-items: center; width: 100%; }
+.editorial-content { max-width: 680px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 16px; }
 .editorial-content h2 { font-family: var(--font-head); font-size: 34px; font-weight: 700; color: var(--white); line-height: 1.2; }
 .editorial-content p { color: rgba(255, 255, 255, 0.85); font-size: 15.5px; line-height: 1.6; }
 
@@ -568,16 +569,29 @@ img { max-width: 100%; height: auto; display: block; }
 .footer-social a:hover { border-color: var(--lime); color: var(--lime); }
 .footer-social svg { width: 16px; height: 16px; }
 
-/* Categories & Editorial 6-Square Grid */
-.category-showcase-grid {
+/* Categories & Promo Blocks */
+.category-block-a-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  width: 100%;
+}
+@media (min-width: 768px) {
+  .category-block-a-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+}
+
+.promo-block-b-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 12px;
   width: 100%;
 }
 @media (min-width: 768px) {
-  .category-showcase-grid {
-    grid-template-columns: repeat(3, 1fr);
+  .promo-block-b-grid {
+    grid-template-columns: repeat(2, 1fr);
     gap: 16px;
   }
 }
@@ -585,7 +599,6 @@ img { max-width: 100%; height: auto; display: block; }
 .cat-tile {
   position: relative;
   width: 100%;
-  aspect-ratio: 1 / 1;
   border-radius: 6px;
   overflow: hidden;
   display: flex;
@@ -593,6 +606,26 @@ img { max-width: 100%; height: auto; display: block; }
   justify-content: flex-end;
   text-decoration: none;
   background: var(--black);
+}
+
+/* Block A: Rectangular Category Tiles (4/3 mobile, 16/10 desktop) */
+.cat-tile-cat {
+  aspect-ratio: 4 / 3;
+}
+@media (min-width: 768px) {
+  .cat-tile-cat {
+    aspect-ratio: 16 / 10;
+  }
+}
+
+/* Block B: Promo 2x2 Tiles (1/1 square mobile, 4/3 desktop) */
+.cat-tile-promo {
+  aspect-ratio: 1 / 1;
+}
+@media (min-width: 768px) {
+  .cat-tile-promo {
+    aspect-ratio: 4 / 3;
+  }
 }
 
 .cat-tile-bg {
@@ -812,7 +845,7 @@ img { max-width: 100%; height: auto; display: block; }
     padding: 4px 0;
     border-right: none;
   }
-  .editorial-banner { padding: 56px 20px; }
+  .editorial-banner { padding: 56px 0; }
   .editorial-content h2 { font-size: 26px; }
   .editorial-content p { font-size: 14.5px; }
   .editorial-content .btn { width: 100%; text-align: center; }

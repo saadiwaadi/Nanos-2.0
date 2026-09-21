@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
 import { fmtPrice } from "@/lib/cart";
-import { event as trackEvent } from "@/lib/fpixel";
+import { trackMeta } from "@/lib/fpixel";
 import type { ProductColor } from "@/lib/types";
 
 interface ProductData {
@@ -38,13 +38,19 @@ export function PdpActions({ product: p }: { product: ProductData }) {
 
   useEffect(() => {
     setMounted(true);
-    trackEvent("ViewContent", {
-      content_ids: [p.id],
-      content_name: p.name,
-      content_category: p.category,
-      value: p.price,
-      currency: "PKR",
-    });
+    const eventId = crypto.randomUUID();
+    trackMeta(
+      "ViewContent",
+      {
+        content_ids: [p.id],
+        content_name: p.name,
+        content_category: p.category,
+        content_type: "product",
+        value: p.price,
+        currency: "PKR",
+      },
+      eventId
+    );
   }, [p.id, p.name, p.category, p.price]);
 
   const gallery = p.gallery && p.gallery.length > 0 ? p.gallery : [p.hero];

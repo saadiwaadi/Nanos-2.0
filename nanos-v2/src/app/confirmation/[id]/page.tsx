@@ -5,9 +5,10 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { fmtPrice } from "@/lib/cart";
-import { event as trackEvent } from "@/lib/fpixel";
+import { trackMeta } from "@/lib/fpixel";
 
 interface OrderItemData {
+  productId?: string;
   name: string;
   sku: string;
   color: string;
@@ -78,12 +79,27 @@ export default function ConfirmationPage({
           const storageKey = `meta_purchase_fired_${data.id}`;
           if (typeof window !== "undefined" && !sessionStorage.getItem(storageKey)) {
             sessionStorage.setItem(storageKey, "true");
-            trackEvent("Purchase", {
-              value: data.total,
-              currency: "PKR",
-              content_type: "product",
-              content_ids: data.items?.map((i: any) => i.sku || i.name) || [],
-            });
+            const items = data.items || [];
+            const contentIds = items.map((i: any) => i.productId).filter(Boolean);
+            const contents = items.map((i: any) => ({
+              id: i.productId,
+              quantity: i.quantity || 1,
+              item_price: i.unitPrice || 0,
+            }));
+            const numItems = items.reduce((acc: number, i: any) => acc + (i.quantity || 1), 0);
+
+            trackMeta(
+              "Purchase",
+              {
+                value: data.total,
+                currency: "PKR",
+                content_type: "product",
+                content_ids: contentIds,
+                contents,
+                num_items: numItems,
+              },
+              data.id
+            );
           }
         } catch {
           // Ignore tracking error

@@ -3,6 +3,7 @@ import { verifyToken } from "@/lib/auth-server";
 import { getProductById } from "@/lib/products";
 import { prisma } from "@/lib/prisma";
 import { isAutoBookCity } from "@/lib/postex";
+import { MetaCapiService } from "@/lib/meta-capi";
 
 // In-memory fallback order store for dev when DB is offline
 export const memoryOrders = new Map<string, any>();
@@ -13,7 +14,7 @@ export async function POST(request: Request) {
     const userId = authPayload?.sub || null;
 
     const body = await request.json();
-    const { items, shippingInfo, promoCode, guestEmail, guestName } = body || {};
+    const { items, shippingInfo, promoCode, guestEmail, guestName, fbp, fbc, eventId } = body || {};
 
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
@@ -129,6 +130,66 @@ export async function POST(request: Request) {
       });
     } catch {
       // Graceful fallback to memory store when DB offline
+    }
+
+    // Send CAPI events asynchronously (non-blocking)
+    try {
+      const clientIp =
+        request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+        request.headers.get("x-real-ip") ||
+        null;
+      const clientUserAgent = request.headers.get("user-agent") || null;
+      const eventSourceUrl =
+        request.headers.get("referer") || "https://nanos.pk/checkout";
+
+      const userData = {
+        email: shippingInfo.email || guestEmail,
+        phone: shippingInfo.phone,
+        name: shippingInfo.name || guestName,
+        city: shippingInfo.city,
+        country: "pk",
+        fbp,
+        fbc,
+        clientIp,
+        clientUserAgent,
+      };
+
+      const contentIds = resolvedItems.map((i) => i.productId);
+      const contents = resolvedItems.map((i) => ({
+        id: i.productId,
+        quantity: i.quantity,
+        item_price: i.unitPrice,
+      }));
+      const numItems = resolvedItems.reduce((acc, i) => acc + i.quantity, 0);
+
+      const customData = {
+        value: total,
+        currency: "PKR",
+        content_type: "product",
+        content_ids: contentIds,
+        contents,
+        num_items: numItems,
+      };
+
+      if (eventId) {
+        MetaCapiService.sendEvent(
+          "InitiateCheckout",
+          eventId,
+          eventSourceUrl,
+          userData,
+          customData
+        );
+      }
+
+      MetaCapiService.sendEvent(
+        "Purchase",
+        orderId,
+        eventSourceUrl,
+        userData,
+        customData
+      );
+    } catch (capiErr) {
+      console.error("Failed to trigger CAPI events:", capiErr);
     }
 
     return NextResponse.json(

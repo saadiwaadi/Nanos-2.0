@@ -1,28 +1,31 @@
 "use client";
 
-import { useEffect, useRef, Suspense } from "react";
+import { useEffect, Suspense } from "react";
 import Script from "next/script";
 import { usePathname, useSearchParams } from "next/navigation";
-import { META_PIXEL_ID, pageview } from "@/lib/fpixel";
+import { META_PIXEL_ID, shouldSuppressPixel, trackMeta } from "@/lib/fpixel";
 
 function MetaPixelNavigation() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const isFirstRender = useRef(true);
 
   useEffect(() => {
-    // Skip initial load pageview because script tag fires PageView on init
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
-    pageview();
+    if (!META_PIXEL_ID) return;
+    if (shouldSuppressPixel(pathname, searchParams)) return;
+    trackMeta("PageView");
   }, [pathname, searchParams]);
 
   return null;
 }
 
-export function MetaPixel() {
+function MetaPixelInner() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  if (!META_PIXEL_ID || shouldSuppressPixel(pathname, searchParams)) {
+    return null;
+  }
+
   return (
     <>
       <Script
@@ -39,11 +42,10 @@ export function MetaPixel() {
             s.parentNode.insertBefore(t,s)}(window, document,'script',
             'https://connect.facebook.net/en_US/fbevents.js');
             fbq('init', '${META_PIXEL_ID}');
-            fbq('track', 'PageView');
           `,
         }}
       />
-      <noscript>
+      <noscript style={{ display: "none" }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           height="1"
@@ -53,9 +55,16 @@ export function MetaPixel() {
           alt=""
         />
       </noscript>
-      <Suspense fallback={null}>
-        <MetaPixelNavigation />
-      </Suspense>
+      <MetaPixelNavigation />
     </>
   );
 }
+
+export function MetaPixel() {
+  return (
+    <Suspense fallback={null}>
+      <MetaPixelInner />
+    </Suspense>
+  );
+}
+

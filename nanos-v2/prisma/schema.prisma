@@ -192,3 +192,10 @@ model CategorySetting {
   category          String @id
   lowStockThreshold Int    @default(20)
 }
+
+model HomeSetting {
+  key       String   @id
+  value     String   @default("{}") // JSON string value
+  updatedAt DateTime @updatedAt
+}
+

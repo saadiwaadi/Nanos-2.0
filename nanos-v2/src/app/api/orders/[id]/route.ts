@@ -46,6 +46,7 @@ export async function GET(
             status: dbOrder.status,
             createdAt: dbOrder.createdAt.toISOString(),
             items: dbOrder.items.map((i) => ({
+              productId: i.productId,
               name: i.name,
               sku: i.sku,
               color: i.color,
@@ -100,6 +101,7 @@ export async function GET(
       payment: order.payment,
       createdAt: order.createdAt,
       items: order.items.map((i: any) => ({
+        productId: i.productId,
         name: i.name,
         sku: i.sku,
         color: i.color,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { trackMeta } from "@/lib/fpixel";
 
 export const PROMO_CODE = "NANOS10";
 export const PROMO_DISCOUNT = 0.1; // −10%
@@ -95,15 +96,19 @@ export function useCart() {
       save(cur);
 
       try {
-        if (typeof window !== "undefined" && (window as any).fbq) {
-          (window as any).fbq("track", "AddToCart", {
+        const eventId = crypto.randomUUID();
+        trackMeta(
+          "AddToCart",
+          {
             content_ids: [item.productId],
             content_name: item.name,
+            content_type: "product",
             value: item.price * qty,
             currency: "PKR",
             quantity: qty,
-          });
-        }
+          },
+          eventId
+        );
       } catch {
         // Ignore tracking errors
       }

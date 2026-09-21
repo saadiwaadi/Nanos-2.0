@@ -237,12 +237,16 @@ export default function AdminPage() {
   const [colorSortInput, setColorSortInput] = useState("0");
   const [savingColor, setSavingColor] = useState(false);
 
+  // Edit Panel — Sizes Sub-section
+  const [productSizes, setProductSizes] = useState<string[]>([]);
+  const [newSizeInput, setNewSizeInput] = useState("");
+  const [addingSize, setAddingSize] = useState(false);
+  const [renamingSize, setRenamingSize] = useState<string | null>(null);
+  const [renameSizeInput, setRenameSizeInput] = useState("");
+  const [applyingTemplate, setApplyingTemplate] = useState(false);
+
   // Edit Panel — Variants Matrix Sub-section
   const [dbVariants, setDbVariants] = useState<ProductVariant[]>([]);
-  const [showVariantAddForm, setShowVariantAddForm] = useState(false);
-  const [variantColorInput, setVariantColorInput] = useState("");
-  const [variantSizeInput, setVariantSizeInput] = useState("");
-  const [variantStockInput, setVariantStockInput] = useState("0");
   const [cellStockDrafts, setCellStockDrafts] = useState<Record<string, string>>({});
   const [cellSaving, setCellSaving] = useState<Record<string, boolean>>({});
 
@@ -433,6 +437,22 @@ export default function AdminPage() {
     [authFetch]
   );
 
+  // Load Sizes for Edit Panel
+  const loadEditSizes = useCallback(
+    async (productId: string) => {
+      try {
+        const res = await authFetch(`/api/admin/products/${productId}/sizes`);
+        if (res.ok) {
+          const data = await res.json();
+          setProductSizes(Array.isArray(data.sizes) ? data.sizes : []);
+        }
+      } catch {
+        setProductSizes([]);
+      }
+    },
+    [authFetch]
+  );
+
   // Load Variants for Edit Panel
   const loadEditVariants = useCallback(
     async (productId: string) => {
@@ -562,10 +582,10 @@ export default function AdminPage() {
     setEditFormHero(p.hero || "");
     setEditFormGallery(Array.isArray(p.gallery) ? p.gallery : []);
     setShowColorAddForm(false);
-    setShowVariantAddForm(false);
     setActiveTab("edit-product");
 
     loadEditColors(p.id);
+    loadEditSizes(p.id);
     loadEditVariants(p.id);
   }
 
@@ -615,14 +635,19 @@ export default function AdminPage() {
   // Save DB Color
   async function handleSaveColor(colorId?: string) {
     if (!editingProduct) return;
+    const trimmedName = colorNameInput.trim();
+    if (!trimmedName) {
+      showToast("Color name cannot be empty", "error");
+      return;
+    }
     setSavingColor(true);
     try {
       const isEdit = !!colorId;
       const images = colorImagesInput.split("\n").map((s) => s.trim()).filter(Boolean);
       const payload = {
-        name: colorNameInput.trim(),
-        hex: colorHexInput,
-        imagesJson: JSON.stringify(images),
+        name: trimmedName,
+        hex: colorHexInput.trim(),
+        images,
         sortOrder: Number(colorSortInput) || 0,
       };
 
@@ -632,7 +657,8 @@ export default function AdminPage() {
       const method = isEdit ? "PATCH" : "POST";
 
       const res = await authFetch(url, { method, body: JSON.stringify(payload) });
-      if (!res.ok) throw new Error("Failed to save color");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to save color");
       showToast(isEdit ? "Color updated!" : "Color added!");
       setShowColorAddForm(false);
       setEditingColorId(null);
@@ -641,6 +667,7 @@ export default function AdminPage() {
       setColorImagesInput("");
       setColorSortInput("0");
       loadEditColors(editingProduct.id);
+      loadEditVariants(editingProduct.id);
     } catch (err: any) {
       showToast(err.message || "Failed to save color", "error");
     } finally {
@@ -650,16 +677,120 @@ export default function AdminPage() {
 
   // Delete DB Color
   async function handleDeleteColor(colorId: string) {
-    if (!editingProduct || !window.confirm("Delete this color?")) return;
+    if (!editingProduct || !window.confirm("Delete this color and all its variant stock? This cannot be undone.")) return;
     try {
       const res = await authFetch(`/api/admin/products/${editingProduct.id}/colors/${colorId}`, {
         method: "DELETE",
       });
-      if (!res.ok) throw new Error("Failed to delete color");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to delete color");
       showToast("Color deleted!");
       loadEditColors(editingProduct.id);
+      loadEditVariants(editingProduct.id);
     } catch (err: any) {
       showToast(err.message || "Failed to delete color", "error");
+    }
+  }
+
+  // Sizes Management Handlers
+  async function handleAddSize(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingProduct || !newSizeInput.trim()) return;
+    setAddingSize(true);
+    try {
+      const res = await authFetch(`/api/admin/products/${editingProduct.id}/sizes`, {
+        method: "POST",
+        body: JSON.stringify({ size: newSizeInput.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to add size");
+      showToast(`Size "${newSizeInput.trim()}" added!`);
+      setNewSizeInput("");
+      loadEditSizes(editingProduct.id);
+      loadEditVariants(editingProduct.id);
+    } catch (err: any) {
+      showToast(err.message || "Failed to add size", "error");
+    } finally {
+      setAddingSize(false);
+    }
+  }
+
+  async function handleRenameSizeSubmit(oldSize: string) {
+    if (!editingProduct || !renameSizeInput.trim() || renameSizeInput.trim() === oldSize) {
+      setRenamingSize(null);
+      return;
+    }
+    try {
+      const res = await authFetch(`/api/admin/products/${editingProduct.id}/sizes`, {
+        method: "PATCH",
+        body: JSON.stringify({ oldSize, newSize: renameSizeInput.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to rename size");
+      showToast(`Size renamed to "${renameSizeInput.trim()}"!`);
+      setRenamingSize(null);
+      loadEditSizes(editingProduct.id);
+      loadEditVariants(editingProduct.id);
+    } catch (err: any) {
+      showToast(err.message || "Failed to rename size", "error");
+    }
+  }
+
+  async function handleDeleteSize(size: string) {
+    if (!editingProduct || !window.confirm(`Delete size "${size}"? All variant stock for this size will be removed.`)) return;
+    try {
+      const res = await authFetch(`/api/admin/products/${editingProduct.id}/sizes`, {
+        method: "DELETE",
+        body: JSON.stringify({ size }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to delete size");
+      showToast(`Size "${size}" deleted!`);
+      loadEditSizes(editingProduct.id);
+      loadEditVariants(editingProduct.id);
+    } catch (err: any) {
+      showToast(err.message || "Failed to delete size", "error");
+    }
+  }
+
+  async function handleReorderSize(index: number, direction: -1 | 1) {
+    if (!editingProduct) return;
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= productSizes.length) return;
+    const updated = [...productSizes];
+    const temp = updated[index];
+    updated[index] = updated[targetIndex];
+    updated[targetIndex] = temp;
+    setProductSizes(updated);
+
+    try {
+      const res = await authFetch(`/api/admin/products/${editingProduct.id}/sizes`, {
+        method: "PATCH",
+        body: JSON.stringify({ sizes: updated }),
+      });
+      if (!res.ok) throw new Error("Failed to save size order");
+    } catch (err: any) {
+      showToast(err.message || "Failed to reorder sizes", "error");
+      loadEditSizes(editingProduct.id);
+    }
+  }
+
+  async function handleApplyCategoryTemplate() {
+    if (!editingProduct) return;
+    setApplyingTemplate(true);
+    try {
+      const res = await authFetch(`/api/admin/products/${editingProduct.id}/sizes/apply-template`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to apply size template");
+      showToast(data.message || "Size template applied!");
+      loadEditSizes(editingProduct.id);
+      loadEditVariants(editingProduct.id);
+    } catch (err: any) {
+      showToast(err.message || "Failed to apply size template", "error");
+    } finally {
+      setApplyingTemplate(false);
     }
   }
 
@@ -688,34 +819,6 @@ export default function AdminPage() {
     } finally {
       setCellSaving((prev) => ({ ...prev, [key]: false }));
       loadEditVariants(editingProduct.id);
-    }
-  }
-
-  // Add Variant Form Submit
-  async function handleAddVariant(e: React.FormEvent) {
-    e.preventDefault();
-    if (!editingProduct || !variantColorInput.trim() || !variantSizeInput.trim()) return;
-    try {
-      const payload = {
-        color: variantColorInput.trim(),
-        size: variantSizeInput.trim(),
-        stock: Number(variantStockInput) || 0,
-      };
-
-      const res = await authFetch(`/api/admin/products/${editingProduct.id}/variants`, {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) throw new Error("Failed to add variant");
-      showToast("Variant added!");
-      setShowVariantAddForm(false);
-      setVariantColorInput("");
-      setVariantSizeInput("");
-      setVariantStockInput("0");
-      loadEditVariants(editingProduct.id);
-    } catch (err: any) {
-      showToast(err.message || "Failed to add variant", "error");
     }
   }
 
@@ -1876,7 +1979,12 @@ export default function AdminPage() {
               {/* Colors Section */}
               <div className="panel" style={{ padding: 24 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                  <h3>Database Colors ({dbColors.length})</h3>
+                  <div>
+                    <h3 style={{ margin: 0 }}>Database Colors ({dbColors.length})</h3>
+                    <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--admin-text-soft)" }}>
+                      Colors configured for this product. Renaming updates corresponding variant stock columns.
+                    </p>
+                  </div>
                   <button
                     type="button"
                     className="btn btn-outline btn-sm"
@@ -1885,88 +1993,339 @@ export default function AdminPage() {
                       setColorNameInput("");
                       setColorHexInput("#111111");
                       setColorImagesInput("");
-                      setColorSortInput("0");
+                      setColorSortInput(String(dbColors.length));
                       setShowColorAddForm(!showColorAddForm);
                     }}
                   >
-                    {showColorAddForm ? "Cancel" : "+ Add Color"}
+                    {showColorAddForm ? "Close Form" : "+ Add Color"}
                   </button>
-                </div>
-
-                {/* Color Cards List */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
-                  {dbColors.map((c) => {
-                    let imgCount = 0;
-                    try {
-                      const parsed = JSON.parse(c.imagesJson || "[]");
-                      imgCount = Array.isArray(parsed) ? parsed.length : 0;
-                    } catch {
-                      imgCount = 0;
-                    }
-
-                    return (
-                      <div key={c.id} style={{ border: "1px solid var(--admin-border)", padding: 14, borderRadius: 6, background: "var(--admin-surface-2)" }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <span className="colour-swatch" style={{ background: c.hex, width: 24, height: 24, borderRadius: "50%", display: "inline-block" }} />
-                            <strong>{c.name}</strong> ({c.hex})
-                            <span style={{ fontSize: 12, color: "var(--admin-text-soft)" }}>
-                              (Sort order: {c.sortOrder}, {imgCount} images)
-                            </span>
-                          </div>
-                          <div style={{ display: "flex", gap: 8 }}>
-                            <button
-                              type="button"
-                              className="btn btn-outline btn-sm"
-                              onClick={() => {
-                                setEditingColorId(c.id);
-                                setColorNameInput(c.name);
-                                setColorHexInput(c.hex);
-                                try {
-                                  const parsed = JSON.parse(c.imagesJson || "[]");
-                                  setColorImagesInput(Array.isArray(parsed) ? parsed.join("\n") : "");
-                                } catch {
-                                  setColorImagesInput("");
-                                }
-                                setColorSortInput(String(c.sortOrder ?? 0));
-                                setShowColorAddForm(true);
-                              }}
-                            >
-                              Edit
-                            </button>
-                            <button
-                              type="button"
-                              className="btn btn-outline btn-sm"
-                              style={{ color: "var(--admin-danger)" }}
-                              onClick={() => handleDeleteColor(c.id)}
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
                 </div>
 
                 {/* Color Form */}
                 {showColorAddForm && (
-                  <div style={{ background: "#fff", padding: 16, border: "1px solid var(--admin-border)", borderRadius: 6, display: "flex", flexDirection: "column", gap: 12 }}>
-                    <h4>{editingColorId ? "Edit Color" : "Add Color"}</h4>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 12 }}>
-                      <input type="text" placeholder="Color Name (e.g. Black)" value={colorNameInput} onChange={(e) => setColorNameInput(e.target.value)} />
-                      <input type="color" value={colorHexInput} onChange={(e) => setColorHexInput(e.target.value)} style={{ width: 44, height: 38, padding: 0 }} />
-                      <input type="number" placeholder="Sort Order" value={colorSortInput} onChange={(e) => setColorSortInput(e.target.value)} style={{ width: 90 }} />
+                  <div
+                    style={{
+                      background: "var(--admin-surface-2)",
+                      padding: 18,
+                      border: "1px solid var(--admin-border)",
+                      borderRadius: 6,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 14,
+                      marginBottom: 16,
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <h4 style={{ margin: 0, color: "var(--admin-text)" }}>
+                        {editingColorId ? "Edit Color" : "Add Color"}
+                      </h4>
+                      <button
+                        type="button"
+                        style={{ background: "none", border: "none", color: "var(--admin-text-soft)", cursor: "pointer", fontSize: 16 }}
+                        onClick={() => setShowColorAddForm(false)}
+                      >
+                        ✕
+                      </button>
                     </div>
-                    <textarea rows={3} placeholder="Image URLs (one per line)" value={colorImagesInput} onChange={(e) => setColorImagesInput(e.target.value)} />
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 12, alignItems: "center" }}>
+                      <input
+                        type="text"
+                        placeholder="Color Name (e.g. Black)"
+                        value={colorNameInput}
+                        onChange={(e) => setColorNameInput(e.target.value)}
+                        style={{ minWidth: 160 }}
+                      />
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <input
+                          type="color"
+                          value={colorHexInput.startsWith("#") && colorHexInput.length === 7 ? colorHexInput : "#111111"}
+                          onChange={(e) => setColorHexInput(e.target.value.toUpperCase())}
+                          style={{ width: 42, height: 38, padding: 2, cursor: "pointer", border: "1px solid var(--admin-border)", borderRadius: 4, background: "transparent" }}
+                          title="Color Swatch"
+                        />
+                        <input
+                          type="text"
+                          placeholder="#111111"
+                          value={colorHexInput}
+                          onChange={(e) => setColorHexInput(e.target.value)}
+                          style={{ width: 100, fontFamily: "monospace", textTransform: "uppercase" }}
+                          title="Hex code (e.g. #111111)"
+                        />
+                      </div>
+                      <input
+                        type="number"
+                        placeholder="Sort Order"
+                        value={colorSortInput}
+                        onChange={(e) => setColorSortInput(e.target.value)}
+                        style={{ width: 85 }}
+                        title="Sort order"
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: "block", fontSize: 12, color: "var(--admin-text-soft)", marginBottom: 4 }}>
+                        Color-specific Image URLs (one per line)
+                      </label>
+                      <textarea
+                        rows={3}
+                        placeholder="https://images.unsplash.com/..."
+                        value={colorImagesInput}
+                        onChange={(e) => setColorImagesInput(e.target.value)}
+                        style={{ width: "100%", fontFamily: "monospace", fontSize: 12 }}
+                      />
+                    </div>
+
                     <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                      <button type="button" className="btn btn-outline btn-sm" onClick={() => setShowColorAddForm(false)}>
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm"
+                        onClick={() => setShowColorAddForm(false)}
+                      >
                         Cancel
                       </button>
-                      <button type="button" className="btn btn-dark btn-sm" disabled={savingColor} onClick={() => handleSaveColor(editingColorId || undefined)}>
-                        {savingColor ? "Saving…" : "Save Color"}
+                      <button
+                        type="button"
+                        className="btn btn-dark btn-sm"
+                        disabled={savingColor}
+                        onClick={() => handleSaveColor(editingColorId || undefined)}
+                      >
+                        {savingColor ? "Saving…" : editingColorId ? "Update Color" : "Save Color"}
                       </button>
                     </div>
+                  </div>
+                )}
+
+                {/* Color Cards List */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {dbColors.length === 0 ? (
+                    <div style={{ color: "var(--admin-text-soft)", fontSize: 13, padding: "12px 0" }}>
+                      No colors added yet. Click &quot;+ Add Color&quot; above to create one.
+                    </div>
+                  ) : (
+                    dbColors.map((c) => {
+                      let imgCount = 0;
+                      try {
+                        const parsed = JSON.parse(c.imagesJson || "[]");
+                        imgCount = Array.isArray(parsed) ? parsed.length : 0;
+                      } catch {
+                        imgCount = 0;
+                      }
+
+                      return (
+                        <div key={c.id} style={{ border: "1px solid var(--admin-border)", padding: 14, borderRadius: 6, background: "var(--admin-surface-2)" }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                              <span className="colour-swatch" style={{ background: c.hex, width: 24, height: 24, borderRadius: "50%", display: "inline-block", border: "1px solid var(--admin-border)" }} />
+                              <strong style={{ color: "var(--admin-text)" }}>{c.name}</strong>
+                              <span style={{ fontFamily: "monospace", fontSize: 12, color: "var(--admin-text-soft)" }}>({c.hex})</span>
+                              <span style={{ fontSize: 12, color: "var(--admin-text-soft)" }}>
+                                (Sort: {c.sortOrder}, {imgCount} images)
+                              </span>
+                            </div>
+                            <div style={{ display: "flex", gap: 8 }}>
+                              <button
+                                type="button"
+                                className="btn btn-outline btn-sm"
+                                onClick={() => {
+                                  setEditingColorId(c.id);
+                                  setColorNameInput(c.name);
+                                  setColorHexInput(c.hex);
+                                  try {
+                                    const parsed = JSON.parse(c.imagesJson || "[]");
+                                    setColorImagesInput(Array.isArray(parsed) ? parsed.join("\n") : "");
+                                  } catch {
+                                    setColorImagesInput("");
+                                  }
+                                  setColorSortInput(String(c.sortOrder ?? 0));
+                                  setShowColorAddForm(true);
+                                }}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-outline btn-sm"
+                                style={{ color: "var(--admin-danger)" }}
+                                onClick={() => handleDeleteColor(c.id)}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Sizes Section */}
+              <div className="panel" style={{ padding: 24 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                  <div>
+                    <h3 style={{ margin: 0 }}>Product Sizes ({productSizes.length})</h3>
+                    <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--admin-text-soft)" }}>
+                      Manage sizes specific to this product. New sizes automatically add rows to the stock matrix below.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    disabled={applyingTemplate}
+                    onClick={handleApplyCategoryTemplate}
+                    title={`Apply default sizes for ${editingProduct.category}`}
+                  >
+                    {applyingTemplate ? "Applying…" : "Apply Category Template"}
+                  </button>
+                </div>
+
+                {/* Add Size Form */}
+                <form onSubmit={handleAddSize} style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+                  <input
+                    type="text"
+                    placeholder="Add new size (e.g. UK 12 or 40)"
+                    value={newSizeInput}
+                    onChange={(e) => setNewSizeInput(e.target.value)}
+                    style={{ maxWidth: 280 }}
+                  />
+                  <button type="submit" className="btn btn-dark btn-sm" disabled={addingSize || !newSizeInput.trim()}>
+                    {addingSize ? "Adding…" : "+ Add Size"}
+                  </button>
+                </form>
+
+                {/* Size List / Chips */}
+                {productSizes.length === 0 ? (
+                  <div style={{ color: "var(--admin-text-soft)", fontSize: 13, padding: "12px 0" }}>
+                    No sizes added yet. Click &quot;Apply Category Template&quot; or type a size above.
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                    {productSizes.map((size, idx) => (
+                      <div
+                        key={size}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 8,
+                          background: "var(--admin-surface-2)",
+                          border: "1px solid var(--admin-border)",
+                          borderRadius: 6,
+                          padding: "6px 12px",
+                          fontSize: 13,
+                        }}
+                      >
+                        {renamingSize === size ? (
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <input
+                              type="text"
+                              value={renameSizeInput}
+                              onChange={(e) => setRenameSizeInput(e.target.value)}
+                              style={{ width: 80, padding: "2px 6px", fontSize: 13 }}
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  handleRenameSizeSubmit(size);
+                                } else if (e.key === "Escape") {
+                                  setRenamingSize(null);
+                                }
+                              }}
+                            />
+                            <button
+                              type="button"
+                              className="btn btn-dark btn-sm"
+                              style={{ padding: "2px 6px", fontSize: 11 }}
+                              onClick={() => handleRenameSizeSubmit(size)}
+                            >
+                              Save
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-outline btn-sm"
+                              style={{ padding: "2px 6px", fontSize: 11 }}
+                              onClick={() => setRenamingSize(null)}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <span style={{ fontWeight: 600, color: "var(--admin-text)" }}>{size}</span>
+                            <div style={{ display: "inline-flex", alignItems: "center", gap: 4, marginLeft: 4 }}>
+                              <button
+                                type="button"
+                                title="Move left"
+                                disabled={idx === 0}
+                                onClick={() => handleReorderSize(idx, -1)}
+                                style={{
+                                  background: "none",
+                                  border: "none",
+                                  cursor: idx === 0 ? "default" : "pointer",
+                                  opacity: idx === 0 ? 0.3 : 0.8,
+                                  color: "var(--admin-text)",
+                                  padding: 0,
+                                  fontSize: 12,
+                                }}
+                              >
+                                ←
+                              </button>
+                              <button
+                                type="button"
+                                title="Move right"
+                                disabled={idx === productSizes.length - 1}
+                                onClick={() => handleReorderSize(idx, 1)}
+                                style={{
+                                  background: "none",
+                                  border: "none",
+                                  cursor: idx === productSizes.length - 1 ? "default" : "pointer",
+                                  opacity: idx === productSizes.length - 1 ? 0.3 : 0.8,
+                                  color: "var(--admin-text)",
+                                  padding: 0,
+                                  fontSize: 12,
+                                }}
+                              >
+                                →
+                              </button>
+                              <button
+                                type="button"
+                                title="Rename size"
+                                onClick={() => {
+                                  setRenamingSize(size);
+                                  setRenameSizeInput(size);
+                                }}
+                                style={{
+                                  background: "none",
+                                  border: "none",
+                                  cursor: "pointer",
+                                  color: "var(--admin-text-soft)",
+                                  padding: "0 2px",
+                                  fontSize: 12,
+                                }}
+                              >
+                                ✎
+                              </button>
+                              <button
+                                type="button"
+                                title="Delete size"
+                                onClick={() => handleDeleteSize(size)}
+                                style={{
+                                  background: "none",
+                                  border: "none",
+                                  cursor: "pointer",
+                                  color: "var(--admin-danger)",
+                                  padding: "0 2px",
+                                  fontSize: 14,
+                                  lineHeight: 1,
+                                }}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -1974,30 +2333,30 @@ export default function AdminPage() {
               {/* Variants Stock Matrix Section */}
               <div className="panel" style={{ padding: 24 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                  <h3>Variants &amp; Stock Matrix</h3>
-                  <button type="button" className="btn btn-outline btn-sm" onClick={() => setShowVariantAddForm(!showVariantAddForm)}>
-                    {showVariantAddForm ? "Cancel" : "+ Add Variant"}
-                  </button>
+                  <div>
+                    <h3 style={{ margin: 0 }}>Variants &amp; Stock Matrix</h3>
+                    <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--admin-text-soft)" }}>
+                      Edit stock quantities directly. Changes auto-save on blur.
+                    </p>
+                  </div>
                 </div>
-
-                {showVariantAddForm && (
-                  <form onSubmit={handleAddVariant} style={{ display: "flex", gap: 10, marginBottom: 16, background: "var(--admin-surface-2)", padding: 12, borderRadius: 6 }}>
-                    <input type="text" placeholder="Color" value={variantColorInput} onChange={(e) => setVariantColorInput(e.target.value)} required />
-                    <input type="text" placeholder="Size" value={variantSizeInput} onChange={(e) => setVariantSizeInput(e.target.value)} style={{ width: 100 }} required />
-                    <input type="number" placeholder="Stock" value={variantStockInput} onChange={(e) => setVariantStockInput(e.target.value)} style={{ width: 90 }} min={0} required />
-                    <button type="submit" className="btn btn-dark btn-sm">
-                      Save Variant
-                    </button>
-                  </form>
-                )}
 
                 {/* Matrix Grid: Rows = sizes, Cols = colors */}
                 {(() => {
-                  const colorsList = Array.from(new Set(dbVariants.map((v) => v.color))).sort();
-                  const sizesList = Array.from(new Set(dbVariants.map((v) => v.size))).sort();
+                  const colorsList = dbColors.length > 0
+                    ? dbColors.map((c) => c.name)
+                    : Array.from(new Set(dbVariants.map((v) => v.color))).sort();
+
+                  const sizesList = productSizes.length > 0
+                    ? productSizes
+                    : Array.from(new Set(dbVariants.map((v) => v.size)));
 
                   if (colorsList.length === 0 || sizesList.length === 0) {
-                    return <div style={{ color: "var(--admin-text-soft)", fontSize: 13 }}>No variants added yet. Click "+ Add Variant" to create rows.</div>;
+                    return (
+                      <div style={{ color: "var(--admin-text-soft)", fontSize: 13, padding: "12px 0" }}>
+                        Add at least one color and one size above to populate the stock matrix.
+                      </div>
+                    );
                   }
 
                   return (
@@ -2022,21 +2381,17 @@ export default function AdminPage() {
 
                                 return (
                                   <td key={key}>
-                                    {variant ? (
-                                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                        <input
-                                          type="number"
-                                          style={{ width: 70 }}
-                                          value={cellStockDrafts[key] ?? String(variant.stock)}
-                                          onChange={(e) => setCellStockDrafts({ ...cellStockDrafts, [key]: e.target.value })}
-                                          onBlur={() => handleVariantCellBlur(c, s)}
-                                          min={0}
-                                        />
-                                        {isSavingCell && <span style={{ fontSize: 11, color: "var(--admin-text-soft)" }}>saving…</span>}
-                                      </div>
-                                    ) : (
-                                      <span style={{ fontSize: 12, color: "var(--admin-text-soft)" }}>-</span>
-                                    )}
+                                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                      <input
+                                        type="number"
+                                        style={{ width: 70 }}
+                                        value={cellStockDrafts[key] ?? String(variant?.stock ?? 0)}
+                                        onChange={(e) => setCellStockDrafts({ ...cellStockDrafts, [key]: e.target.value })}
+                                        onBlur={() => handleVariantCellBlur(c, s)}
+                                        min={0}
+                                      />
+                                      {isSavingCell && <span style={{ fontSize: 11, color: "var(--admin-accent)" }}>saving…</span>}
+                                    </div>
                                   </td>
                                 );
                               })}

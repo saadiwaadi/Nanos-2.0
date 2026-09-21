@@ -109,90 +109,102 @@ export default async function HomePage() {
         </section>
       </div>
 
-      {/* Categories & Editorial Showcase (6 Square Tiles) */}
-      <div className="wrap" style={{ marginBottom: 64 }}>
-        <section className="category-showcase-grid grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
-          {/* Tile 1: Crocs Category Link */}
-          <Link href="/crocs" className="cat-tile cat-tile-clickable aspect-square w-full">
-            <div
-              className="cat-tile-bg"
-              style={{
-                backgroundImage: `url('https://res.cloudinary.com/tp1vyxi3/image/upload/v1789791756/ChatGPT_Image_Sep_18_2026_09_22_00_PM.png')`,
-                backgroundPosition: "center",
-              }}
-            />
-            <div className="cat-tile-overlay">
-              <span className="cat-tile-eyebrow">Category</span>
-              <h3 className="cat-tile-title">Crocs</h3>
-              <span className="cat-tile-link">
-                Explore Collection <span className="cat-tile-arrow">&rarr;</span>
-              </span>
-            </div>
-          </Link>
-
-          {/* Tile 2: Trousers Category Link */}
-          <Link href="/trousers" className="cat-tile cat-tile-clickable aspect-square w-full">
-            <div
-              className="cat-tile-bg"
-              style={{
-                backgroundImage: `url('https://res.cloudinary.com/tp1vyxi3/image/upload/v1789791884/High_Waist_Wide_Leg_Pants_Women_s_Loose_Fit_Straight_Casual_Long_Trousers_with_Slimming_Effect.jpg')`,
-                backgroundPosition: "center 25%",
-              }}
-            />
-            <div className="cat-tile-overlay">
-              <span className="cat-tile-eyebrow">Category</span>
-              <h3 className="cat-tile-title">Trousers</h3>
-              <span className="cat-tile-link">
-                Explore Collection <span className="cat-tile-arrow">&rarr;</span>
-              </span>
-            </div>
-          </Link>
-
-          {/* Tile 3: Dark Logo Card */}
-          <div className="cat-tile cat-tile-dark aspect-square w-full">
-            <div className="cat-tile-overlay">
-              <div className="cat-brand">nanos.pk</div>
-              <div className="cat-sub">CROCS / TROUSERS</div>
-            </div>
+      {/* Block A: Categories (Crocs & Trousers only) */}
+      <div className="wrap" id="shop-categories" style={{ marginBottom: 64 }}>
+        <section className="category-section">
+          <div className="section-head" style={{ marginBottom: 20 }}>
+            <h2>Shop by Category</h2>
           </div>
+          <div className="category-block-a-grid">
+            {/* Tile 1: Crocs Category Link */}
+            <Link href="/crocs" className="cat-tile cat-tile-clickable cat-tile-cat w-full">
+              <div
+                className="cat-tile-bg"
+                style={{
+                  backgroundImage: `url('https://res.cloudinary.com/tp1vyxi3/image/upload/v1789791756/ChatGPT_Image_Sep_18_2026_09_22_00_PM.png')`,
+                  backgroundPosition: "center",
+                }}
+              />
+              <div className="cat-tile-overlay">
+                <span className="cat-tile-eyebrow">Category</span>
+                <h3 className="cat-tile-title">Crocs</h3>
+                <span className="cat-tile-link">
+                  Explore Collection <span className="cat-tile-arrow">&rarr;</span>
+                </span>
+              </div>
+            </Link>
 
-          {/* Tile 4: Comfort Image Card */}
-          <div className="cat-tile aspect-square w-full">
-            <div
-              className="cat-tile-bg"
-              style={{
-                backgroundImage: `url('${crocsImg1}')`,
-                backgroundPosition: "center",
-              }}
-            />
-            <div className="cat-tile-overlay">
-              <div className="cat-line1">COMFORT</div>
-              <div className="cat-line2" style={{ fontWeight: 400 }}>
-                IN EVERY STEP.
+            {/* Tile 2: Trousers Category Link */}
+            <Link href="/trousers" className="cat-tile cat-tile-clickable cat-tile-cat w-full">
+              <div
+                className="cat-tile-bg"
+                style={{
+                  backgroundImage: `url('https://res.cloudinary.com/tp1vyxi3/image/upload/v1789791884/High_Waist_Wide_Leg_Pants_Women_s_Loose_Fit_Straight_Casual_Long_Trousers_with_Slimming_Effect.jpg')`,
+                  backgroundPosition: "center 25%",
+                }}
+              />
+              <div className="cat-tile-overlay">
+                <span className="cat-tile-eyebrow">Category</span>
+                <h3 className="cat-tile-title">Trousers</h3>
+                <span className="cat-tile-link">
+                  Explore Collection <span className="cat-tile-arrow">&rarr;</span>
+                </span>
+              </div>
+            </Link>
+          </div>
+        </section>
+      </div>
+
+      {/* Block B: Promo / Brand Showcase (4 Tiles in 2x2 Grid) */}
+      <div className="wrap" style={{ marginBottom: 80 }}>
+        <section className="promo-section">
+          <div className="promo-block-b-grid">
+            {/* Tile 1: Dark Logo Card */}
+            <div className="cat-tile cat-tile-dark cat-tile-promo w-full">
+              <div className="cat-tile-overlay">
+                <div className="cat-brand">nanos.pk</div>
+                <div className="cat-sub">CROCS / TROUSERS</div>
               </div>
             </div>
-          </div>
 
-          {/* Tile 5: Better Basics Image Card */}
-          <div className="cat-tile aspect-square w-full">
-            <div
-              className="cat-tile-bg"
-              style={{
-                backgroundImage: `url('${crocsImg2}')`,
-                backgroundPosition: "center",
-              }}
-            />
-            <div className="cat-tile-overlay">
-              <div className="cat-line1">BETTER</div>
-              <div className="cat-line2">BASICS.</div>
+            {/* Tile 2: Comfort Image Card */}
+            <div className="cat-tile cat-tile-promo w-full">
+              <div
+                className="cat-tile-bg"
+                style={{
+                  backgroundImage: `url('${crocsImg1}')`,
+                  backgroundPosition: "center",
+                }}
+              />
+              <div className="cat-tile-overlay">
+                <div className="cat-line1">COMFORT</div>
+                <div className="cat-line2" style={{ fontWeight: 400 }}>
+                  IN EVERY STEP.
+                </div>
+              </div>
             </div>
-          </div>
 
-          {/* Tile 6: Lime Card */}
-          <div className="cat-tile cat-tile-lime aspect-square w-full">
-            <div className="cat-tile-overlay">
-              <div className="cat-line1">KEEP IT SIMPLE.</div>
-              <div className="cat-line2">WEAR IT YOUR WAY.</div>
+            {/* Tile 3: Better Basics Image Card */}
+            <div className="cat-tile cat-tile-promo w-full">
+              <div
+                className="cat-tile-bg"
+                style={{
+                  backgroundImage: `url('${crocsImg2}')`,
+                  backgroundPosition: "center",
+                }}
+              />
+              <div className="cat-tile-overlay">
+                <div className="cat-line1">BETTER</div>
+                <div className="cat-line2">BASICS.</div>
+              </div>
+            </div>
+
+            {/* Tile 4: Lime Card */}
+            <div className="cat-tile cat-tile-lime cat-tile-promo w-full">
+              <div className="cat-tile-overlay">
+                <div className="cat-line1">KEEP IT SIMPLE.</div>
+                <div className="cat-line2">WEAR IT YOUR WAY.</div>
+              </div>
             </div>
           </div>
         </section>
@@ -200,14 +212,16 @@ export default async function HomePage() {
 
       {/* Editorial Banner */}
       <section className="editorial-banner">
-        <div className="editorial-content">
-          <h2>Built for Pakistan. Priced for Everyone.</h2>
-          <p>
-            Premium lightweight clogs &amp; relaxed utility trousers engineered for everyday movement and built to last.
-          </p>
-          <Link href="/products" className="btn btn-primary">
-            Explore All Products &rarr;
-          </Link>
+        <div className="wrap">
+          <div className="editorial-content">
+            <h2>Built for Pakistan. Priced for Everyone.</h2>
+            <p>
+              Premium lightweight clogs &amp; relaxed utility trousers engineered for everyday movement and built to last.
+            </p>
+            <Link href="/products" className="btn btn-primary">
+              Explore All Products &rarr;
+            </Link>
+          </div>
         </div>
       </section>
     </div>

@@ -1,17 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { fmtPrice } from "@/lib/cart";
-import { event as trackEvent } from "@/lib/fpixel";
+import { trackMeta } from "@/lib/fpixel";
+
+function getCookie(name: string): string | undefined {
+  if (typeof document === "undefined") return undefined;
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(";").shift();
+  return undefined;
+}
 
 export default function CheckoutPage() {
   const router = useRouter();
   const cart = useCart();
   const auth = useAuth();
+
+  const [initiateCheckoutEventId] = useState(() => crypto.randomUUID());
+  const hasTrackedRef = useRef(false);
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -33,15 +44,24 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (cart.items.length === 0) {
       router.push("/");
-    } else {
-      trackEvent("InitiateCheckout", {
-        value: cart.total,
-        currency: "PKR",
-        num_items: cart.count,
-        content_ids: cart.items.map((i) => i.productId),
-      });
+      return;
     }
-  }, [cart.items.length, cart.total, cart.count, router]);
+
+    if (!hasTrackedRef.current) {
+      hasTrackedRef.current = true;
+      trackMeta(
+        "InitiateCheckout",
+        {
+          content_ids: cart.items.map((i) => i.productId),
+          content_type: "product",
+          currency: "PKR",
+          value: cart.total,
+          num_items: cart.count,
+        },
+        initiateCheckoutEventId
+      );
+    }
+  }, [cart.items.length, initiateCheckoutEventId, router]);
 
   useEffect(() => {
     if (auth.user) {
@@ -131,6 +151,9 @@ export default function CheckoutPage() {
         promoCode: cart.promo || undefined,
         guestEmail: currentToken ? undefined : email,
         guestName: currentToken ? undefined : name,
+        fbp: getCookie("_fbp"),
+        fbc: getCookie("_fbc"),
+        eventId: initiateCheckoutEventId,
       };
 
       const orderRes = await fetch("/api/orders", {
