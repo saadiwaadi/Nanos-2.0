@@ -25,9 +25,10 @@ async function main() {
   let updatedCount = 0;
 
   for (const o of orders) {
+    const orderAny = o as any;
     let newStatus = o.status;
     let newCourierBookingStatus = o.courierBookingStatus;
-    const tracking = o.postexTrackingNumber || o.trackingNumber;
+    const tracking = orderAny.postexTrackingNumber || orderAny.trackingNumber || null;
 
     const rawStatus = (o.status || "").toLowerCase().trim();
 
@@ -49,15 +50,15 @@ async function main() {
     }
 
     const sInfo = parseShippingInfo(o.shippingInfo);
-    const cName = o.customerName || sInfo.name || o.user?.name || o.guestName || "Guest";
-    const cEmail = o.customerEmail || sInfo.email || o.user?.email || o.guestEmail || "No email";
+    const cName = orderAny.customerName || sInfo.name || o.user?.name || o.guestName || "Guest";
+    const cEmail = orderAny.customerEmail || sInfo.email || o.user?.email || o.guestEmail || "No email";
 
-    await prisma.order.update({
+    await (prisma.order as any).update({
       where: { id: o.id },
       data: {
         status: newStatus,
         courierBookingStatus: newCourierBookingStatus,
-        trackingNumber: tracking || o.trackingNumber,
+        trackingNumber: tracking,
         customerName: cName,
         customerEmail: cEmail,
       },
