@@ -20,6 +20,14 @@ export async function POST(
   try {
     const res = await bookOne(orderId, adminEmail);
 
+    if (!res) {
+      return NextResponse.json({
+        ok: false,
+        result: "skipped",
+        message: "Order booking skipped or already in progress.",
+      });
+    }
+
     let ok = false;
     let message = "";
 
