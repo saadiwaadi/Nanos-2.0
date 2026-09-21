@@ -44,7 +44,7 @@ async function runRealDbTests() {
             size: "UK 7",
             quantity: 1,
             ignoreStock: false,
-          },
+          } as any,
         },
       },
     });
