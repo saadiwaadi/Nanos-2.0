@@ -28,7 +28,7 @@ async function runRealDbTests() {
   const testProdId = "test_stock_prod_" + Date.now();
 
   try {
-    await prisma.product.create({
+    await (prisma.product as any).create({
       data: {
         id: testProdId,
         sku: "TEST-SKU-" + Date.now(),
@@ -44,7 +44,7 @@ async function runRealDbTests() {
             size: "UK 7",
             quantity: 1,
             ignoreStock: false,
-          } as any,
+          },
         },
       },
     });
