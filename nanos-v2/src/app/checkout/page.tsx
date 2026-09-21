@@ -35,6 +35,7 @@ export default function CheckoutPage() {
   const [password, setPassword] = useState("");
 
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const submittingRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -47,7 +48,7 @@ export default function CheckoutPage() {
       return;
     }
 
-    if (!hasTrackedRef.current) {
+    if (!hasTrackedRef.current && cart.items.length > 0) {
       hasTrackedRef.current = true;
       trackMeta(
         "InitiateCheckout",
@@ -97,11 +98,17 @@ export default function CheckoutPage() {
     e.preventDefault();
     setErrorMsg(null);
 
+    // Double-submission guard (Ref + State)
+    if (submittingRef.current || isSubmitting) {
+      return;
+    }
+
     if (!isFormValid) {
       setErrorMsg("Please fill out all required fields correctly before submitting.");
       return;
     }
 
+    submittingRef.current = true;
     setIsSubmitting(true);
 
     try {
@@ -112,6 +119,7 @@ export default function CheckoutPage() {
         if (!password || password.length < 8) {
           setErrorMsg("Password must be at least 8 characters long.");
           setIsSubmitting(false);
+          submittingRef.current = false;
           return;
         }
 
@@ -125,6 +133,7 @@ export default function CheckoutPage() {
         if (!regRes.ok) {
           setErrorMsg(regData.error?.message || regData.message || "Registration failed.");
           setIsSubmitting(false);
+          submittingRef.current = false;
           return;
         }
 
@@ -166,20 +175,22 @@ export default function CheckoutPage() {
       if (!orderRes.ok) {
         setErrorMsg(orderData.error?.message || orderData.message || "Failed to place order.");
         setIsSubmitting(false);
+        submittingRef.current = false;
         return;
       }
 
-      // 3. Clear Cart & Navigate
+      // 3. Clear Cart & Direct Redirect to Confirmation
       cart.clear();
 
-      if (currentToken) {
-        router.push(`/confirmation/${orderData.id}`);
-      } else {
-        router.push(`/confirmation/${orderData.id}?email=${encodeURIComponent(email)}`);
-      }
+      const redirectUrl = currentToken
+        ? `/confirmation/${orderData.id}`
+        : `/confirmation/${orderData.id}?email=${encodeURIComponent(email)}`;
+
+      router.push(redirectUrl);
     } catch (err: any) {
       setErrorMsg(err.message || "An unexpected error occurred.");
       setIsSubmitting(false);
+      submittingRef.current = false;
     }
   }
 
@@ -487,7 +498,7 @@ export default function CheckoutPage() {
                 className="btn btn-primary btn-block"
                 style={{ marginTop: 18 }}
               >
-                {isSubmitting ? "Placing Order..." : `Place Order — ${fmtPrice(cart.total)}`}
+                {isSubmitting ? "Placing your order..." : `Place Order — ${fmtPrice(cart.total)}`}
               </button>
 
               <Link

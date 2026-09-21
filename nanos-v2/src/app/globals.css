@@ -972,8 +972,8 @@ noscript { display: none !important; }
 .colour-swatch { width: 16px; height: 16px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.15); display: inline-block; }
 .btn-dark { background: var(--admin-charcoal); color: #FFF; border: none; }
 .btn-dark:hover { background: #000; }
-.btn-outline { background: transparent; border: 1px solid var(--admin-border); color: var(--admin-text); }
-.btn-outline:hover { background: var(--admin-surface-2); }
+.admin-wrap .btn-outline { background: transparent; border: 1px solid var(--admin-border); color: var(--admin-text); }
+.admin-wrap .btn-outline:hover { background: var(--admin-surface-2); color: var(--admin-text); }
 .btn-danger { background: var(--admin-danger); color: #FFF; border: none; }
 .btn-danger:hover { opacity: 0.9; }
 .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 4px; }
