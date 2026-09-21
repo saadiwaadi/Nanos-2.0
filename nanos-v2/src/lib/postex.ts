@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { postexFetch, postexToken } from "@/lib/postex-client";
 
 export interface PostexCreateOrderPayload {
   cityName: string;
@@ -47,7 +48,7 @@ export interface PostexTrackOrderResponse {
 
 export const POSTEX_BASE_URL = (
   process.env.POSTEX_BASE_URL || "https://api.postex.pk"
-).replace(/\/$/, "");
+).replace(/\/+$/, "");
 
 export const POSTEX_API_TOKEN = process.env.POSTEX_API_TOKEN || "";
 
@@ -65,59 +66,32 @@ function parseShippingInfo(val: any) {
 }
 
 export async function getPickupAddresses() {
-  const url = `${POSTEX_BASE_URL}/services/integration/api/order/v1/get-merchant-address`;
-  const res = await fetch(url, {
-    method: "GET",
-    headers: {
-      token: POSTEX_API_TOKEN,
-      "Content-Type": "application/json",
-    },
-  });
-  return res.json();
+  return postexFetch("/order/v1/get-merchant-address", { method: "GET" });
 }
 
 export async function callCreateOrderApi(
   payload: PostexCreateOrderPayload
 ): Promise<PostexCreateOrderResponse> {
-  const url = `${POSTEX_BASE_URL}/services/integration/api/order/v1/create-order`;
-  const res = await fetch(url, {
+  return postexFetch<PostexCreateOrderResponse>("/order/v1/create-order", {
     method: "POST",
-    headers: {
-      token: POSTEX_API_TOKEN,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
+    body: payload,
   });
-  const data = await res.json();
-  return data as PostexCreateOrderResponse;
 }
 
 export async function callTrackOrderApi(
   trackingNumber: string
 ): Promise<PostexTrackOrderResponse> {
-  const url = `${POSTEX_BASE_URL}/services/integration/api/order/v1/track-order/${encodeURIComponent(trackingNumber)}`;
-  const res = await fetch(url, {
-    method: "GET",
-    headers: {
-      token: POSTEX_API_TOKEN,
-      "Content-Type": "application/json",
-    },
-  });
-  const data = await res.json();
-  return data as PostexTrackOrderResponse;
+  return postexFetch<PostexTrackOrderResponse>(
+    `/order/v1/track-order/${encodeURIComponent(trackingNumber)}`,
+    { method: "GET" }
+  );
 }
 
 export async function callCancelOrderApi(trackingNumber: string) {
-  const url = `${POSTEX_BASE_URL}/services/integration/api/order/v1/cancel-order`;
-  const res = await fetch(url, {
+  return postexFetch("/order/v1/cancel-order", {
     method: "PUT",
-    headers: {
-      token: POSTEX_API_TOKEN,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ trackingNumber }),
+    body: { trackingNumber },
   });
-  return res.json();
 }
 
 export async function isAutoBookCity(city: string): Promise<boolean> {

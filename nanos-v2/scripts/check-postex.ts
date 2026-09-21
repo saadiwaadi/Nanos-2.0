@@ -1,5 +1,6 @@
 import "dotenv/config";
-import { POSTEX_BASE_URL, POSTEX_API_TOKEN } from "../src/lib/postex";
+import { postexFetch, postexToken, PostexError } from "../src/lib/postex-client";
+import { POSTEX_BASE_URL, getPickupAddresses } from "../src/lib/postex";
 import { prisma } from "../src/lib/prisma";
 
 const PICKUP_ADDRESS_CODE = process.env.POSTEX_PICKUP_ADDRESS_CODE || "001";
@@ -11,58 +12,44 @@ async function main() {
   console.log("      PostEx Connectivity Check         ");
   console.log("=========================================");
   console.log(`Base URL: ${POSTEX_BASE_URL}`);
-  if (!POSTEX_API_TOKEN) {
-    console.log("[WARN] POSTEX_API_TOKEN is empty or not set in environment.");
-  } else {
+  try {
+    postexToken();
     console.log("API Token: [CONFIGURED - HIDDEN]");
+  } catch (e: any) {
+    console.log(`[WARN] ${e.message}`);
   }
 
   // 1. Call get-operational-city
   console.log("\n--- Check 1: Operational Cities API (get-operational-city) ---");
   let operationalCities: string[] = [];
   try {
-    const cityUrl = `${POSTEX_BASE_URL}/services/integration/api/order/v1/get-operational-city`;
-    const res = await fetch(cityUrl, {
-      method: "GET",
-      headers: {
-        token: POSTEX_API_TOKEN,
-        "Content-Type": "application/json",
-      },
-    });
+    const data = await postexFetch("/order/v1/get-operational-city", { method: "GET" });
+    const rawList = Array.isArray(data?.dist)
+      ? data.dist
+      : Array.isArray(data)
+      ? data
+      : [];
 
-    console.log(`HTTP Status: ${res.status}`);
+    operationalCities = rawList
+      .map((item: any) =>
+        typeof item === "string"
+          ? item
+          : item?.cityName || item?.name || item?.cityNameEng || item?.operationalCityName || item?.title || ""
+      )
+      .filter(Boolean);
 
-    if (!res.ok) {
-      console.log(`[FAIL] get-operational-city HTTP status is ${res.status}`);
-      hasFailure = true;
+    console.log(`HTTP Status: 200`);
+    console.log(`Cities Returned Count: ${operationalCities.length}`);
+
+    if (operationalCities.length > 0) {
+      console.log(`[PASS] Successfully retrieved ${operationalCities.length} operational cities.`);
     } else {
-      const data = await res.json();
-      const rawList = Array.isArray(data?.dist)
-        ? data.dist
-        : Array.isArray(data)
-        ? data
-        : [];
-
-      operationalCities = rawList
-        .map((item: any) =>
-          typeof item === "string"
-            ? item
-            : item?.cityName || item?.name || item?.cityNameEng || item?.operationalCityName || item?.title || ""
-        )
-        .filter(Boolean);
-
-
-      console.log(`Cities Returned Count: ${operationalCities.length}`);
-
-      if (operationalCities.length > 0) {
-        console.log(`[PASS] Successfully retrieved ${operationalCities.length} operational cities.`);
-      } else {
-        console.log(`[FAIL] get-operational-city returned 0 cities or unexpected format.`);
-        hasFailure = true;
-      }
+      console.log(`[FAIL] get-operational-city returned 0 cities or unexpected format.`);
+      hasFailure = true;
     }
   } catch (err: any) {
-    console.log(`[FAIL] Failed to execute get-operational-city fetch: ${err.message}`);
+    const statusStr = err instanceof PostexError && err.status ? ` (Status ${err.status})` : "";
+    console.log(`[FAIL] get-operational-city failed${statusStr}: ${err.message}`);
     hasFailure = true;
   }
 
@@ -70,48 +57,34 @@ async function main() {
   console.log("\n--- Check 2: Merchant Addresses API (get-merchant-address) ---");
   let merchantAddressCodes: string[] = [];
   try {
-    const addressUrl = `${POSTEX_BASE_URL}/services/integration/api/order/v1/get-merchant-address`;
-    const res = await fetch(addressUrl, {
-      method: "GET",
-      headers: {
-        token: POSTEX_API_TOKEN,
-        "Content-Type": "application/json",
-      },
-    });
+    const data = await getPickupAddresses();
+    const rawList = Array.isArray(data?.dist)
+      ? data.dist
+      : Array.isArray(data)
+      ? data
+      : [];
 
-    console.log(`HTTP Status: ${res.status}`);
+    merchantAddressCodes = rawList
+      .map((item: any) =>
+        typeof item === "string"
+          ? item
+          : item?.pickupAddressCode || item?.addressCode || item?.code || ""
+      )
+      .filter(Boolean);
 
-    if (!res.ok) {
-      console.log(`[FAIL] get-merchant-address HTTP status is ${res.status}`);
-      hasFailure = true;
+    console.log(`HTTP Status: 200`);
+    console.log(`Merchant Addresses Count: ${merchantAddressCodes.length}`);
+    console.log(`Address Codes: ${merchantAddressCodes.length > 0 ? merchantAddressCodes.join(", ") : "(none)"}`);
+
+    if (merchantAddressCodes.length > 0) {
+      console.log(`[PASS] Successfully retrieved ${merchantAddressCodes.length} merchant address codes.`);
     } else {
-      const data = await res.json();
-      const rawList = Array.isArray(data?.dist)
-        ? data.dist
-        : Array.isArray(data)
-        ? data
-        : [];
-
-      merchantAddressCodes = rawList
-        .map((item: any) =>
-          typeof item === "string"
-            ? item
-            : item?.pickupAddressCode || item?.addressCode || item?.code || ""
-        )
-        .filter(Boolean);
-
-      console.log(`Merchant Addresses Count: ${merchantAddressCodes.length}`);
-      console.log(`Address Codes: ${merchantAddressCodes.length > 0 ? merchantAddressCodes.join(", ") : "(none)"}`);
-
-      if (merchantAddressCodes.length > 0) {
-        console.log(`[PASS] Successfully retrieved ${merchantAddressCodes.length} merchant address codes.`);
-      } else {
-        console.log(`[FAIL] get-merchant-address returned 0 address codes.`);
-        hasFailure = true;
-      }
+      console.log(`[FAIL] get-merchant-address returned 0 address codes.`);
+      hasFailure = true;
     }
   } catch (err: any) {
-    console.log(`[FAIL] Failed to execute get-merchant-address fetch: ${err.message}`);
+    const statusStr = err instanceof PostexError && err.status ? ` (Status ${err.status})` : "";
+    console.log(`[FAIL] get-merchant-address failed${statusStr}: ${err.message}`);
     hasFailure = true;
   }
 
