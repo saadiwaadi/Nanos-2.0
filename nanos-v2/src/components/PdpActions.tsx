@@ -175,9 +175,42 @@ export function PdpActions({ product: p }: { product: ProductData }) {
     <div className="pdp" suppressHydrationWarning>
       {/* Left: Gallery */}
       <div className="pdp-gallery">
-        <div className="pdp-main-image" style={{ transition: "opacity 0.2s ease" }}>
+        <div className="pdp-main-image" style={{ transition: "opacity 0.2s ease", position: "relative" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={displayedImage} alt={p.name} />
+          {p.category === "trousers" && (
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                background: "rgba(17, 17, 17, 0.65)",
+                backdropFilter: "blur(4px)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 4,
+                pointerEvents: "none",
+              }}
+            >
+              <span
+                style={{
+                  background: "var(--accent, #C8FF00)",
+                  color: "#111",
+                  fontFamily: "var(--font-head, sans-serif)",
+                  fontSize: "12px",
+                  fontWeight: 800,
+                  letterSpacing: "0.14em",
+                  padding: "8px 18px",
+                  borderRadius: "24px",
+                  textTransform: "uppercase",
+                  boxShadow: "0 6px 20px rgba(0,0,0,0.6)",
+                }}
+              >
+                Coming Soon
+              </span>
+            </div>
+          )}
         </div>
         {gallery.length > 1 && (
           <div className="pdp-thumbs">
@@ -200,7 +233,25 @@ export function PdpActions({ product: p }: { product: ProductData }) {
 
       {/* Right: Info Panel */}
       <div className="pdp-info">
-        <h1>{p.name}</h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 6 }}>
+          <h1 style={{ margin: 0 }}>{p.name}</h1>
+          {p.category === "trousers" && (
+            <span
+              style={{
+                background: "var(--accent, #C8FF00)",
+                color: "#111",
+                fontSize: "10px",
+                fontWeight: 800,
+                letterSpacing: "0.1em",
+                padding: "3px 10px",
+                borderRadius: "12px",
+                textTransform: "uppercase",
+              }}
+            >
+              Coming Soon
+            </span>
+          )}
+        </div>
         <div className="pdp-sub">
           {p.category === "crocs" ? "Crocs" : "Trousers"} · {p.colors.length} colors available
         </div>
@@ -261,17 +312,17 @@ export function PdpActions({ product: p }: { product: ProductData }) {
                   <button
                     key={s}
                     type="button"
-                    disabled={isOutOfStock}
+                    disabled={isOutOfStock || p.category === "trousers"}
                     aria-label={`Select size ${s}`}
                     className={`size-opt ${size === s ? "selected" : ""} ${isOutOfStock ? "out-of-stock" : ""}`}
                     style={{
-                      opacity: isOutOfStock ? 0.35 : 1,
+                      opacity: isOutOfStock || p.category === "trousers" ? 0.35 : 1,
                       textDecoration: isOutOfStock ? "line-through" : "none",
-                      cursor: isOutOfStock ? "not-allowed" : "pointer",
+                      cursor: isOutOfStock || p.category === "trousers" ? "not-allowed" : "pointer",
                       position: "relative",
                     }}
                     onClick={() => {
-                      if (!isOutOfStock) setSize(s);
+                      if (!isOutOfStock && p.category !== "trousers") setSize(s);
                     }}
                   >
                     {s}
@@ -301,6 +352,7 @@ export function PdpActions({ product: p }: { product: ProductData }) {
           <div className="qty-stepper">
             <button
               type="button"
+              disabled={p.category === "trousers"}
               aria-label="Decrease quantity"
               onClick={() => setQty(Math.max(1, qty - 1))}
             >
@@ -309,6 +361,7 @@ export function PdpActions({ product: p }: { product: ProductData }) {
             <span className="qty-val">{qty}</span>
             <button
               type="button"
+              disabled={p.category === "trousers"}
               aria-label="Increase quantity"
               onClick={() => setQty(qty + 1)}
             >
@@ -319,18 +372,29 @@ export function PdpActions({ product: p }: { product: ProductData }) {
 
         {/* PDP Actions */}
         <div className="pdp-actions">
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={!size}
-            onClick={handleAdd}
-          >
-            {added
-              ? "Added ✓"
-              : !size
-              ? "Select a size"
-              : `Add to Cart — ${fmtPrice(p.price * qty)}`}
-          </button>
+          {p.category === "trousers" ? (
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled
+              style={{ opacity: 0.6, cursor: "not-allowed", background: "var(--surface-2, #2a2a2a)" }}
+            >
+              Coming Soon
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={!size}
+              onClick={handleAdd}
+            >
+              {added
+                ? "Added ✓"
+                : !size
+                ? "Select a size"
+                : `Add to Cart — ${fmtPrice(p.price * qty)}`}
+            </button>
+          )}
           <button
             type="button"
             className={`wish-toggle ${wished ? "active" : ""}`}

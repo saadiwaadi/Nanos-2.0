@@ -87,11 +87,46 @@ export function ProductCard({
         />
       )}
 
-      <div className="product-thumb">
+      <div className="product-thumb" style={{ position: "relative" }}>
         <Link href={`/product/${id}`} className="w-full h-full block">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={hero} alt={name} />
         </Link>
+
+        {/* Coming Soon Overlay for Trousers */}
+        {category === "trousers" && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: "rgba(17, 17, 17, 0.65)",
+              backdropFilter: "blur(3px)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 4,
+              pointerEvents: "none",
+            }}
+          >
+            <span
+              style={{
+                background: "var(--accent, #C8FF00)",
+                color: "#111",
+                fontFamily: "var(--font-head, sans-serif)",
+                fontSize: "11px",
+                fontWeight: 800,
+                letterSpacing: "0.12em",
+                padding: "6px 14px",
+                borderRadius: "20px",
+                textTransform: "uppercase",
+                boxShadow: "0 4px 14px rgba(0,0,0,0.5)",
+              }}
+            >
+              Coming Soon
+            </span>
+          </div>
+        )}
 
         {/* Badges */}
         <div className="badges">
@@ -146,13 +181,24 @@ export function ProductCard({
           </div>
         )}
 
-        <button
-          type="button"
-          onClick={handleQuickAdd}
-          className={`quick-add ${added ? "added" : ""}`}
-        >
-          {added ? "Added ✓" : "+ Quick Add"}
-        </button>
+        {category === "trousers" ? (
+          <button
+            type="button"
+            disabled
+            className="quick-add"
+            style={{ opacity: 0.6, cursor: "not-allowed", background: "var(--surface-2, #2a2a2a)" }}
+          >
+            Coming Soon
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={handleQuickAdd}
+            className={`quick-add ${added ? "added" : ""}`}
+          >
+            {added ? "Added ✓" : "+ Quick Add"}
+          </button>
+        )}
       </div>
     </div>
   );

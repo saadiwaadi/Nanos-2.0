@@ -144,7 +144,23 @@ export default async function HomePage() {
                 }}
               />
               <div className="cat-tile-overlay">
-                <span className="cat-tile-eyebrow">Category</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                  <span className="cat-tile-eyebrow">Category</span>
+                  <span
+                    style={{
+                      background: "var(--accent, #C8FF00)",
+                      color: "#111",
+                      fontSize: "10px",
+                      fontWeight: 800,
+                      letterSpacing: "0.1em",
+                      padding: "3px 9px",
+                      borderRadius: "12px",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Coming Soon
+                  </span>
+                </div>
                 <h3 className="cat-tile-title">Trousers</h3>
                 <span className="cat-tile-link">
                   Explore Collection <span className="cat-tile-arrow">&rarr;</span>
