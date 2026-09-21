@@ -261,6 +261,14 @@ export default function AdminPage() {
   const [newCityInput, setNewCityInput] = useState("");
   const [courierLoading, setCourierLoading] = useState(false);
   const [courierActionId, setCourierActionId] = useState<string | null>(null);
+  const [healthLoading, setHealthLoading] = useState(false);
+  const [postexHealth, setPostexHealth] = useState<{
+    ok: boolean;
+    tokenLength: number;
+    addresses?: string[];
+    code?: string;
+    message?: string;
+  } | null>(null);
 
   // Size Charts Tab State
   const [sizeChartCategories, setSizeChartCategories] = useState<string[]>(["crocs", "trousers"]);
@@ -850,10 +858,28 @@ export default function AdminPage() {
         showToast(`Batch completed! Processed ${results.length} orders.`);
         loadCourierData();
       }
-    } catch {
-      showToast("Batch booking failed", "error");
+    } catch (err: any) {
+      showToast(err.message || "Failed to run batch booking", "error");
     } finally {
       setCourierActionId(null);
+    }
+  }
+
+  async function handleTestPostexConnection() {
+    setHealthLoading(true);
+    try {
+      const res = await authFetch("/api/admin/postex/health");
+      const data = await res.json();
+      setPostexHealth(data);
+      if (data.ok) {
+        showToast(`PostEx Connection PASS (Addresses: ${data.addresses?.join(", ") || "(none)"})`);
+      } else {
+        showToast(`PostEx Health FAIL [${data.code}]: ${data.message}`, "error");
+      }
+    } catch (err: any) {
+      showToast(err.message || "Failed to check PostEx connection", "error");
+    } finally {
+      setHealthLoading(false);
     }
   }
 
@@ -2414,15 +2440,75 @@ export default function AdminPage() {
                     Daily 4:00 PM batch booking &amp; 4-hour status tracking sync
                   </p>
                 </div>
-                <button
-                  type="button"
-                  className="btn btn-dark"
-                  disabled={courierActionId === "batch"}
-                  onClick={handleRunBatchNow}
-                >
-                  {courierActionId === "batch" ? "Processing Batch…" : "▶ Run Batch Booking Now"}
-                </button>
+                <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    className="admin-btn-outline"
+                    style={{
+                      padding: "8px 14px",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      borderRadius: "4px",
+                      border: "1px solid var(--admin-border)",
+                      background: "var(--admin-surface)",
+                      color: "var(--admin-text)",
+                      cursor: "pointer",
+                    }}
+                    disabled={healthLoading}
+                    onClick={handleTestPostexConnection}
+                  >
+                    {healthLoading ? "Testing Connection…" : "⚡ Test PostEx Connection"}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-dark"
+                    disabled={courierActionId === "batch"}
+                    onClick={handleRunBatchNow}
+                  >
+                    {courierActionId === "batch" ? "Processing Batch…" : "▶ Run Batch Booking Now"}
+                  </button>
+                </div>
               </div>
+
+              {/* Health Check Result Card */}
+              {postexHealth && (
+                <div
+                  style={{
+                    padding: "16px 20px",
+                    borderRadius: "8px",
+                    border: postexHealth.ok ? "1px solid #bbf7d0" : "1px solid #fecaca",
+                    backgroundColor: postexHealth.ok ? "#f0fdf4" : "#fef2f2",
+                    color: postexHealth.ok ? "#166534" : "#991b1b",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                    <div style={{ fontWeight: 700, fontSize: "14px" }}>
+                      {postexHealth.ok ? "✓ PostEx Connection Active (PASS)" : `✗ PostEx Connection Failed [${postexHealth.code}]`}
+                    </div>
+                    <div style={{ fontSize: "12px", fontFamily: "monospace", opacity: 0.9 }}>
+                      Token Length: {postexHealth.tokenLength} chars
+                    </div>
+                  </div>
+                  {postexHealth.ok ? (
+                    <div style={{ fontSize: "13px", marginTop: 6 }}>
+                      Merchant Address Codes: <strong>{postexHealth.addresses?.join(", ") || "None returned"}</strong>
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: 8, fontSize: "13px", lineHeight: "1.4" }}>
+                      <div><strong>Error:</strong> {postexHealth.message}</div>
+                      <div style={{ marginTop: 6, fontSize: "12px", opacity: 0.95 }}>
+                        {postexHealth.tokenLength === 0 || postexHealth.code === "CONFIG" ? (
+                          <span>💡 <strong>Cause &amp; Fix:</strong> POSTEX_API_TOKEN is not set on this server. Add <code>POSTEX_API_TOKEN</code> (and <code>POSTEX_BASE_URL</code>, <code>POSTEX_PICKUP_ADDRESS_CODE</code>) in your hosting dashboard, then redeploy.</span>
+                        ) : postexHealth.code === "AUTH" ? (
+                          <span>💡 <strong>Cause &amp; Fix:</strong> Token rejected (401/403). Re-paste the token in hosting settings or regenerate it in the PostEx portal.</span>
+                        ) : (
+                          <span>💡 <strong>Cause &amp; Fix:</strong> Check server network/timeout. Retryable: {String(postexHealth.code === "TIMEOUT" || postexHealth.code === "SERVER" || postexHealth.code === "NETWORK")}</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {courierLoading ? (
                 <div>Loading courier queue…</div>
