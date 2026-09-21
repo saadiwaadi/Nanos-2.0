@@ -241,6 +241,16 @@ export default function AdminPage() {
   const [colorSortInput, setColorSortInput] = useState("0");
   const [savingColor, setSavingColor] = useState(false);
 
+  // Edit Panel — Per-Color Gallery & Stock Manager State
+  const [selectedColorId, setSelectedColorId] = useState<string | null>(null);
+  const [colorImagesMap, setColorImagesMap] = useState<Record<string, string[]>>({});
+  const [colorStockMap, setColorStockMap] = useState<Record<string, Record<string, number>>>({});
+  const [dirtyColorTabs, setDirtyColorTabs] = useState<Set<string>>(new Set());
+  const [urlInputMap, setUrlInputMap] = useState<Record<string, string>>({});
+  const [urlErrorMap, setUrlErrorMap] = useState<Record<string, string | null>>({});
+  const [bulkQtyMap, setBulkQtyMap] = useState<Record<string, string>>({});
+  const [copyColorMap, setCopyColorMap] = useState<Record<string, string>>({});
+
   // Edit Panel — Sizes Sub-section
   const [productSizes, setProductSizes] = useState<string[]>([]);
   const [newSizeInput, setNewSizeInput] = useState("");
@@ -440,7 +450,25 @@ export default function AdminPage() {
         const res = await authFetch(`/api/admin/products/${productId}/colors`);
         if (res.ok) {
           const data = await res.json();
-          setDbColors(Array.isArray(data) ? data : []);
+          const colors = Array.isArray(data) ? data : [];
+          setDbColors(colors);
+
+          const imgMap: Record<string, string[]> = {};
+          colors.forEach((c: any) => {
+            try {
+              const parsed = JSON.parse(c.imagesJson || "[]");
+              imgMap[c.id] = Array.isArray(parsed) ? parsed : [];
+            } catch {
+              imgMap[c.id] = [];
+            }
+          });
+          setColorImagesMap(imgMap);
+
+          if (colors.length > 0) {
+            setSelectedColorId((prev) => (prev && colors.some((c: any) => c.id === prev) ? prev : colors[0].id));
+          } else {
+            setSelectedColorId(null);
+          }
         }
       } catch {
         setDbColors([]);
@@ -476,10 +504,14 @@ export default function AdminPage() {
             const flat = Object.values(grouped).flat() as ProductVariant[];
             setDbVariants(flat);
             const drafts: Record<string, string> = {};
+            const stockMap: Record<string, Record<string, number>> = {};
             for (const v of flat) {
               drafts[`${v.color}|${v.size}`] = String(v.stock);
+              if (!stockMap[v.color]) stockMap[v.color] = {};
+              stockMap[v.color][v.size] = v.stock;
             }
             setCellStockDrafts(drafts);
+            setColorStockMap(stockMap);
           }
         }
       } catch {
@@ -488,6 +520,154 @@ export default function AdminPage() {
     },
     [authFetch]
   );
+
+  // Per-Color Manager Handlers
+  async function handleSaveColorTab(colorId: string) {
+    if (!editingProduct) return;
+    const colorObj = dbColors.find((c) => c.id === colorId);
+    if (!colorObj) return;
+
+    const images = colorImagesMap[colorId] || [];
+    const stockForColor = colorStockMap[colorObj.name] || {};
+
+    setSavingColor(true);
+    try {
+      const resColor = await authFetch(`/api/admin/products/${editingProduct.id}/colors/${colorId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ images }),
+      });
+      if (!resColor.ok) {
+        const errData = await resColor.json();
+        throw new Error(errData.error || "Failed to save color images");
+      }
+
+      const variantsPayload = productSizes.map((sz) => ({
+        color: colorObj.name,
+        size: sz,
+        stock: stockForColor[sz] ?? 0,
+      }));
+      const resStock = await authFetch(`/api/admin/products/${editingProduct.id}/variants`, {
+        method: "POST",
+        body: JSON.stringify(variantsPayload),
+      });
+      if (!resStock.ok) {
+        const errData = await resStock.json();
+        throw new Error(errData.error || "Failed to save stock levels");
+      }
+
+      setDirtyColorTabs((prev) => {
+        const next = new Set(prev);
+        next.delete(colorId);
+        return next;
+      });
+
+      showToast(`Saved changes for ${colorObj.name}!`);
+      loadEditColors(editingProduct.id);
+      loadEditVariants(editingProduct.id);
+    } catch (err: any) {
+      showToast(err.message || "Failed to save color tab", "error");
+    } finally {
+      setSavingColor(false);
+    }
+  }
+
+  function handleAddImageUrl(colorId: string) {
+    const inputUrl = (urlInputMap[colorId] || "").trim();
+    if (!inputUrl) return;
+
+    try {
+      const parsed = new URL(inputUrl);
+      if (!["http:", "https:"].includes(parsed.protocol)) {
+        setUrlErrorMap((prev) => ({ ...prev, [colorId]: "URL must start with http:// or https://" }));
+        return;
+      }
+    } catch {
+      setUrlErrorMap((prev) => ({ ...prev, [colorId]: "Invalid image URL format" }));
+      return;
+    }
+
+    const currentImages = colorImagesMap[colorId] || [];
+    if (currentImages.includes(inputUrl)) {
+      setUrlErrorMap((prev) => ({ ...prev, [colorId]: "This image URL is already added for this color" }));
+      return;
+    }
+
+    setColorImagesMap((prev) => ({ ...prev, [colorId]: [...currentImages, inputUrl] }));
+    setUrlInputMap((prev) => ({ ...prev, [colorId]: "" }));
+    setUrlErrorMap((prev) => ({ ...prev, [colorId]: null }));
+    setDirtyColorTabs((prev) => new Set(prev).add(colorId));
+  }
+
+  function handleMoveColorImage(colorId: string, idx: number, delta: number) {
+    const currentImages = [...(colorImagesMap[colorId] || [])];
+    const targetIdx = idx + delta;
+    if (targetIdx < 0 || targetIdx >= currentImages.length) return;
+
+    const temp = currentImages[idx];
+    currentImages[idx] = currentImages[targetIdx];
+    currentImages[targetIdx] = temp;
+
+    setColorImagesMap((prev) => ({ ...prev, [colorId]: currentImages }));
+    setDirtyColorTabs((prev) => new Set(prev).add(colorId));
+  }
+
+  function handleRemoveColorImage(colorId: string, idx: number) {
+    const currentImages = (colorImagesMap[colorId] || []).filter((_, i) => i !== idx);
+    setColorImagesMap((prev) => ({ ...prev, [colorId]: currentImages }));
+    setDirtyColorTabs((prev) => new Set(prev).add(colorId));
+  }
+
+  function handleUpdateSizeStock(colorName: string, size: string, newQty: number) {
+    const qty = Math.max(0, newQty);
+    setColorStockMap((prev) => ({
+      ...prev,
+      [colorName]: {
+        ...(prev[colorName] || {}),
+        [size]: qty,
+      },
+    }));
+    const colorObj = dbColors.find((c) => c.name.toLowerCase() === colorName.toLowerCase());
+    if (colorObj) {
+      setDirtyColorTabs((prev) => new Set(prev).add(colorObj.id));
+    }
+  }
+
+  function handleBulkSetStock(colorId: string, colorName: string) {
+    const val = parseInt(bulkQtyMap[colorId] || "0", 10);
+    if (isNaN(val) || val < 0) return;
+
+    const newStock: Record<string, number> = {};
+    productSizes.forEach((sz) => {
+      newStock[sz] = val;
+    });
+
+    setColorStockMap((prev) => ({ ...prev, [colorName]: newStock }));
+    setDirtyColorTabs((prev) => new Set(prev).add(colorId));
+    showToast(`Set all sizes for ${colorName} to ${val}`);
+  }
+
+  function handleCopyStockFromColor(colorId: string, targetColorName: string, sourceColorName: string) {
+    if (!sourceColorName) return;
+    const sourceStock = colorStockMap[sourceColorName] || {};
+
+    setColorStockMap((prev) => ({
+      ...prev,
+      [targetColorName]: { ...sourceStock },
+    }));
+    setDirtyColorTabs((prev) => new Set(prev).add(colorId));
+    showToast(`Copied stock from ${sourceColorName} to ${targetColorName}`);
+  }
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (dirtyColorTabs.size > 0) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [dirtyColorTabs]);
 
   useEffect(() => {
     setMounted(true);
@@ -2020,70 +2200,36 @@ export default function AdminPage() {
                   <label>Description</label>
                   <textarea rows={3} value={editFormDesc} onChange={(e) => setEditFormDesc(e.target.value)} />
                 </div>
-
-                {/* Gallery Images List */}
-                <div className="field" style={{ marginTop: 16 }}>
-                  <label>Gallery Image URLs</label>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {editFormGallery.map((url, i) => (
-                      <div key={i} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                        <input
-                          type="text"
-                          style={{ flex: 1 }}
-                          value={url}
-                          onChange={(e) => {
-                            const next = [...editFormGallery];
-                            next[i] = e.target.value;
-                            setEditFormGallery(next);
-                          }}
-                        />
-                        <button
-                          type="button"
-                          className="btn btn-outline btn-sm"
-                          onClick={() => setEditFormGallery(editFormGallery.filter((_, idx) => idx !== i))}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ))}
-                    <button
-                      type="button"
-                      className="btn btn-outline btn-sm"
-                      style={{ alignSelf: "flex-start" }}
-                      onClick={() => setEditFormGallery([...editFormGallery, ""])}
-                    >
-                      + Add Gallery Image URL
-                    </button>
-                  </div>
-                </div>
               </div>
 
-              {/* Colors Section */}
+              {/* Color Galleries & Stock Manager Section */}
               <div className="panel" style={{ padding: 24 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
                   <div>
-                    <h3 style={{ margin: 0 }}>Database Colors ({dbColors.length})</h3>
+                    <h3 style={{ margin: 0, color: "var(--admin-text)" }}>Color Galleries &amp; Stock Manager</h3>
                     <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--admin-text-soft)" }}>
-                      Colors configured for this product. Renaming updates corresponding variant stock columns.
+                      Manage images and size stock levels per color. Select a tab to edit that color.
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-sm"
-                    onClick={() => {
-                      setEditingColorId(null);
-                      setColorNameInput("");
-                      setColorHexInput("#111111");
-                      setColorImagesInput("");
-                      setColorSortInput(String(dbColors.length));
-                      setShowColorAddForm(!showColorAddForm);
-                    }}
-                  >
-                    {showColorAddForm ? "Close Form" : "+ Add Color"}
-                  </button>
+                  {dirtyColorTabs.size > 0 && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span style={{ fontSize: 12, color: "var(--admin-accent)", fontWeight: 600 }}>
+                        • Unsaved changes on {dirtyColorTabs.size} tab{dirtyColorTabs.size > 1 ? "s" : ""}
+                      </span>
+                      <button
+                        type="button"
+                        className="btn btn-dark btn-sm"
+                        onClick={() => {
+                          dirtyColorTabs.forEach((cId) => handleSaveColorTab(cId));
+                        }}
+                      >
+                        Save All Dirty Tabs
+                      </button>
+                    </div>
+                  )}
                 </div>
 
-                {/* Color Form */}
+                {/* Color Add / Edit Form Modal/Drawer if open */}
                 {showColorAddForm && (
                   <div
                     style={{
@@ -2094,12 +2240,12 @@ export default function AdminPage() {
                       display: "flex",
                       flexDirection: "column",
                       gap: 14,
-                      marginBottom: 16,
+                      marginBottom: 20,
                     }}
                   >
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <h4 style={{ margin: 0, color: "var(--admin-text)" }}>
-                        {editingColorId ? "Edit Color" : "Add Color"}
+                        {editingColorId ? "Edit Color Info" : "Add New Color"}
                       </h4>
                       <button
                         type="button"
@@ -2145,19 +2291,6 @@ export default function AdminPage() {
                       />
                     </div>
 
-                    <div>
-                      <label style={{ display: "block", fontSize: 12, color: "var(--admin-text-soft)", marginBottom: 4 }}>
-                        Color-specific Image URLs (one per line)
-                      </label>
-                      <textarea
-                        rows={3}
-                        placeholder="https://images.unsplash.com/..."
-                        value={colorImagesInput}
-                        onChange={(e) => setColorImagesInput(e.target.value)}
-                        style={{ width: "100%", fontFamily: "monospace", fontSize: 12 }}
-                      />
-                    </div>
-
                     <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                       <button
                         type="button"
@@ -2172,74 +2305,484 @@ export default function AdminPage() {
                         disabled={savingColor}
                         onClick={() => handleSaveColor(editingColorId || undefined)}
                       >
-                        {savingColor ? "Saving…" : editingColorId ? "Update Color" : "Save Color"}
+                        {savingColor ? "Saving…" : editingColorId ? "Update Color Info" : "Save Color"}
                       </button>
                     </div>
                   </div>
                 )}
 
-                {/* Color Cards List */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {dbColors.length === 0 ? (
-                    <div style={{ color: "var(--admin-text-soft)", fontSize: 13, padding: "12px 0" }}>
-                      No colors added yet. Click &quot;+ Add Color&quot; above to create one.
-                    </div>
-                  ) : (
-                    dbColors.map((c) => {
-                      let imgCount = 0;
-                      try {
-                        const parsed = JSON.parse(c.imagesJson || "[]");
-                        imgCount = Array.isArray(parsed) ? parsed.length : 0;
-                      } catch {
-                        imgCount = 0;
-                      }
+                {/* Color Tabs Header */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    borderBottom: "1px solid var(--admin-border)",
+                    paddingBottom: 12,
+                    marginBottom: 20,
+                    overflowX: "auto",
+                  }}
+                >
+                  {dbColors.map((c) => {
+                    const isSelected = selectedColorId === c.id;
+                    const isDirty = dirtyColorTabs.has(c.id);
+                    const stockForColor = colorStockMap[c.name] || {};
+                    const totalStock = Object.values(stockForColor).reduce((sum, q) => sum + (Number(q) || 0), 0);
+                    const isOutOfStock = totalStock === 0;
 
-                      return (
-                        <div key={c.id} style={{ border: "1px solid var(--admin-border)", padding: 14, borderRadius: 6, background: "var(--admin-surface-2)" }}>
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                              <span className="colour-swatch" style={{ background: c.hex, width: 24, height: 24, borderRadius: "50%", display: "inline-block", border: "1px solid var(--admin-border)" }} />
-                              <strong style={{ color: "var(--admin-text)" }}>{c.name}</strong>
-                              <span style={{ fontFamily: "monospace", fontSize: 12, color: "var(--admin-text-soft)" }}>({c.hex})</span>
-                              <span style={{ fontSize: 12, color: "var(--admin-text-soft)" }}>
-                                (Sort: {c.sortOrder}, {imgCount} images)
-                              </span>
-                            </div>
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => setSelectedColorId(c.id)}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          padding: "8px 14px",
+                          borderRadius: 6,
+                          border: isSelected ? "2px solid var(--admin-accent)" : "1px solid var(--admin-border)",
+                          background: isSelected ? "var(--admin-surface-2)" : "var(--admin-surface)",
+                          color: "var(--admin-text)",
+                          cursor: "pointer",
+                          fontWeight: isSelected ? 600 : 400,
+                          fontSize: 13,
+                          position: "relative",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: 14,
+                            height: 14,
+                            borderRadius: "50%",
+                            background: c.hex,
+                            border: "1px solid var(--admin-border)",
+                            display: "inline-block",
+                          }}
+                        />
+                        <span>{c.name}</span>
+
+                        <span
+                          style={{
+                            fontSize: 11,
+                            padding: "2px 6px",
+                            borderRadius: 10,
+                            background: isOutOfStock ? "var(--admin-danger-bg)" : totalStock <= 3 ? "var(--admin-warn-bg)" : "var(--admin-surface)",
+                            color: isOutOfStock ? "var(--admin-danger)" : totalStock <= 3 ? "var(--admin-warn)" : "var(--admin-text-soft)",
+                            fontWeight: 600,
+                            border: "1px solid var(--admin-border)",
+                          }}
+                        >
+                          {totalStock} in stock
+                        </span>
+
+                        {isOutOfStock && (
+                          <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--admin-danger)" }} title="0 Total Stock" />
+                        )}
+
+                        {isDirty && (
+                          <span
+                            style={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: "50%",
+                              background: "var(--admin-accent)",
+                            }}
+                            title="Unsaved changes"
+                          />
+                        )}
+                      </button>
+                    );
+                  })}
+
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    style={{ padding: "8px 14px", borderRadius: 6, display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}
+                    onClick={() => {
+                      setEditingColorId(null);
+                      setColorNameInput("");
+                      setColorHexInput("#111111");
+                      setColorImagesInput("");
+                      setColorSortInput(String(dbColors.length));
+                      setShowColorAddForm(true);
+                    }}
+                  >
+                    + Add Color
+                  </button>
+                </div>
+
+                {/* Active Color Panels */}
+                {(() => {
+                  const activeColorObj = dbColors.find((c) => c.id === selectedColorId) || dbColors[0] || null;
+                  if (!activeColorObj) {
+                    return (
+                      <div style={{ fontSize: 13, color: "var(--admin-text-soft)", padding: 20 }}>
+                        No colors added yet. Click &quot;+ Add Color&quot; above to create one.
+                      </div>
+                    );
+                  }
+
+                  const activeImages = colorImagesMap[activeColorObj.id] || [];
+                  const activeStockMap = colorStockMap[activeColorObj.name] || {};
+                  const activeTotalStock = Object.values(activeStockMap).reduce((sum, q) => sum + (Number(q) || 0), 0);
+
+                  return (
+                    <div>
+                      {/* Tab Top Action Bar */}
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          background: "var(--admin-surface-2)",
+                          padding: "12px 16px",
+                          borderRadius: 6,
+                          marginBottom: 20,
+                          border: "1px solid var(--admin-border)",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                          <span
+                            style={{
+                              width: 20,
+                              height: 20,
+                              borderRadius: "50%",
+                              background: activeColorObj.hex,
+                              border: "1px solid var(--admin-border)",
+                            }}
+                          />
+                          <h4 style={{ margin: 0, color: "var(--admin-text)" }}>{activeColorObj.name}</h4>
+                          <span style={{ fontSize: 12, color: "var(--admin-text-soft)", fontFamily: "monospace" }}>
+                            ({activeColorObj.hex})
+                          </span>
+                        </div>
+
+                        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                          {dirtyColorTabs.has(activeColorObj.id) && (
+                            <button
+                              type="button"
+                              className="btn btn-dark btn-sm"
+                              disabled={savingColor}
+                              onClick={() => handleSaveColorTab(activeColorObj.id)}
+                            >
+                              {savingColor ? "Saving…" : `Save ${activeColorObj.name} Changes`}
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            className="btn btn-outline btn-sm"
+                            onClick={() => {
+                              setEditingColorId(activeColorObj.id);
+                              setColorNameInput(activeColorObj.name);
+                              setColorHexInput(activeColorObj.hex);
+                              setColorSortInput(String(activeColorObj.sortOrder ?? 0));
+                              setShowColorAddForm(true);
+                            }}
+                          >
+                            Edit Color Info
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-outline btn-sm"
+                            style={{ color: "var(--admin-danger)" }}
+                            onClick={() => handleDeleteColor(activeColorObj.id)}
+                          >
+                            Delete Color
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* 2 Panels */}
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+                        {/* PANEL 1: Images */}
+                        <div style={{ background: "var(--admin-surface-2)", padding: 18, borderRadius: 8, border: "1px solid var(--admin-border)" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                            <h4 style={{ margin: 0, color: "var(--admin-text)", fontSize: 14 }}>
+                              Panel 1: Images ({activeImages.length})
+                            </h4>
+                            <span style={{ fontSize: 11, color: "var(--admin-text-soft)" }}>First image is Cover</span>
+                          </div>
+
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
+                            {activeImages.length === 0 ? (
+                              <div style={{ fontSize: 12, color: "var(--admin-text-soft)", padding: "12px 0" }}>
+                                No images for this color yet. Paste an image URL below.
+                              </div>
+                            ) : (
+                              activeImages.map((url, idx) => (
+                                <div
+                                  key={`${url}-${idx}`}
+                                  style={{
+                                    width: 96,
+                                    height: 96,
+                                    borderRadius: 6,
+                                    border: idx === 0 ? "2px solid var(--admin-accent)" : "1px solid var(--admin-border)",
+                                    position: "relative",
+                                    overflow: "hidden",
+                                    background: "#000",
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+
+                                  {idx === 0 && (
+                                    <span
+                                      style={{
+                                        position: "absolute",
+                                        top: 4,
+                                        left: 4,
+                                        background: "var(--admin-accent)",
+                                        color: "#111",
+                                        fontSize: 9,
+                                        fontWeight: 700,
+                                        padding: "1px 5px",
+                                        borderRadius: 3,
+                                        textTransform: "uppercase",
+                                      }}
+                                    >
+                                      Cover
+                                    </span>
+                                  )}
+
+                                  <div
+                                    style={{
+                                      position: "absolute",
+                                      bottom: 0,
+                                      left: 0,
+                                      right: 0,
+                                      background: "rgba(0,0,0,0.75)",
+                                      display: "flex",
+                                      justifyContent: "space-between",
+                                      alignItems: "center",
+                                      padding: "2px 4px",
+                                    }}
+                                  >
+                                    <button
+                                      type="button"
+                                      disabled={idx === 0}
+                                      onClick={() => handleMoveColorImage(activeColorObj.id, idx, -1)}
+                                      style={{ background: "none", border: "none", color: "#fff", cursor: idx === 0 ? "default" : "pointer", opacity: idx === 0 ? 0.3 : 1, fontSize: 11 }}
+                                      title="Move left"
+                                    >
+                                      ←
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveColorImage(activeColorObj.id, idx)}
+                                      style={{ background: "none", border: "none", color: "var(--admin-danger)", cursor: "pointer", fontSize: 12, fontWeight: "bold" }}
+                                      title="Remove image"
+                                    >
+                                      ✕
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={idx === activeImages.length - 1}
+                                      onClick={() => handleMoveColorImage(activeColorObj.id, idx, 1)}
+                                      style={{ background: "none", border: "none", color: "#fff", cursor: idx === activeImages.length - 1 ? "default" : "pointer", opacity: idx === activeImages.length - 1 ? 0.3 : 1, fontSize: 11 }}
+                                      title="Move right"
+                                    >
+                                      →
+                                    </button>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+
+                          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                            <label style={{ fontSize: 12, color: "var(--admin-text-soft)", fontWeight: 500 }}>
+                              Paste image URL
+                            </label>
                             <div style={{ display: "flex", gap: 8 }}>
-                              <button
-                                type="button"
-                                className="btn btn-outline btn-sm"
-                                onClick={() => {
-                                  setEditingColorId(c.id);
-                                  setColorNameInput(c.name);
-                                  setColorHexInput(c.hex);
-                                  try {
-                                    const parsed = JSON.parse(c.imagesJson || "[]");
-                                    setColorImagesInput(Array.isArray(parsed) ? parsed.join("\n") : "");
-                                  } catch {
-                                    setColorImagesInput("");
+                              <input
+                                type="text"
+                                placeholder="https://images.unsplash.com/..."
+                                value={urlInputMap[activeColorObj.id] || ""}
+                                onChange={(e) => setUrlInputMap({ ...urlInputMap, [activeColorObj.id]: e.target.value })}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    handleAddImageUrl(activeColorObj.id);
                                   }
-                                  setColorSortInput(String(c.sortOrder ?? 0));
-                                  setShowColorAddForm(true);
                                 }}
-                              >
-                                Edit
-                              </button>
+                                style={{ flex: 1, fontSize: 12 }}
+                              />
                               <button
                                 type="button"
-                                className="btn btn-outline btn-sm"
-                                style={{ color: "var(--admin-danger)" }}
-                                onClick={() => handleDeleteColor(c.id)}
+                                className="btn btn-dark btn-sm"
+                                onClick={() => handleAddImageUrl(activeColorObj.id)}
                               >
-                                Delete
+                                Add Image
                               </button>
                             </div>
+                            {urlErrorMap[activeColorObj.id] && (
+                              <span style={{ fontSize: 11, color: "var(--admin-danger)" }}>
+                                {urlErrorMap[activeColorObj.id]}
+                              </span>
+                            )}
                           </div>
                         </div>
-                      );
-                    })
-                  )}
-                </div>
+
+                        {/* PANEL 2: Stock */}
+                        <div style={{ background: "var(--admin-surface-2)", padding: 18, borderRadius: 8, border: "1px solid var(--admin-border)" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                            <h4 style={{ margin: 0, color: "var(--admin-text)", fontSize: 14 }}>
+                              Panel 2: Stock ({activeColorObj.name})
+                            </h4>
+                            <span
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 600,
+                                color: activeTotalStock === 0 ? "var(--admin-danger)" : activeTotalStock <= 3 ? "var(--admin-warn)" : "var(--admin-accent)",
+                              }}
+                            >
+                              Total: {activeTotalStock} in stock
+                            </span>
+                          </div>
+
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 10, marginBottom: 16 }}>
+                            {productSizes.map((sz) => {
+                              const currentQty = activeStockMap[sz] ?? 0;
+                              const isLow = currentQty > 0 && currentQty <= 3;
+                              const isZero = currentQty === 0;
+
+                              return (
+                                <div
+                                  key={sz}
+                                  style={{
+                                    background: "var(--admin-surface)",
+                                    padding: "8px 10px",
+                                    borderRadius: 6,
+                                    border: `1px solid ${isZero ? "var(--admin-danger)" : isLow ? "var(--admin-warn)" : "var(--admin-border)"}`,
+                                  }}
+                                >
+                                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                                    <span style={{ fontSize: 12, fontWeight: 700, color: "var(--admin-text)" }}>{sz}</span>
+                                    <span
+                                      style={{
+                                        fontSize: 10,
+                                        fontWeight: 600,
+                                        color: isZero ? "var(--admin-danger)" : isLow ? "var(--admin-warn)" : "var(--admin-text-soft)",
+                                      }}
+                                    >
+                                      {isZero ? "Sold out" : isLow ? `Low (${currentQty})` : `${currentQty}`}
+                                    </span>
+                                  </div>
+
+                                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                    <button
+                                      type="button"
+                                      style={{
+                                        width: 24,
+                                        height: 24,
+                                        borderRadius: 4,
+                                        border: "1px solid var(--admin-border)",
+                                        background: "var(--admin-surface-2)",
+                                        color: "var(--admin-text)",
+                                        cursor: "pointer",
+                                        fontWeight: "bold",
+                                      }}
+                                      onClick={() => handleUpdateSizeStock(activeColorObj.name, sz, currentQty - 1)}
+                                    >
+                                      −
+                                    </button>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      value={currentQty}
+                                      onChange={(e) => handleUpdateSizeStock(activeColorObj.name, sz, parseInt(e.target.value || "0", 10))}
+                                      style={{
+                                        width: "100%",
+                                        textAlign: "center",
+                                        padding: "2px 4px",
+                                        fontSize: 12,
+                                        fontWeight: 600,
+                                      }}
+                                    />
+                                    <button
+                                      type="button"
+                                      style={{
+                                        width: 24,
+                                        height: 24,
+                                        borderRadius: 4,
+                                        border: "1px solid var(--admin-border)",
+                                        background: "var(--admin-surface-2)",
+                                        color: "var(--admin-text)",
+                                        cursor: "pointer",
+                                        fontWeight: "bold",
+                                      }}
+                                      onClick={() => handleUpdateSizeStock(activeColorObj.name, sz, currentQty + 1)}
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingTop: 12, borderTop: "1px solid var(--admin-border)" }}>
+                            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                              <span style={{ fontSize: 12, color: "var(--admin-text-soft)", whiteSpace: "nowrap" }}>Set all sizes to:</span>
+                              <input
+                                type="number"
+                                min={0}
+                                placeholder="Qty"
+                                value={bulkQtyMap[activeColorObj.id] || ""}
+                                onChange={(e) => setBulkQtyMap({ ...bulkQtyMap, [activeColorObj.id]: e.target.value })}
+                                style={{ width: 70, fontSize: 12 }}
+                              />
+                              <button
+                                type="button"
+                                className="btn btn-outline btn-sm"
+                                onClick={() => handleBulkSetStock(activeColorObj.id, activeColorObj.name)}
+                              >
+                                Apply
+                              </button>
+                            </div>
+
+                            {dbColors.length > 1 && (
+                              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                                <span style={{ fontSize: 12, color: "var(--admin-text-soft)", whiteSpace: "nowrap" }}>Copy stock from:</span>
+                                <select
+                                  value={copyColorMap[activeColorObj.id] || ""}
+                                  onChange={(e) => setCopyColorMap({ ...copyColorMap, [activeColorObj.id]: e.target.value })}
+                                  style={{ flex: 1, fontSize: 12 }}
+                                >
+                                  <option value="">Select color...</option>
+                                  {dbColors
+                                    .filter((c) => c.id !== activeColorObj.id)
+                                    .map((c) => (
+                                      <option key={c.id} value={c.name}>
+                                        {c.name}
+                                      </option>
+                                    ))}
+                                </select>
+                                <button
+                                  type="button"
+                                  className="btn btn-outline btn-sm"
+                                  onClick={() =>
+                                    handleCopyStockFromColor(
+                                      activeColorObj.id,
+                                      activeColorObj.name,
+                                      copyColorMap[activeColorObj.id] || ""
+                                    )
+                                  }
+                                >
+                                  Copy
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Sizes Section */}
@@ -2410,80 +2953,6 @@ export default function AdminPage() {
                     ))}
                   </div>
                 )}
-              </div>
-
-              {/* Variants Stock Matrix Section */}
-              <div className="panel" style={{ padding: 24 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                  <div>
-                    <h3 style={{ margin: 0 }}>Variants &amp; Stock Matrix</h3>
-                    <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--admin-text-soft)" }}>
-                      Edit stock quantities directly. Changes auto-save on blur.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Matrix Grid: Rows = sizes, Cols = colors */}
-                {(() => {
-                  const colorsList = dbColors.length > 0
-                    ? dbColors.map((c) => c.name)
-                    : Array.from(new Set(dbVariants.map((v) => v.color))).sort();
-
-                  const sizesList = productSizes.length > 0
-                    ? productSizes
-                    : Array.from(new Set(dbVariants.map((v) => v.size)));
-
-                  if (colorsList.length === 0 || sizesList.length === 0) {
-                    return (
-                      <div style={{ color: "var(--admin-text-soft)", fontSize: 13, padding: "12px 0" }}>
-                        Add at least one color and one size above to populate the stock matrix.
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div className="table-scroll">
-                      <table className="admin-table">
-                        <thead>
-                          <tr>
-                            <th>Size / Color</th>
-                            {colorsList.map((c) => (
-                              <th key={c}>{c}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {sizesList.map((s) => (
-                            <tr key={s}>
-                              <td><strong>{s}</strong></td>
-                              {colorsList.map((c) => {
-                                const key = `${c}|${s}`;
-                                const variant = dbVariants.find((v) => v.color === c && v.size === s);
-                                const isSavingCell = cellSaving[key];
-
-                                return (
-                                  <td key={key}>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                      <input
-                                        type="number"
-                                        style={{ width: 70 }}
-                                        value={cellStockDrafts[key] ?? String(variant?.stock ?? 0)}
-                                        onChange={(e) => setCellStockDrafts({ ...cellStockDrafts, [key]: e.target.value })}
-                                        onBlur={() => handleVariantCellBlur(c, s)}
-                                        min={0}
-                                      />
-                                      {isSavingCell && <span style={{ fontSize: 11, color: "var(--admin-accent)" }}>saving…</span>}
-                                    </div>
-                                  </td>
-                                );
-                              })}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  );
-                })()}
               </div>
             </div>
           ) : activeTab === "courier" ? (

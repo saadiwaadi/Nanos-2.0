@@ -57,6 +57,32 @@ export async function POST(
 
   try {
     const body = await request.json();
+
+    if (Array.isArray(body)) {
+      const results = await prisma.$transaction(
+        body.map((item) => {
+          const qty = typeof item.stock === "number" ? item.stock : item.quantity ?? 0;
+          return prisma.stockLevel.upsert({
+            where: {
+              productId_color_size: {
+                productId: id,
+                color: item.color,
+                size: item.size,
+              },
+            },
+            update: { quantity: qty },
+            create: {
+              productId: id,
+              color: item.color,
+              size: item.size,
+              quantity: qty,
+            },
+          });
+        })
+      );
+      return NextResponse.json({ success: true, count: results.length });
+    }
+
     const { color, size } = body;
     const qty = typeof body.stock === "number" ? body.stock : body.quantity;
 

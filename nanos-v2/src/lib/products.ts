@@ -239,6 +239,19 @@ function parseProduct(row: any): Product {
     colors: parseJson<ProductColor>(row.colors),
     sizes: parseJson<string>(row.sizes),
     gallery: parseJson<string>(row.gallery),
+    productColors: row.productColors ? row.productColors.map((c: any) => ({
+      id: c.id,
+      name: c.name,
+      hex: c.hex,
+      imagesJson: c.imagesJson,
+      sortOrder: c.sortOrder ?? 0,
+    })) : undefined,
+    stockLevels: row.stockLevels ? row.stockLevels.map((s: any) => ({
+      id: s.id,
+      color: s.color,
+      size: s.size,
+      quantity: s.quantity,
+    })) : undefined,
   };
 }
 
@@ -246,7 +259,12 @@ let dbWarned = false;
 
 export async function getProducts(): Promise<Product[]> {
   try {
-    const rows = await prisma.product.findMany();
+    const rows = await prisma.product.findMany({
+      include: {
+        productColors: { orderBy: { sortOrder: "asc" } },
+        stockLevels: true,
+      },
+    });
     if (rows && rows.length > 0) {
       return rows.map(parseProduct);
     }
@@ -262,7 +280,13 @@ export async function getProducts(): Promise<Product[]> {
 
 export async function getProductById(id: string): Promise<Product | null> {
   try {
-    const row = await prisma.product.findUnique({ where: { id } });
+    const row = await prisma.product.findUnique({
+      where: { id },
+      include: {
+        productColors: { orderBy: { sortOrder: "asc" } },
+        stockLevels: true,
+      },
+    });
     if (row) {
       return parseProduct(row);
     }

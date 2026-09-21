@@ -20,6 +20,19 @@ export interface Product {
   colors: ProductColor[];
   sizes: string[];
   gallery: string[];
+  productColors?: {
+    id: string;
+    name: string;
+    hex: string;
+    imagesJson: string;
+    sortOrder: number;
+  }[];
+  stockLevels?: {
+    id?: string;
+    color: string;
+    size: string;
+    quantity: number;
+  }[];
 }
 
 export interface AdminProduct {
