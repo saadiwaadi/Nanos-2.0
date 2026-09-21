@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { allowedNext, OrderStatus } from "@/lib/order-state";
 
 // ─── TYPES ──────────────────────────────────────────────
 
@@ -79,6 +80,7 @@ interface AdminOrder {
   customerEmail?: string | null;
   createdAt: string;
   version?: number;
+  isTest?: boolean;
   postexTrackingNumber?: string | null;
   postexStatus?: string | null;
   courierBookingStatus?: string | null;
@@ -86,6 +88,7 @@ interface AdminOrder {
   user?: { id: string; email: string; name?: string | null } | null;
   orderItems: OrderItem[];
   bookingLogs?: BookingLog[];
+  events?: any[];
 }
 
 interface QueueData {
@@ -1614,19 +1617,26 @@ export default function AdminPage() {
                                       <div>PostEx Status: {o.postexStatus || "N/A"}</div>
                                       <div style={{ marginTop: 8 }}>
                                         <label style={{ fontWeight: 700, marginRight: 8 }}>Update Status:</label>
-                                        <select
-                                          value={o.status}
-                                          disabled={updatingStatusId === o.id}
-                                          onChange={(e) => handleUpdateOrderStatus(o, e.target.value)}
-                                        >
-                                          <option value="placed">Placed</option>
-                                          <option value="confirmed">Confirmed</option>
-                                          <option value="on_hold">On Hold</option>
-                                          <option value="shipped">Shipped</option>
-                                          <option value="delivered">Delivered</option>
-                                          <option value="returned">Returned</option>
-                                          <option value="cancelled">Cancelled</option>
-                                        </select>
+                                        {allowedNext(o.status as OrderStatus).length === 0 ? (
+                                          <span className="badge" style={{ textTransform: "capitalize", background: "#333", color: "#aaa" }}>
+                                            {o.status} (Final)
+                                          </span>
+                                        ) : (
+                                          <select
+                                            value={o.status}
+                                            disabled={updatingStatusId === o.id}
+                                            onChange={(e) => handleUpdateOrderStatus(o, e.target.value)}
+                                          >
+                                            <option value={o.status} disabled>
+                                              {o.status.toUpperCase()} (Current)
+                                            </option>
+                                            {allowedNext(o.status as OrderStatus).map((nextSt) => (
+                                              <option key={nextSt} value={nextSt}>
+                                                {nextSt.toUpperCase()}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        )}
                                       </div>
                                     </div>
                                   </div>

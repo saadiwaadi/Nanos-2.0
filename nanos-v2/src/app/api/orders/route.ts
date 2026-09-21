@@ -4,6 +4,8 @@ import { getProductById } from "@/lib/products";
 import { prisma } from "@/lib/prisma";
 import { isAutoBookCity } from "@/lib/postex";
 import { MetaCapiService } from "@/lib/meta-capi";
+import { reserveStock } from "@/lib/stock";
+import { AppError } from "@/lib/order-state";
 
 // In-memory fallback order store for dev when DB is offline
 export const memoryOrders = new Map<string, any>();
@@ -40,7 +42,7 @@ export async function POST(request: Request) {
 
     // Resolve each item's server-authoritative unit price and details
     let subtotal = 0;
-    const resolvedItems = [];
+    const resolvedItems: any[] = [];
 
     for (const item of items) {
       const product = await getProductById(item.productId);
@@ -76,60 +78,73 @@ export async function POST(request: Request) {
     const now = new Date().toISOString();
 
     const isAuto = await isAutoBookCity(shippingInfo.city || "");
-    const courierBookingStatus = isAuto ? "pending_auto" : "pending_manual_review";
+    const courierBookingStatus = "queued";
 
-    const orderData = {
-      id: orderId,
-      userId,
-      guestEmail: userId ? null : guestEmail || shippingInfo.email,
-      guestName: userId ? null : guestName || shippingInfo.name,
-      subtotal,
-      discount,
-      shipping,
-      total,
-      shippingInfo: JSON.stringify(shippingInfo),
-      payment: "cod",
-      status: "processing",
-      courierBookingStatus,
-      createdAt: now,
-      updatedAt: now,
-      items: resolvedItems,
-    };
+    const stockLines = resolvedItems.map((i) => ({
+      productId: i.productId,
+      color: i.color,
+      size: i.size,
+      qty: i.quantity,
+    }));
 
-    // Store in memory for instant retrieval fallback
-    memoryOrders.set(orderId, orderData);
-
-    // Try DB persistence if active
     try {
-      await prisma.order.create({
-        data: {
-          id: orderId,
-          userId,
-          guestEmail: userId ? null : guestEmail || shippingInfo.email,
-          guestName: userId ? null : guestName || shippingInfo.name,
-          subtotal,
-          discount,
-          shipping,
-          total,
-          shippingInfo: JSON.stringify(shippingInfo),
-          payment: "cod",
-          status: "processing",
-          courierBookingStatus,
-          items: {
-            create: resolvedItems.map((i) => ({
-              productId: i.productId,
-              sku: i.sku,
-              name: i.name,
-              color: i.color,
-              size: i.size,
-              quantity: i.quantity,
-              unitPrice: i.unitPrice,
-            })),
+      await prisma.$transaction(async (tx) => {
+        const trackedMap = await reserveStock(tx, stockLines);
+
+        const createdOrder = await tx.order.create({
+          data: {
+            id: orderId,
+            userId,
+            guestEmail: userId ? null : guestEmail || shippingInfo.email,
+            guestName: userId ? null : guestName || shippingInfo.name,
+            subtotal,
+            discount,
+            shipping,
+            total,
+            shippingInfo: JSON.stringify(shippingInfo),
+            payment: "cod",
+            status: "placed",
+            courierBookingStatus,
+            stockReserved: true,
+            items: {
+              create: resolvedItems.map((i) => {
+                const key = `${i.productId}:${i.color}:${i.size}`;
+                return {
+                  productId: i.productId,
+                  sku: i.sku,
+                  name: i.name,
+                  color: i.color,
+                  size: i.size,
+                  quantity: i.quantity,
+                  unitPrice: i.unitPrice,
+                  stockTracked: trackedMap[key] ?? true,
+                };
+              }),
+            },
           },
-        },
+        });
+
+        await tx.orderEvent.create({
+          data: {
+            orderId: createdOrder.id,
+            type: "created",
+            toValue: "placed",
+            actor: userId ? `user:${userId}` : "customer:guest",
+          },
+        });
       });
-    } catch {
-      // Graceful fallback to memory store when DB offline
+    } catch (txErr: any) {
+      if (txErr instanceof AppError && txErr.code === "OUT_OF_STOCK") {
+        return NextResponse.json(
+          {
+            error: "OUT_OF_STOCK",
+            message: txErr.message,
+            shortages: txErr.details?.shortages || [],
+          },
+          { status: 409 }
+        );
+      }
+      throw txErr;
     }
 
     // Send CAPI events asynchronously (non-blocking)

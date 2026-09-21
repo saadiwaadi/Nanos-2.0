@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth-server";
-import { runBatch } from "@/lib/postex-booking";
+import { syncCourierStatus } from "@/lib/courier-sync";
 
 export async function POST(request: Request) {
   const auth = await requireAdmin(request);
@@ -10,11 +10,11 @@ export async function POST(request: Request) {
   }
 
   try {
-    const results = await runBatch();
-    return NextResponse.json(results);
+    const result = await syncCourierStatus();
+    return NextResponse.json(result);
   } catch (err: any) {
     return NextResponse.json(
-      { error: err.message || "Failed to execute batch booking" },
+      { error: err.message || "Courier sync failed" },
       { status: 500 }
     );
   }

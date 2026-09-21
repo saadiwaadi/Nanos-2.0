@@ -15,7 +15,7 @@ const MANUAL: Record<OrderStatus, OrderStatus[]> = {
   confirmed: ["shipped", "on_hold", "cancelled"],
   on_hold: ["confirmed", "cancelled"],
   shipped: ["delivered", "returned"],
-  delivered: ["returned"],
+  delivered: [],
   returned: [],
   cancelled: [],
 };
@@ -44,14 +44,19 @@ export function mapCourierStatus(raw: string): OrderStatus | null {
 }
 
 export class AppError extends Error {
+  public status: number;
+  public details: any;
+
   constructor(
     public code: string,
     message: string,
     public httpStatus = 400,
-    public extra: object = {}
+    public extra: any = {}
   ) {
     super(message);
     this.name = "AppError";
+    this.status = httpStatus;
+    this.details = extra;
   }
 }
 

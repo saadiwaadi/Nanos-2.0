@@ -23,6 +23,7 @@ model Product {
   reviews     Int     @default(0)
   hero        String  // main image URL
   isSale      Boolean @default(false)
+  ignoreStock Boolean @default(false)
 
   // Display data — JSON strings
   colors  String @default("[]") // [{name, hex}]
@@ -55,12 +56,13 @@ model ProductColor {
 }
 
 model StockLevel {
-  id        String  @id @default(cuid())
-  productId String
-  color     String
-  size      String
-  quantity  Int     @default(0)
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  id          String  @id @default(cuid())
+  productId   String
+  color       String
+  size        String
+  quantity    Int     @default(0)
+  ignoreStock Boolean @default(false)
+  product     Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([productId, color, size])
 }
@@ -123,11 +125,14 @@ model Order {
   userId         String?
   guestEmail     String?
   guestName      String?
+  customerName   String?
+  customerEmail  String?
   subtotal       Int      @default(0)
   discount       Int      @default(0)
   shipping       Int      @default(0)
   total          Int      @default(0)
-  shippingInfo   String   @default("{}") // JSON: {name, phone, email, address, city, postal}
+  shippingInfo   String   @default("{}") // JSON string
+  notes          String?
   payment        String   @default("cod") // "cod" | "card" | "easypaisa"
 
   // Lifecycle & booking pipeline
@@ -183,7 +188,7 @@ model OrderEvent {
   toValue   String?
   actor     String   // admin email, "system:batch", "system:sync"
   reason    String?
-  meta      Json?
+  metadata  Json?    @map("meta")
   createdAt DateTime @default(now())
 
   @@index([orderId, createdAt])
