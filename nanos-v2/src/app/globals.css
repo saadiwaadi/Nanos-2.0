@@ -944,8 +944,21 @@ noscript { display: none !important; }
 .panel-head h3 { font-family: var(--font-head); font-size: 16px; font-weight: 700; margin: 0; }
 .panel-body { padding: 24px; }
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px; }
-@media (max-width: 960px) { .two-col { grid-template-columns: 1fr; } }
-.table-scroll { overflow-x: auto; }
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+@media (max-width: 768px) {
+  .table-scroll .admin-table th:first-child,
+  .table-scroll .admin-table td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: var(--admin-surface);
+    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+  }
+}
 .admin-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13.5px; }
 .admin-table th { background: var(--admin-surface-2); padding: 12px 16px; font-weight: 600; color: var(--admin-text-soft); border-bottom: 1px solid var(--admin-border); }
 .admin-table td { padding: 14px 16px; border-bottom: 1px solid var(--admin-border); color: var(--admin-text); vertical-align: middle; }

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { postexFetch, postexToken } from "@/lib/postex-client";
+import { postexFetch, postexToken, PostexError } from "@/lib/postex-client";
 
 export interface PostexCreateOrderPayload {
   cityName: string;
@@ -153,6 +153,7 @@ export async function bookSingleOrder(
   let responseData: PostexCreateOrderResponse | null = null;
   let success = false;
   let errorMessage: string | null = null;
+  let caughtError: any = null;
 
   try {
     responseData = await callCreateOrderApi(payload);
@@ -164,7 +165,6 @@ export async function bookSingleOrder(
     ) {
       success = true;
       const trackingNumber = responseData.dist.trackingNumber;
-      const postexStatus = responseData.dist.orderStatus || "UnBooked";
 
       await prisma.order.update({
         where: { id: order.id },
@@ -191,13 +191,25 @@ export async function bookSingleOrder(
   } catch (err: any) {
     success = false;
     errorMessage = err.message || "Network error connecting to PostEx API";
+    caughtError = err;
 
-    await prisma.order.update({
-      where: { id: order.id },
-      data: {
-        courierBookingStatus: "booking_failed",
-      },
-    });
+    const isSystemError =
+      err instanceof PostexError &&
+      (err.code === "CONFIG" ||
+        err.code === "AUTH" ||
+        err.code === "SERVER" ||
+        err.code === "TIMEOUT" ||
+        err.code === "NETWORK");
+
+    // Only mark as booking_failed if error is order-specific (REQUEST). System/Config/Auth/Transient errors leave order queued.
+    if (!isSystemError) {
+      await prisma.order.update({
+        where: { id: order.id },
+        data: {
+          courierBookingStatus: "booking_failed",
+        },
+      });
+    }
   }
 
   const log = await prisma.postexBookingLog.create({
@@ -209,6 +221,13 @@ export async function bookSingleOrder(
       errorMessage,
     },
   });
+
+  if (
+    caughtError instanceof PostexError &&
+    (caughtError.code === "CONFIG" || caughtError.code === "AUTH")
+  ) {
+    throw caughtError;
+  }
 
   return {
     orderId: order.id,
@@ -243,8 +262,23 @@ export async function processBatchBooking() {
 
   const results = [];
   for (const order of eligibleOrders) {
-    const result = await bookSingleOrder(order);
-    results.push(result);
+    try {
+      const result = await bookSingleOrder(order);
+      results.push(result);
+    } catch (err: any) {
+      if (
+        err instanceof PostexError &&
+        (err.code === "CONFIG" || err.code === "AUTH")
+      ) {
+        // Abort batch run immediately for AUTH/CONFIG error without burning orders
+        throw err;
+      }
+      results.push({
+        orderId: order.id,
+        success: false,
+        errorMessage: err.message,
+      });
+    }
   }
 
   return results;

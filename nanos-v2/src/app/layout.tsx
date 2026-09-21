@@ -9,6 +9,8 @@ import { ScrollRestoration } from "@/components/ScrollRestoration";
 
 import { MetaPixel } from "@/components/MetaPixel";
 
+import SiteChrome from "@/components/SiteChrome";
+
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
@@ -31,10 +33,14 @@ export default function RootLayout({
         <AuthProvider>
           <CartProvider>
             <ScrollRestoration />
-            <Navbar />
+            <SiteChrome>
+              <Navbar />
+            </SiteChrome>
             {children}
-            <Footer />
-            <CartDrawer />
+            <SiteChrome>
+              <Footer />
+              <CartDrawer />
+            </SiteChrome>
           </CartProvider>
         </AuthProvider>
       </body>

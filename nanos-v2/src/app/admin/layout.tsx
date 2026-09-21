@@ -10,5 +10,17 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <div style={{ minHeight: "100vh" }}>{children}</div>;
+  return (
+    <div
+      style={{
+        minHeight: "100dvh",
+        width: "100%",
+        display: "flex",
+        flexDirection: "column",
+        flex: "1 1 auto",
+      }}
+    >
+      {children}
+    </div>
+  );
 }

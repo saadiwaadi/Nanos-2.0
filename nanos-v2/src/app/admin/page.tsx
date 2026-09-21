@@ -1611,18 +1611,40 @@ export default function AdminPage() {
                                   <div style={{ fontWeight: 700, marginBottom: 8 }}>Order Items</div>
                                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                                     {o.orderItems.map((item) => (
-                                      <div key={item.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fff", padding: "8px 12px", borderRadius: 4 }}>
+                                      <div
+                                        key={item.id}
+                                        style={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          justifyContent: "space-between",
+                                          background: "#1f1f1f",
+                                          color: "#f5f5f5",
+                                          padding: "10px 14px",
+                                          borderRadius: 6,
+                                          border: "1px solid var(--admin-border)",
+                                        }}
+                                      >
                                         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                                           {item.product?.hero && (
                                             /* eslint-disable-next-line @next/next/no-img-element */
-                                            <img src={item.product.hero} alt="" width={32} height={32} style={{ objectFit: "cover", borderRadius: 4 }} />
+                                            <img
+                                              src={item.product.hero}
+                                              alt=""
+                                              width={32}
+                                              height={32}
+                                              style={{ objectFit: "cover", borderRadius: 4 }}
+                                            />
                                           )}
-                                          <div>
-                                            <strong>{item.product?.name || item.productId}</strong> ({item.color}/{item.size})
+                                          <div style={{ color: "#f5f5f5" }}>
+                                            <strong style={{ color: "#ffffff" }}>{item.product?.name || item.productId}</strong>{" "}
+                                            <span style={{ color: "rgba(245, 245, 245, 0.8)", fontSize: "12.5px" }}>
+                                              ({item.color}/{item.size})
+                                            </span>
                                           </div>
                                         </div>
-                                        <div>
-                                          {item.quantity} × {fmtPrice(item.price)} = <strong>{fmtPrice(item.quantity * item.price)}</strong>
+                                        <div style={{ color: "#f5f5f5", fontSize: "13.5px" }}>
+                                          {item.quantity} × {fmtPrice(item.price)} ={" "}
+                                          <strong style={{ color: "#ffffff" }}>{fmtPrice(item.quantity * item.price)}</strong>
                                         </div>
                                       </div>
                                     ))}
