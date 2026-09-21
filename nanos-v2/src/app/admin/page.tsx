@@ -78,6 +78,7 @@ interface AdminOrder {
   customerName?: string | null;
   customerEmail?: string | null;
   createdAt: string;
+  version?: number;
   postexTrackingNumber?: string | null;
   postexStatus?: string | null;
   courierBookingStatus?: string | null;
@@ -830,16 +831,33 @@ export default function AdminPage() {
     }
   }
 
-  // Order Status Update (PATCH)
-  async function handleUpdateOrderStatus(orderId: string, status: string) {
-    setUpdatingStatusId(orderId);
+  // Order Status Update (POST /api/admin/orders/[id]/status)
+  async function handleUpdateOrderStatus(order: AdminOrder, toStatus: string) {
+    let reason: string | undefined = undefined;
+    if (["cancelled", "on_hold", "returned"].includes(toStatus)) {
+      const reasonInput = window.prompt(`Please enter a reason for changing status to "${toStatus}":`);
+      if (!reasonInput || !reasonInput.trim()) {
+        showToast("Reason is required for this status change.", "error");
+        return;
+      }
+      reason = reasonInput.trim();
+    }
+
+    setUpdatingStatusId(order.id);
     try {
-      const res = await authFetch(`/api/admin/orders/${orderId}/status`, {
-        method: "PATCH",
-        body: JSON.stringify({ status }),
+      const res = await authFetch(`/api/admin/orders/${order.id}/status`, {
+        method: "POST",
+        body: JSON.stringify({
+          to: toStatus,
+          expectedVersion: order.version ?? 0,
+          reason,
+        }),
       });
-      if (!res.ok) throw new Error("Failed to update status");
-      showToast(`Order status updated to ${status}`);
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to update order status");
+      }
+      showToast(`Order status updated to ${toStatus}`);
       loadMainData();
     } catch (err: any) {
       showToast(err.message || "Failed to update order status", "error");
@@ -1453,9 +1471,12 @@ export default function AdminPage() {
                   />
                   <select value={orderStatusFilter} onChange={(e) => setOrderStatusFilter(e.target.value)}>
                     <option value="all">All Statuses</option>
-                    <option value="processing">Processing</option>
+                    <option value="placed">Placed</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="on_hold">On Hold</option>
                     <option value="shipped">Shipped</option>
                     <option value="delivered">Delivered</option>
+                    <option value="returned">Returned</option>
                     <option value="cancelled">Cancelled</option>
                   </select>
                   <select value={orderCustomerFilter} onChange={(e) => setOrderCustomerFilter(e.target.value)}>
@@ -1596,11 +1617,14 @@ export default function AdminPage() {
                                         <select
                                           value={o.status}
                                           disabled={updatingStatusId === o.id}
-                                          onChange={(e) => handleUpdateOrderStatus(o.id, e.target.value)}
+                                          onChange={(e) => handleUpdateOrderStatus(o, e.target.value)}
                                         >
-                                          <option value="processing">Processing</option>
+                                          <option value="placed">Placed</option>
+                                          <option value="confirmed">Confirmed</option>
+                                          <option value="on_hold">On Hold</option>
                                           <option value="shipped">Shipped</option>
                                           <option value="delivered">Delivered</option>
+                                          <option value="returned">Returned</option>
                                           <option value="cancelled">Cancelled</option>
                                         </select>
                                       </div>

@@ -129,33 +129,64 @@ model Order {
   total          Int      @default(0)
   shippingInfo   String   @default("{}") // JSON: {name, phone, email, address, city, postal}
   payment        String   @default("cod") // "cod" | "card" | "easypaisa"
-  status         String   @default("processing") // "processing" | "shipped" | "delivered" | "cancelled"
 
-  // PostEx fields
-  postexTrackingNumber String?            @map("postexTracking")
-  courierBookingStatus String?            @map("courierStatus")
-  adminApproved        Boolean            @default(false)
+  // Lifecycle & booking pipeline
+  status               String    @default("placed")       // lifecycle
+  courierBookingStatus String    @default("not_booked") @map("courierStatus")  // booking pipeline
+  courierStatusRaw     String?                            // last raw PostEx status
+  courierSyncedAt      DateTime?
+  trackingNumber       String?
+  postexTrackingNumber String?   @map("postexTracking")
+  adminApproved        Boolean   @default(false)
+
+  bookingAttempts      Int       @default(0)
+  bookingLockedAt      DateTime?
+  bookingError         String?
+  bookingAmbiguous     Boolean   @default(false)           // timeout: may exist on PostEx
+  stockReserved        Boolean   @default(false)
+  isTest               Boolean   @default(false)
+  version              Int       @default(0)
 
   user        User?              @relation(fields: [userId], references: [id])
   items       OrderItem[]
   bookingLogs PostexBookingLog[]
+  events      OrderEvent[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([status, courierBookingStatus])
+  @@index([trackingNumber])
 }
 
 model OrderItem {
-  id        String @id @default(cuid())
+  id           String  @id @default(cuid())
+  orderId      String
+  productId    String
+  sku          String
+  name         String  // denormalized for display
+  color        String
+  size         String
+  quantity     Int
+  unitPrice    Int     // price at time of order
+  stockTracked Boolean @default(false)
+  order        Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product      Product @relation(fields: [productId], references: [id])
+}
+
+model OrderEvent {
+  id        String   @id @default(cuid())
   orderId   String
-  productId String
-  sku       String
-  name      String // denormalized for display
-  color     String
-  size      String
-  quantity  Int
-  unitPrice Int    // price at time of order
-  order     Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product   Product @relation(fields: [productId], references: [id])
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  type      String   // status_change | edited | booking | courier_sync | stock
+  fromValue String?
+  toValue   String?
+  actor     String   // admin email, "system:batch", "system:sync"
+  reason    String?
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  @@index([orderId, createdAt])
 }
 
 model PostexBookingLog {

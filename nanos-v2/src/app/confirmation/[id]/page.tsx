@@ -147,10 +147,59 @@ export default function ConfirmationPage({
   return (
     <div className="page">
       <div className="confirm-wrap">
+        {/* Banner */}
+        <div
+          style={{
+            backgroundColor: "#f0fdf4",
+            border: "1px solid #bbf7d0",
+            borderRadius: "8px",
+            padding: "16px 20px",
+            marginBottom: "24px",
+            display: "flex",
+            alignItems: "center",
+            gap: "14px",
+            textAlign: "left",
+          }}
+        >
+          <div
+            style={{
+              width: "36px",
+              height: "36px",
+              borderRadius: "50%",
+              backgroundColor: "#22c55e",
+              color: "#ffffff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            <svg
+              style={{ width: "20px", height: "20px" }}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </div>
+          <div>
+            <div style={{ fontSize: "16px", fontWeight: 700, color: "#14532d" }}>
+              Your order is placed — {shortId}
+            </div>
+            <div style={{ fontSize: "13px", color: "#15803d" }}>
+              Thank you. We&apos;ll confirm your order shortly and you pay cash on delivery.
+            </div>
+          </div>
+        </div>
+
         {/* Checkmark Circle */}
         <div className="confirm-check">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-            <polyline points="20 6 9 12 4 10" />
+            <polyline points="20 6 9 17 4 12" />
           </svg>
         </div>
 
