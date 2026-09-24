@@ -34,11 +34,12 @@ export function CartDrawer() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [cart.isOpen, cart]);
 
-  function handleApplyPromo(e: React.FormEvent) {
+  async function handleApplyPromo(e: React.FormEvent) {
     e.preventDefault();
     if (!promoInput.trim()) return;
-    const res = cart.applyPromo(promoInput);
+    const res = await cart.applyPromo(promoInput);
     setPromoMsg(res);
+    if (res.ok) setPromoInput("");
   }
 
   function handleCheckout() {
@@ -153,7 +154,6 @@ export function CartDrawer() {
               <input
                 type="text"
                 className="promo-input"
-                placeholder="Promo code (NANOS10)"
                 value={promoInput}
                 onChange={(e) => setPromoInput(e.target.value)}
               />
@@ -168,10 +168,46 @@ export function CartDrawer() {
                   fontSize: 12,
                   fontWeight: 600,
                   marginBottom: 12,
-                  color: promoMsg ? (promoMsg.ok ? "var(--lime)" : "#d64545") : "var(--lime)",
+                  padding: "7px 10px",
+                  borderRadius: 4,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  color: promoMsg ? (promoMsg.ok ? "#166534" : "#991b1b") : "#166534",
+                  background: promoMsg
+                    ? promoMsg.ok
+                      ? "rgba(34, 197, 94, 0.12)"
+                      : "rgba(239, 68, 68, 0.1)"
+                    : "rgba(34, 197, 94, 0.12)",
+                  border: promoMsg
+                    ? promoMsg.ok
+                      ? "1px solid rgba(34, 197, 94, 0.25)"
+                      : "1px solid rgba(239, 68, 68, 0.25)"
+                    : "1px solid rgba(34, 197, 94, 0.25)",
                 }}
               >
-                {promoMsg ? promoMsg.message : "NANOS10 applied — 10% off ✓"}
+                <span>{promoMsg ? promoMsg.message : `${cart.promo} applied ✓`}</span>
+                {cart.promo && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      cart.clearPromo();
+                      setPromoMsg(null);
+                    }}
+                    style={{
+                      border: "none",
+                      background: "none",
+                      color: "#6b7280",
+                      fontSize: 12,
+                      cursor: "pointer",
+                      padding: "0 2px",
+                      textDecoration: "underline",
+                    }}
+                    title="Remove promo code"
+                  >
+                    Remove
+                  </button>
+                )}
               </div>
             )}
 
@@ -181,8 +217,8 @@ export function CartDrawer() {
                 <span>{fmtPrice(cart.subtotal)}</span>
               </div>
               {cart.discount > 0 && (
-                <div className="cart-total-row" style={{ color: "var(--lime)" }}>
-                  <span>Discount (10%)</span>
+                <div className="cart-total-row" style={{ color: "#166534", fontWeight: 600 }}>
+                  <span>Discount {cart.promo ? `(${cart.promo})` : ""}</span>
                   <span>−{fmtPrice(cart.discount)}</span>
                 </div>
               )}

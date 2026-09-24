@@ -99,10 +99,10 @@ export function Navbar() {
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="https://res.cloudinary.com/tp1vyxi3/image/upload/v1789301766/ChatGPT_Image_Sep_13__2026__05_15_23_AM-removebg-preview.png"
+                src="https://res.cloudinary.com/wj34wxob/image/upload/v1790160668/ChatGPT_Image_Sep_13__2026__05_15_23_AM-removebg-preview.png"
                 alt="nanos.pk"
-                width={160}
-                height={44}
+                width={190}
+                height={54}
                 className="logo-img"
               />
             </Link>
@@ -153,7 +153,14 @@ export function Navbar() {
         </button>
 
         <div className="nav-drawer-logo">
-          nanos<span className="pk">.pk</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="https://res.cloudinary.com/wj34wxob/image/upload/v1790160668/ChatGPT_Image_Sep_13__2026__05_15_23_AM-removebg-preview.png"
+            alt="nanos.pk"
+            width={180}
+            height={50}
+            className="nav-drawer-logo-img"
+          />
         </div>
 
         {/* Categories Section */}
@@ -164,21 +171,21 @@ export function Navbar() {
             className={`nav-drawer-link ${pathname === "/products" ? "active" : ""}`}
             onClick={closeDrawer}
           >
-            Shop All →
+            <span>Shop All</span>
           </Link>
           <Link
             href="/crocs"
             className={`nav-drawer-link ${pathname === "/crocs" ? "active" : ""}`}
             onClick={closeDrawer}
           >
-            Crocs →
+            <span>Crocs</span>
           </Link>
           <Link
             href="/trousers"
             className={`nav-drawer-link ${pathname === "/trousers" ? "active" : ""}`}
             onClick={closeDrawer}
           >
-            Trousers →
+            <span>Trousers</span>
           </Link>
         </div>
 
@@ -190,33 +197,33 @@ export function Navbar() {
             className="nav-drawer-link"
             onClick={closeDrawer}
           >
-            New Arrivals →
+            <span>New Arrivals</span>
           </Link>
           <Link
             href="/products?tag=SALE"
             className="nav-drawer-link"
             onClick={closeDrawer}
           >
-            Sale →
+            <span>Sale</span>
           </Link>
         </div>
 
         {/* Account & Orders Section */}
-        <div className="nav-drawer-section">
+        <div className="nav-drawer-section nav-drawer-section-account">
           <div className="nav-drawer-section-title">Account</div>
           <Link
             href={isLoggedIn ? "/account" : "/login"}
             className={`nav-drawer-link ${pathname === "/account" || pathname === "/login" ? "active" : ""}`}
             onClick={closeDrawer}
           >
-            My Account →
+            <span>My Account</span>
           </Link>
           <Link
             href={isLoggedIn ? "/account" : "/login"}
             className="nav-drawer-link"
             onClick={closeDrawer}
           >
-            Track Order →
+            <span>Track Order</span>
           </Link>
         </div>
       </div>

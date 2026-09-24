@@ -20,23 +20,32 @@ export type CartItem = {
   qty: number;
 };
 
+export type PromoInfo = {
+  code: string;
+  discountType: "percent" | "fixed";
+  discountValue: number;
+  minOrderAmount?: number;
+};
+
 type CartState = {
   items: CartItem[];
   promo: string | null;
+  promoInfo?: PromoInfo | null;
 };
 
 function load(): CartState {
-  if (typeof window === "undefined") return { items: [], promo: null };
+  if (typeof window === "undefined") return { items: [], promo: null, promoInfo: null };
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { items: [], promo: null };
+    if (!raw) return { items: [], promo: null, promoInfo: null };
     const parsed = JSON.parse(raw) as CartState;
     return {
       items: Array.isArray(parsed.items) ? parsed.items : [],
       promo: typeof parsed.promo === "string" ? parsed.promo : null,
+      promoInfo: parsed.promoInfo && typeof parsed.promoInfo === "object" ? parsed.promoInfo : null,
     };
   } catch {
-    return { items: [], promo: null };
+    return { items: [], promo: null, promoInfo: null };
   }
 }
 
@@ -47,7 +56,7 @@ function save(state: CartState) {
 }
 
 export function useCart() {
-  const [state, setState] = useState<CartState>({ items: [], promo: null });
+  const [state, setState] = useState<CartState>({ items: [], promo: null, promoInfo: null });
 
   useEffect(() => {
     const sync = () => setState(load());
@@ -63,9 +72,30 @@ export function useCart() {
   const items = state.items;
   const count = items.reduce((n, i) => n + i.qty, 0);
   const subtotal = items.reduce((n, i) => n + i.qty * i.price, 0);
-  const promoValid = state.promo === PROMO_CODE && items.length > 0;
-  const discount = promoValid ? Math.round(subtotal * PROMO_DISCOUNT) : 0;
-  const afterDiscount = subtotal - discount;
+
+  const promoInfo = state.promoInfo;
+  let promoValid = Boolean(state.promo && items.length > 0);
+  let discount = 0;
+
+  if (promoValid && promoInfo && state.promo === promoInfo.code) {
+    if (promoInfo.minOrderAmount && subtotal < promoInfo.minOrderAmount) {
+      promoValid = false;
+      discount = 0;
+    } else if (promoInfo.discountType === "fixed") {
+      discount = Math.min(subtotal, Math.round(promoInfo.discountValue));
+    } else {
+      const rate = Math.min(100, Math.max(0, promoInfo.discountValue)) / 100;
+      discount = Math.round(subtotal * rate);
+    }
+  } else if (promoValid && state.promo) {
+    // Default fallback 10%
+    discount = Math.round(subtotal * 0.1);
+  } else {
+    promoValid = false;
+    discount = 0;
+  }
+
+  const afterDiscount = Math.max(0, subtotal - discount);
   const shipping =
     items.length === 0 || afterDiscount >= FREE_SHIPPING_THRESHOLD
       ? 0
@@ -82,6 +112,7 @@ export function useCart() {
     shipping,
     total,
     promo: promoValid ? state.promo : null,
+    promoInfo: promoValid ? state.promoInfo : null,
 
     addItem(item: Omit<CartItem, "qty">, qty = 1) {
       const cur = load();
@@ -146,28 +177,63 @@ export function useCart() {
       save(cur);
     },
 
-    applyPromo(code: string): { ok: boolean; message: string } {
+    async applyPromo(code: string): Promise<{ ok: boolean; message: string }> {
       const cur = load();
       const normalized = code.trim().toUpperCase();
       if (cur.items.length === 0) {
         return { ok: false, message: "Add something to your cart first." };
       }
-      if (normalized !== PROMO_CODE) {
+      if (!normalized) {
+        return { ok: false, message: "Please enter a promo code." };
+      }
+
+      const curSubtotal = cur.items.reduce((n, i) => n + i.qty * i.price, 0);
+
+      try {
+        const res = await fetch("/api/promo", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: normalized, subtotal: curSubtotal }),
+        });
+        const data = await res.json();
+        if (data.valid) {
+          cur.promo = normalized;
+          cur.promoInfo = {
+            code: normalized,
+            discountType: data.discountType || "percent",
+            discountValue: typeof data.discountValue === "number" ? data.discountValue : 10,
+            minOrderAmount: typeof data.minOrderAmount === "number" ? data.minOrderAmount : 0,
+          };
+          save(cur);
+          return { ok: true, message: data.message || `${normalized} applied.` };
+        } else {
+          return { ok: false, message: data.message || `Code "${code}" is not valid.` };
+        }
+      } catch {
+        // Fallback for offline/local if promo matches NANOS10
+        if (normalized === PROMO_CODE) {
+          cur.promo = normalized;
+          cur.promoInfo = {
+            code: normalized,
+            discountType: "percent",
+            discountValue: 10,
+          };
+          save(cur);
+          return { ok: true, message: `${PROMO_CODE} applied — 10% off.` };
+        }
         return { ok: false, message: `Code "${code}" is not valid.` };
       }
-      cur.promo = normalized;
-      save(cur);
-      return { ok: true, message: `${PROMO_CODE} applied — 10% off.` };
     },
 
     clearPromo() {
       const cur = load();
       cur.promo = null;
+      cur.promoInfo = null;
       save(cur);
     },
 
     clear() {
-      save({ items: [], promo: null });
+      save({ items: [], promo: null, promoInfo: null });
     },
   };
 }

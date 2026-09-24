@@ -426,7 +426,7 @@ export default function CheckoutPage() {
               </div>
 
               {cart.discount > 0 && (
-                <div className="summary-row" style={{ color: "#5a8f00" }}>
+                <div className="summary-row" style={{ color: "#166534", fontWeight: 600 }}>
                   <span>Promo ({cart.promo})</span>
                   <span>−{fmtPrice(cart.discount)}</span>
                 </div>
@@ -446,15 +446,14 @@ export default function CheckoutPage() {
               <div className="promo-row">
                 <input
                   type="text"
-                  placeholder="Promo code"
                   value={promoInput}
                   onChange={(e) => setPromoInput(e.target.value)}
                 />
                 <button
                   type="button"
                   className="btn btn-outline btn-sm"
-                  onClick={() => {
-                    const res = cart.applyPromo(promoInput);
+                  onClick={async () => {
+                    const res = await cart.applyPromo(promoInput);
                     setPromoMsg({ ok: res.ok, text: res.message });
                     if (res.ok) setPromoInput("");
                   }}
@@ -469,7 +468,8 @@ export default function CheckoutPage() {
                     fontSize: 12.5,
                     marginTop: -6,
                     marginBottom: 10,
-                    color: promoMsg.ok ? "#5a8f00" : "#c0392b",
+                    fontWeight: 600,
+                    color: promoMsg.ok ? "#166534" : "#991b1b",
                   }}
                 >
                   {promoMsg.text}

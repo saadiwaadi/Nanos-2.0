@@ -38,7 +38,24 @@ interface ProductData {
   }[];
 }
 
-export function PdpActions({ product: p }: { product: ProductData }) {
+export interface BundlePricingInfo {
+  buy1Price: number;
+  buy2Price: number;
+  buy2UnitPrice: number;
+  buy2DiscountText: string;
+  buy3Price: number;
+  buy3UnitPrice: number;
+  buy3DiscountText: string;
+  enabled: boolean;
+}
+
+export function PdpActions({
+  product: p,
+  bundlePricing,
+}: {
+  product: ProductData;
+  bundlePricing?: BundlePricingInfo;
+}) {
   const [mounted, setMounted] = useState(false);
   const [imgIdx, setImgIdx] = useState(0);
   const [activeImage, setActiveImage] = useState<string | null>(null);
@@ -124,21 +141,50 @@ export function PdpActions({ product: p }: { product: ProductData }) {
     return 999;
   }
 
+  const [bundleTier, setBundleTier] = useState<1 | 2 | 3>(1);
+
+  const b1Price = bundlePricing?.buy1Price ?? p.price;
+  const b2Price = bundlePricing?.buy2Price ?? Math.round(p.price * 2 * 0.9);
+  const b2UnitPrice = bundlePricing?.buy2UnitPrice ?? Math.round(p.price * 0.9);
+  const b2DiscountText = bundlePricing?.buy2DiscountText ?? "10% OFF";
+  const b3Price = bundlePricing?.buy3Price ?? Math.round(p.price * 3 * 0.85);
+  const b3UnitPrice = bundlePricing?.buy3UnitPrice ?? Math.round(p.price * 0.85);
+  const b3DiscountText = bundlePricing?.buy3DiscountText ?? "15% OFF";
+  const bundleEnabled = bundlePricing?.enabled !== false;
+
+  const effectiveUnitPrice =
+    bundleTier === 2
+      ? b2UnitPrice
+      : bundleTier === 3
+      ? b3UnitPrice
+      : b1Price;
+
+  const effectiveQty = bundleTier;
+  const effectiveTotal =
+    bundleTier === 2 ? b2Price : bundleTier === 3 ? b3Price : b1Price;
+
   function handleAdd() {
     if (!size) return;
     const sizeStock = getStockForSize(size);
     if (sizeStock === 0) return;
 
+    const bundleNameSuffix =
+      bundleTier === 2
+        ? ` · 2-Pack (${b2DiscountText})`
+        : bundleTier === 3
+        ? ` · 3-Pack (${b3DiscountText})`
+        : "";
+
     cart.addItem(
       {
         productId: p.id,
-        name: p.name,
+        name: p.name + bundleNameSuffix,
         color,
         size,
-        price: p.price,
+        price: effectiveUnitPrice,
         img: displayedImage,
       },
-      qty
+      effectiveQty
     );
 
     setAdded(true);
@@ -370,6 +416,409 @@ export function PdpActions({ product: p }: { product: ProductData }) {
           </div>
         </div>
 
+        {/* Choose your bundle */}
+        {bundleEnabled && (
+          <div style={{ margin: "24px 0 24px 0" }}>
+            <div
+              style={{
+                fontSize: 15,
+                fontWeight: 700,
+                marginBottom: 12,
+                letterSpacing: "-0.01em",
+              }}
+            >
+              Choose your bundle
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {/* TIER 1: BUY 1 */}
+              <div
+                onClick={() => setBundleTier(1)}
+                style={{
+                  position: "relative",
+                  padding: "14px 18px",
+                  borderRadius: 10,
+                  cursor: "pointer",
+                  transition: "all 0.18s ease",
+                  border: bundleTier === 1 ? "1.5px solid #8C6D46" : "1px solid var(--border, #333)",
+                  background:
+                    bundleTier === 1
+                      ? "rgba(140, 109, 70, 0.08)"
+                      : "var(--surface-2, #1e1e1e)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  {/* Custom Radio Circle */}
+                  <div
+                    style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: "50%",
+                      border: bundleTier === 1 ? "2px solid #8C6D46" : "2px solid #777",
+                      display: "grid",
+                      placeItems: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {bundleTier === 1 && (
+                      <div
+                        style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: "50%",
+                          background: "#8C6D46",
+                        }}
+                      />
+                    )}
+                  </div>
+
+                  {/* 1 Thumbnail */}
+                  <div
+                    style={{
+                      width: 38,
+                      height: 38,
+                      borderRadius: 6,
+                      overflow: "hidden",
+                      background: "#000",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={displayedImage}
+                      alt=""
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    />
+                  </div>
+
+                  {/* Text info */}
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 700 }}>Buy 1</div>
+                    <div style={{ fontSize: 12, color: "var(--text-soft, #888)", marginTop: 2 }}>
+                      {fmtPrice(b1Price)} each · Pick your article and size
+                    </div>
+                  </div>
+                </div>
+
+                {/* Price */}
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: "-0.01em" }}>
+                    {fmtPrice(b1Price)}
+                  </div>
+                </div>
+              </div>
+
+              {/* TIER 2: BUY 2 */}
+              <div
+                onClick={() => setBundleTier(2)}
+                style={{
+                  position: "relative",
+                  padding: "14px 18px",
+                  borderRadius: 10,
+                  cursor: "pointer",
+                  transition: "all 0.18s ease",
+                  border: bundleTier === 2 ? "1.5px solid #8C6D46" : "1px solid var(--border, #333)",
+                  background:
+                    bundleTier === 2
+                      ? "rgba(140, 109, 70, 0.08)"
+                      : "var(--surface-2, #1e1e1e)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                }}
+              >
+                {/* Floating Badge: MOST POPULAR */}
+                <div
+                  style={{
+                    position: "absolute",
+                    top: -10,
+                    right: 14,
+                    background: "#8C6D46",
+                    color: "#fff",
+                    fontSize: 10,
+                    fontWeight: 800,
+                    letterSpacing: "0.06em",
+                    padding: "2px 10px",
+                    borderRadius: 12,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  MOST POPULAR
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  {/* Custom Radio Circle */}
+                  <div
+                    style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: "50%",
+                      border: bundleTier === 2 ? "2px solid #8C6D46" : "2px solid #777",
+                      display: "grid",
+                      placeItems: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {bundleTier === 2 && (
+                      <div
+                        style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: "50%",
+                          background: "#8C6D46",
+                        }}
+                      />
+                    )}
+                  </div>
+
+                  {/* 2 Thumbnails */}
+                  <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
+                    <div
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 6,
+                        overflow: "hidden",
+                        background: "#000",
+                        border: "1px solid rgba(255,255,255,0.1)",
+                        zIndex: 2,
+                      }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={displayedImage}
+                        alt=""
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      />
+                    </div>
+                    <div
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 6,
+                        overflow: "hidden",
+                        background: "#000",
+                        border: "1px solid rgba(255,255,255,0.1)",
+                        marginLeft: -8,
+                        zIndex: 1,
+                      }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={gallery[1] || displayedImage}
+                        alt=""
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Text info */}
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 14, fontWeight: 700 }}>Buy 2</span>
+                      <span
+                        style={{
+                          background: "rgba(140, 109, 70, 0.25)",
+                          color: "#d9b382",
+                          fontSize: 10,
+                          fontWeight: 800,
+                          padding: "2px 7px",
+                          borderRadius: 10,
+                          letterSpacing: "0.02em",
+                        }}
+                      >
+                        {b2DiscountText}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 12, color: "var(--text-soft, #888)", marginTop: 2 }}>
+                      {fmtPrice(b2UnitPrice)} each · Pick two articles and sizes
+                    </div>
+                  </div>
+                </div>
+
+                {/* Price */}
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: "-0.01em" }}>
+                    {fmtPrice(b2Price)}
+                  </div>
+                  {b2Price < b1Price * 2 && (
+                    <div style={{ fontSize: 11, color: "var(--text-soft, #888)", textDecoration: "line-through" }}>
+                      {fmtPrice(b1Price * 2)}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* TIER 3: BUY 3 */}
+              <div
+                onClick={() => setBundleTier(3)}
+                style={{
+                  position: "relative",
+                  padding: "14px 18px",
+                  borderRadius: 10,
+                  cursor: "pointer",
+                  transition: "all 0.18s ease",
+                  border: bundleTier === 3 ? "1.5px solid #8C6D46" : "1px solid var(--border, #333)",
+                  background:
+                    bundleTier === 3
+                      ? "rgba(140, 109, 70, 0.08)"
+                      : "var(--surface-2, #1e1e1e)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                }}
+              >
+                {/* Floating Badge: BEST VALUE */}
+                <div
+                  style={{
+                    position: "absolute",
+                    top: -10,
+                    right: 14,
+                    background: "#8C6D46",
+                    color: "#fff",
+                    fontSize: 10,
+                    fontWeight: 800,
+                    letterSpacing: "0.06em",
+                    padding: "2px 10px",
+                    borderRadius: 12,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  BEST VALUE
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  {/* Custom Radio Circle */}
+                  <div
+                    style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: "50%",
+                      border: bundleTier === 3 ? "2px solid #8C6D46" : "2px solid #777",
+                      display: "grid",
+                      placeItems: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {bundleTier === 3 && (
+                      <div
+                        style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: "50%",
+                          background: "#8C6D46",
+                        }}
+                      />
+                    )}
+                  </div>
+
+                  {/* 3 Thumbnails */}
+                  <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
+                    <div
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 5,
+                        overflow: "hidden",
+                        background: "#000",
+                        border: "1px solid rgba(255,255,255,0.1)",
+                        zIndex: 3,
+                      }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={displayedImage}
+                        alt=""
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      />
+                    </div>
+                    <div
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 5,
+                        overflow: "hidden",
+                        background: "#000",
+                        border: "1px solid rgba(255,255,255,0.1)",
+                        marginLeft: -8,
+                        zIndex: 2,
+                      }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={gallery[1] || displayedImage}
+                        alt=""
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      />
+                    </div>
+                    <div
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 5,
+                        overflow: "hidden",
+                        background: "#000",
+                        border: "1px solid rgba(255,255,255,0.1)",
+                        marginLeft: -8,
+                        zIndex: 1,
+                      }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={gallery[2] || gallery[0] || displayedImage}
+                        alt=""
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Text info */}
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 14, fontWeight: 700 }}>Buy 3</span>
+                      <span
+                        style={{
+                          background: "rgba(140, 109, 70, 0.25)",
+                          color: "#d9b382",
+                          fontSize: 10,
+                          fontWeight: 800,
+                          padding: "2px 7px",
+                          borderRadius: 10,
+                          letterSpacing: "0.02em",
+                        }}
+                      >
+                        {b3DiscountText}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 12, color: "var(--text-soft, #888)", marginTop: 2 }}>
+                      {fmtPrice(b3UnitPrice)} each · Pick three articles and sizes
+                    </div>
+                  </div>
+                </div>
+
+                {/* Price */}
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: "-0.01em" }}>
+                    {fmtPrice(b3Price)}
+                  </div>
+                  {b3Price < b1Price * 3 && (
+                    <div style={{ fontSize: 11, color: "var(--text-soft, #888)", textDecoration: "line-through" }}>
+                      {fmtPrice(b1Price * 3)}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* PDP Actions */}
         <div className="pdp-actions">
           {p.category === "trousers" ? (
@@ -392,7 +841,7 @@ export function PdpActions({ product: p }: { product: ProductData }) {
                 ? "Added ✓"
                 : !size
                 ? "Select a size"
-                : `Add to Cart — ${fmtPrice(p.price * qty)}`}
+                : `Add to Cart — ${fmtPrice(effectiveTotal)}`}
             </button>
           )}
           <button

@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { allowedNext, OrderStatus } from "@/lib/order-state";
+import { HomePageManager } from "@/components/admin/HomePageManager";
 
 // ─── TYPES ──────────────────────────────────────────────
 
@@ -162,6 +163,7 @@ export default function AdminPage() {
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<
     | "dashboard"
+    | "home"
     | "orders"
     | "delivered"
     | "products"
@@ -230,6 +232,47 @@ export default function AdminPage() {
   const [editFormHero, setEditFormHero] = useState("");
   const [editFormGallery, setEditFormGallery] = useState<string[]>([]);
   const [savingProduct, setSavingProduct] = useState(false);
+
+  // Bundle Pricing Settings & Product Override State
+  const [bundleSettings, setBundleSettings] = useState<{
+    defaultBuy2DiscountPercent: number;
+    defaultBuy3DiscountPercent: number;
+    products: Record<string, {
+      buy2Price?: number | null;
+      buy3Price?: number | null;
+      buy2DiscountText?: string | null;
+      buy3DiscountText?: string | null;
+      enabled?: boolean;
+    }>;
+  }>({
+    defaultBuy2DiscountPercent: 10,
+    defaultBuy3DiscountPercent: 15,
+    products: {},
+  });
+  const [savingBundleSettings, setSavingBundleSettings] = useState(false);
+  const [editBundleEnabled, setEditBundleEnabled] = useState(true);
+  const [editBuy2Price, setEditBuy2Price] = useState("");
+  const [editBuy2DiscountText, setEditBuy2DiscountText] = useState("");
+  const [editBuy3Price, setEditBuy3Price] = useState("");
+  const [editBuy3DiscountText, setEditBuy3DiscountText] = useState("");
+
+  // Promo Settings State
+  const [promoSettings, setPromoSettings] = useState<{
+    code: string;
+    discountType: "percent" | "fixed";
+    discountValue: number;
+    minOrderAmount: number;
+    enabled: boolean;
+    description: string;
+  }>({
+    code: "NANOS10",
+    discountType: "percent",
+    discountValue: 10,
+    minOrderAmount: 0,
+    enabled: true,
+    description: "10% off",
+  });
+  const [savingPromoSettings, setSavingPromoSettings] = useState(false);
 
   // Edit Panel — Colors Sub-section
   const [dbColors, setDbColors] = useState<ProductColor[]>([]);
@@ -329,11 +372,23 @@ export default function AdminPage() {
     setLoading(true);
     setError(null);
     try {
-      const [resProd, resOrd, resSet] = await Promise.all([
+      const [resProd, resOrd, resSet, resBundle, resPromo] = await Promise.all([
         authFetch("/api/admin/products"),
         authFetch("/api/admin/orders"),
         authFetch("/api/admin/settings").catch(() => null),
+        authFetch("/api/admin/bundle-pricing").catch(() => null),
+        authFetch("/api/admin/promo").catch(() => null),
       ]);
+
+      if (resPromo && resPromo.ok) {
+        const pData = await resPromo.json();
+        setPromoSettings(pData);
+      }
+
+      if (resBundle && resBundle.ok) {
+        const bData = await resBundle.json();
+        setBundleSettings(bData);
+      }
 
       if (resProd.ok) {
         const pData = await resProd.json();
@@ -774,6 +829,23 @@ export default function AdminPage() {
     setEditFormHero(p.hero || "");
     setEditFormGallery(Array.isArray(p.gallery) ? p.gallery : []);
     setShowColorAddForm(false);
+
+    // Load bundle pricing for product
+    const bOverride = bundleSettings.products[p.id];
+    if (bOverride) {
+      setEditBundleEnabled(bOverride.enabled !== false);
+      setEditBuy2Price(bOverride.buy2Price ? String(bOverride.buy2Price) : "");
+      setEditBuy2DiscountText(bOverride.buy2DiscountText || "");
+      setEditBuy3Price(bOverride.buy3Price ? String(bOverride.buy3Price) : "");
+      setEditBuy3DiscountText(bOverride.buy3DiscountText || "");
+    } else {
+      setEditBundleEnabled(true);
+      setEditBuy2Price("");
+      setEditBuy2DiscountText("");
+      setEditBuy3Price("");
+      setEditBuy3DiscountText("");
+    }
+
     setActiveTab("edit-product");
 
     loadEditColors(p.id);
@@ -802,7 +874,24 @@ export default function AdminPage() {
       });
 
       if (!res.ok) throw new Error("Failed to save product");
-      showToast("Product saved successfully!");
+
+      // Save bundle override
+      await authFetch("/api/admin/bundle-pricing", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productId: editingProduct.id,
+          override: {
+            enabled: editBundleEnabled,
+            buy2Price: editBuy2Price ? Number(editBuy2Price) : null,
+            buy2DiscountText: editBuy2DiscountText.trim() || null,
+            buy3Price: editBuy3Price ? Number(editBuy3Price) : null,
+            buy3DiscountText: editBuy3DiscountText.trim() || null,
+          },
+        }),
+      });
+
+      showToast("Product and bundle pricing saved successfully!");
       loadMainData();
     } catch (err: any) {
       showToast(err.message || "Failed to save product", "error");
@@ -1188,6 +1277,74 @@ export default function AdminPage() {
     }
   }
 
+  // Save Global Bundle Settings
+  async function handleSaveGlobalBundleSettings(buy2Disc: number, buy3Disc: number) {
+    setSavingBundleSettings(true);
+    try {
+      const res = await authFetch("/api/admin/bundle-pricing", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          defaultBuy2DiscountPercent: buy2Disc,
+          defaultBuy3DiscountPercent: buy3Disc,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.settings) setBundleSettings(data.settings);
+        showToast("Updated global bundle discount settings!");
+      }
+    } catch {
+      showToast("Failed to update bundle settings", "error");
+    } finally {
+      setSavingBundleSettings(false);
+    }
+  }
+
+  // Save Per-Product Bundle Row
+  async function handleSaveProductBundleRow(prodId: string, override: any) {
+    try {
+      const res = await authFetch("/api/admin/bundle-pricing", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productId: prodId,
+          override,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.settings) setBundleSettings(data.settings);
+        showToast("Saved bundle pricing for product!");
+      }
+    } catch {
+      showToast("Failed to save product bundle", "error");
+    }
+  }
+
+  // Save Promo Settings
+  async function handleSavePromoSettings() {
+    setSavingPromoSettings(true);
+    try {
+      const res = await authFetch("/api/admin/promo", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(promoSettings),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.settings) setPromoSettings(data.settings);
+        showToast("Updated promo code and discount settings!");
+      } else {
+        showToast("Failed to save promo settings", "error");
+      }
+    } catch {
+      showToast("Failed to update promo settings", "error");
+    } finally {
+      setSavingPromoSettings(false);
+    }
+  }
+
   // ─── DERIVED FILTERED DATA ─────────────────────────────
 
   // Filtered Orders for Orders Tab
@@ -1369,6 +1526,15 @@ export default function AdminPage() {
             <span>Courier Queue</span>
           </button>
 
+          <div className="sidebar-section-label">Storefront</div>
+          <button
+            type="button"
+            className={`nav-item ${activeTab === "home" ? "active" : ""}`}
+            onClick={() => switchTab("home")}
+          >
+            <span>Home Page</span>
+          </button>
+
           <div className="sidebar-section-label">Catalog</div>
           <button
             type="button"
@@ -1428,6 +1594,8 @@ export default function AdminPage() {
               <h1 className="page-title">
                 {activeTab === "dashboard"
                   ? "Dashboard"
+                  : activeTab === "home"
+                  ? "Home Page Manager"
                   : activeTab === "orders"
                   ? "Orders"
                   : activeTab === "delivered"
@@ -1445,6 +1613,8 @@ export default function AdminPage() {
               <p className="page-sub">
                 {activeTab === "dashboard"
                   ? "Store metrics & recent activity"
+                  : activeTab === "home"
+                  ? "Customize homepage images, banners, sections & products"
                   : activeTab === "orders"
                   ? "Filter and manage customer orders"
                   : activeTab === "delivered"
@@ -2200,6 +2370,76 @@ export default function AdminPage() {
                   <label>Description</label>
                   <textarea rows={3} value={editFormDesc} onChange={(e) => setEditFormDesc(e.target.value)} />
                 </div>
+              </div>
+
+              {/* Bundle Pricing Section */}
+              <div className="panel" style={{ padding: 24 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                  <div>
+                    <h3 style={{ margin: 0 }}>Bundle Pricing (&ldquo;Choose Your Bundle&rdquo;)</h3>
+                    <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--admin-text-soft)" }}>
+                      Configure custom bundle prices for Buy 2 and Buy 3 for this product. Leave blank to automatically use store default discounts ({bundleSettings.defaultBuy2DiscountPercent}% and {bundleSettings.defaultBuy3DiscountPercent}%).
+                    </p>
+                  </div>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={editBundleEnabled}
+                      onChange={(e) => setEditBundleEnabled(e.target.checked)}
+                    />
+                    <span>Enable Bundle Options on PDP</span>
+                  </label>
+                </div>
+
+                {editBundleEnabled && (
+                  <div className="admin-form-grid-2" style={{ gap: 20 }}>
+                    <div className="field">
+                      <label>Buy 2 Total Price (PKR)</label>
+                      <input
+                        type="number"
+                        placeholder={`Auto: PKR ${Math.round((Number(editFormPrice) || editingProduct.price) * 2 * (1 - bundleSettings.defaultBuy2DiscountPercent / 100))}`}
+                        value={editBuy2Price}
+                        onChange={(e) => setEditBuy2Price(e.target.value)}
+                      />
+                      <span style={{ fontSize: 11, color: "var(--admin-text-soft)", marginTop: 4 }}>
+                        Total price for 2 pairs combined.
+                      </span>
+                    </div>
+
+                    <div className="field">
+                      <label>Buy 2 Badge Text (e.g. 10% OFF)</label>
+                      <input
+                        type="text"
+                        placeholder="10% OFF"
+                        value={editBuy2DiscountText}
+                        onChange={(e) => setEditBuy2DiscountText(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="field">
+                      <label>Buy 3 Total Price (PKR)</label>
+                      <input
+                        type="number"
+                        placeholder={`Auto: PKR ${Math.round((Number(editFormPrice) || editingProduct.price) * 3 * (1 - bundleSettings.defaultBuy3DiscountPercent / 100))}`}
+                        value={editBuy3Price}
+                        onChange={(e) => setEditBuy3Price(e.target.value)}
+                      />
+                      <span style={{ fontSize: 11, color: "var(--admin-text-soft)", marginTop: 4 }}>
+                        Total price for 3 pairs combined.
+                      </span>
+                    </div>
+
+                    <div className="field">
+                      <label>Buy 3 Badge Text (e.g. 15% OFF)</label>
+                      <input
+                        type="text"
+                        placeholder="15% OFF"
+                        value={editBuy3DiscountText}
+                        onChange={(e) => setEditBuy3DiscountText(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Color Galleries & Stock Manager Section */}
@@ -3317,9 +3557,139 @@ export default function AdminPage() {
                 </button>
               </div>
             </div>
+          ) : activeTab === "home" ? (
+            <HomePageManager
+              authFetch={authFetch}
+              allProducts={products}
+              onRefreshProducts={loadMainData}
+              showToast={showToast}
+            />
           ) : (
             /* TAB 8: SETTINGS */
-            <div style={{ display: "flex", flexDirection: "column", gap: 24, maxWidth: 640 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 24, maxWidth: 840 }}>
+              {/* Promo Code & Discount Settings Panel */}
+              <div className="panel" style={{ padding: 24 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+                  <div>
+                    <h3 style={{ margin: 0 }}>Promo Code & Discount Settings</h3>
+                    <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--admin-text-soft)" }}>
+                      Configure the active storefront promo coupon code, discount rate or fixed amount, and order rules.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-dark btn-sm"
+                    disabled={savingPromoSettings}
+                    onClick={handleSavePromoSettings}
+                  >
+                    {savingPromoSettings ? "Saving…" : "Save Promo Settings"}
+                  </button>
+                </div>
+
+                <div className="admin-form-grid-2" style={{ gap: 20, marginBottom: 16 }}>
+                  <div className="field">
+                    <label>Active Promo Code</label>
+                    <input
+                      type="text"
+                      value={promoSettings.code}
+                      placeholder="e.g. NANOS10"
+                      onChange={(e) =>
+                        setPromoSettings((prev) => ({
+                          ...prev,
+                          code: e.target.value.toUpperCase(),
+                        }))
+                      }
+                    />
+                    <span style={{ fontSize: 11.5, color: "var(--admin-text-soft)", marginTop: 4 }}>
+                      Customers enter this code in cart or checkout.
+                    </span>
+                  </div>
+
+                  <div className="field">
+                    <label>Discount Type</label>
+                    <select
+                      value={promoSettings.discountType}
+                      onChange={(e) =>
+                        setPromoSettings((prev) => ({
+                          ...prev,
+                          discountType: e.target.value as "percent" | "fixed",
+                        }))
+                      }
+                    >
+                      <option value="percent">Percentage Discount (%)</option>
+                      <option value="fixed">Fixed Amount (PKR)</option>
+                    </select>
+                    <span style={{ fontSize: 11.5, color: "var(--admin-text-soft)", marginTop: 4 }}>
+                      Choose percentage (%) or flat PKR discount.
+                    </span>
+                  </div>
+                </div>
+
+                <div className="admin-form-grid-2" style={{ gap: 20, marginBottom: 16 }}>
+                  <div className="field">
+                    <label>
+                      {promoSettings.discountType === "percent"
+                        ? "Discount Percentage (%)"
+                        : "Discount Amount (PKR)"}
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={promoSettings.discountType === "percent" ? 100 : 100000}
+                      value={promoSettings.discountValue}
+                      onChange={(e) =>
+                        setPromoSettings((prev) => ({
+                          ...prev,
+                          discountValue: Number(e.target.value),
+                        }))
+                      }
+                    />
+                  </div>
+
+                  <div className="field">
+                    <label>Minimum Order Subtotal (PKR)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={promoSettings.minOrderAmount}
+                      onChange={(e) =>
+                        setPromoSettings((prev) => ({
+                          ...prev,
+                          minOrderAmount: Number(e.target.value),
+                        }))
+                      }
+                    />
+                    <span style={{ fontSize: 11.5, color: "var(--admin-text-soft)", marginTop: 4 }}>
+                      Set to 0 for no minimum subtotal requirement.
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8, padding: "12px 16px", background: "var(--admin-surface-2)", borderRadius: 6 }}>
+                  <input
+                    type="checkbox"
+                    id="promo-enabled-toggle"
+                    checked={promoSettings.enabled}
+                    onChange={(e) =>
+                      setPromoSettings((prev) => ({
+                        ...prev,
+                        enabled: e.target.checked,
+                      }))
+                    }
+                    style={{ width: 16, height: 16, cursor: "pointer" }}
+                  />
+                  <label htmlFor="promo-enabled-toggle" style={{ margin: 0, cursor: "pointer", fontWeight: 600, fontSize: 13.5 }}>
+                    Enable promo code on storefront
+                  </label>
+                  <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 600, color: promoSettings.enabled ? "var(--admin-success)" : "var(--admin-text-soft)" }}>
+                    {promoSettings.enabled
+                      ? `Active: ${promoSettings.code} (${promoSettings.discountValue}${promoSettings.discountType === "percent" ? "%" : " PKR"} OFF)`
+                      : "Promo Disabled"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Category Low-Stock Thresholds */}
               <div className="panel" style={{ padding: 24 }}>
                 <h3>Category Low-Stock Thresholds</h3>
                 <p style={{ fontSize: 13, color: "var(--admin-text-soft)", marginBottom: 16 }}>
@@ -3349,6 +3719,144 @@ export default function AdminPage() {
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+
+              {/* Bundle Pricing Settings Panel */}
+              <div className="panel" style={{ padding: 24 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+                  <div>
+                    <h3 style={{ margin: 0 }}>Store-Wide Bundle Pricing</h3>
+                    <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--admin-text-soft)" }}>
+                      Default discount percentages applied to &ldquo;Choose Your Bundle&rdquo; when no manual product override is set.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-dark btn-sm"
+                    disabled={savingBundleSettings}
+                    onClick={() =>
+                      handleSaveGlobalBundleSettings(
+                        bundleSettings.defaultBuy2DiscountPercent,
+                        bundleSettings.defaultBuy3DiscountPercent
+                      )
+                    }
+                  >
+                    {savingBundleSettings ? "Saving…" : "Save Global Discounts"}
+                  </button>
+                </div>
+
+                <div className="admin-form-grid-2" style={{ gap: 20, marginBottom: 20 }}>
+                  <div className="field">
+                    <label>Buy 2 Default Discount (%)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={90}
+                      value={bundleSettings.defaultBuy2DiscountPercent}
+                      onChange={(e) =>
+                        setBundleSettings((prev) => ({
+                          ...prev,
+                          defaultBuy2DiscountPercent: Number(e.target.value),
+                        }))
+                      }
+                    />
+                  </div>
+
+                  <div className="field">
+                    <label>Buy 3 Default Discount (%)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={90}
+                      value={bundleSettings.defaultBuy3DiscountPercent}
+                      onChange={(e) =>
+                        setBundleSettings((prev) => ({
+                          ...prev,
+                          defaultBuy3DiscountPercent: Number(e.target.value),
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+
+                <h4 style={{ fontSize: 14, margin: "20px 0 8px 0" }}>Per-Product Manual Bundle Pricing Overrides</h4>
+                <div style={{ overflowX: "auto" }}>
+                  <table className="admin-table" style={{ width: "100%", fontSize: 13 }}>
+                    <thead>
+                      <tr>
+                        <th>Product</th>
+                        <th>Base Price</th>
+                        <th>Buy 2 Bundle Price</th>
+                        <th>Buy 3 Bundle Price</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {products.map((p) => {
+                        const override = bundleSettings.products[p.id] || {};
+                        const defaultB2 = Math.round(p.price * 2 * (1 - bundleSettings.defaultBuy2DiscountPercent / 100));
+                        const defaultB3 = Math.round(p.price * 3 * (1 - bundleSettings.defaultBuy3DiscountPercent / 100));
+                        return (
+                          <tr key={p.id}>
+                            <td style={{ fontWeight: 600 }}>{p.name}</td>
+                            <td>PKR {p.price.toLocaleString()}</td>
+                            <td>
+                              <input
+                                type="number"
+                                placeholder={`Auto: ${defaultB2}`}
+                                style={{ width: 120, padding: "4px 8px" }}
+                                value={override.buy2Price ?? ""}
+                                onChange={(e) => {
+                                  const val = e.target.value ? Number(e.target.value) : null;
+                                  setBundleSettings((prev) => ({
+                                    ...prev,
+                                    products: {
+                                      ...prev.products,
+                                      [p.id]: {
+                                        ...prev.products[p.id],
+                                        buy2Price: val,
+                                      },
+                                    },
+                                  }));
+                                }}
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="number"
+                                placeholder={`Auto: ${defaultB3}`}
+                                style={{ width: 120, padding: "4px 8px" }}
+                                value={override.buy3Price ?? ""}
+                                onChange={(e) => {
+                                  const val = e.target.value ? Number(e.target.value) : null;
+                                  setBundleSettings((prev) => ({
+                                    ...prev,
+                                    products: {
+                                      ...prev.products,
+                                      [p.id]: {
+                                        ...prev.products[p.id],
+                                        buy3Price: val,
+                                      },
+                                    },
+                                  }));
+                                }}
+                              />
+                            </td>
+                            <td>
+                              <button
+                                type="button"
+                                className="btn btn-outline btn-sm"
+                                onClick={() => handleSaveProductBundleRow(p.id, bundleSettings.products[p.id] || {})}
+                              >
+                                Save
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>

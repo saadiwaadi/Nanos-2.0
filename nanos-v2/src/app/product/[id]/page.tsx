@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getProductById, getProducts } from "@/lib/products";
+import { getProductBundlePricing } from "@/lib/bundle-pricing";
 import { PdpActions } from "@/components/PdpActions";
 import { ProductCard } from "@/components/ProductCard";
 
@@ -18,7 +19,10 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
     notFound();
   }
 
-  const allProducts = await getProducts();
+  const [allProducts, bundlePricing] = await Promise.all([
+    getProducts(),
+    getProductBundlePricing(product.id, product.price),
+  ]);
   const related = allProducts
     .filter((p) => p.category === product.category && p.id !== product.id)
     .slice(0, 4);
@@ -38,7 +42,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
         </div>
 
         {/* PDP Main Content */}
-        <PdpActions product={product} />
+        <PdpActions product={product} bundlePricing={bundlePricing} />
 
         {/* You May Also Like Section */}
         {related.length > 0 && (

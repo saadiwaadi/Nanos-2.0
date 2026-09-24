@@ -6,6 +6,7 @@ import { isAutoBookCity } from "@/lib/postex";
 import { MetaCapiService } from "@/lib/meta-capi";
 import { reserveStock } from "@/lib/stock";
 import { AppError } from "@/lib/order-state";
+import { getPromoSettings, calculatePromoDiscount } from "@/lib/promo-settings";
 
 // In-memory fallback order store for dev when DB is offline
 export const memoryOrders = new Map<string, any>();
@@ -68,9 +69,22 @@ export async function POST(request: Request) {
       });
     }
 
-    const promoValid = promoCode === "NANOS10" && items.length > 0;
-    const discount = promoValid ? Math.round(subtotal * 0.1) : 0;
-    const afterDiscount = subtotal - discount;
+    let discount = 0;
+    if (promoCode && items.length > 0) {
+      try {
+        const promoSettings = await getPromoSettings();
+        if (
+          promoSettings.enabled &&
+          promoCode.trim().toUpperCase() === promoSettings.code.trim().toUpperCase() &&
+          subtotal >= (promoSettings.minOrderAmount || 0)
+        ) {
+          discount = calculatePromoDiscount(promoSettings, subtotal);
+        }
+      } catch (err) {
+        console.warn("Failed to check promo settings:", err);
+      }
+    }
+    const afterDiscount = Math.max(0, subtotal - discount);
     const shipping = afterDiscount >= 5000 ? 0 : 250;
     const total = afterDiscount + shipping;
 
