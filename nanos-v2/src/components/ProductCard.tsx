@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
+import { useWishlist } from "@/context/WishlistContext";
 import { fmtPrice } from "@/lib/cart";
 
 export interface ProductCardProps {
@@ -31,7 +33,9 @@ export function ProductCard({
   colors = [],
   sizes = [],
 }: ProductCardProps) {
-  const [wished, setWished] = useState(false);
+  const router = useRouter();
+  const wishlist = useWishlist();
+  const isItemWished = wishlist.isWished(id);
   const [added, setAdded] = useState(false);
   const [animating, setAnimating] = useState(false);
   const [animCoords, setAnimCoords] = useState<{ startX: number; startY: number } | null>(null);
@@ -73,6 +77,28 @@ export function ProductCard({
     }, 600);
   }
 
+  function handleBuyNow(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const selectedColor = colors[0]?.name || "Standard";
+    const selectedSize = sizes[0] || "Standard";
+
+    cart.addItem(
+      {
+        productId: id,
+        name,
+        color: selectedColor,
+        size: selectedSize,
+        price,
+        img: hero,
+      },
+      1
+    );
+
+    router.push("/checkout");
+  }
+
   return (
     <div className="product-card">
       {animating && animCoords && (
@@ -103,12 +129,21 @@ export function ProductCard({
         {/* Wishlist Button */}
         <button
           type="button"
-          aria-label={wished ? "Remove from wishlist" : "Add to wishlist"}
-          className={`wish-btn ${wished ? "active" : ""}`}
+          aria-label={isItemWished ? "Remove from wishlist" : "Add to wishlist"}
+          className={`wish-btn ${isItemWished ? "active" : ""}`}
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            setWished(!wished);
+            wishlist.toggleWishlist({
+              productId: id,
+              name,
+              price,
+              oldPrice,
+              img: hero,
+              color: colors[0]?.name || "Standard",
+              size: sizes[0] || "Standard",
+              category,
+            });
           }}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -151,17 +186,45 @@ export function ProductCard({
             type="button"
             disabled
             className="quick-add coming-soon"
+            style={{ marginTop: 12 }}
           >
             Coming Soon
           </button>
         ) : (
-          <button
-            type="button"
-            onClick={handleQuickAdd}
-            className={`quick-add ${added ? "added" : ""}`}
-          >
-            {added ? "Added ✓" : "+ Quick Add"}
-          </button>
+          <div className="card-actions" style={{ display: "flex", gap: 6, marginTop: 12 }}>
+            <button
+              type="button"
+              onClick={handleQuickAdd}
+              className={`quick-add ${added ? "added" : ""}`}
+              style={{ flex: 1, marginTop: 0, padding: "8px 6px", fontSize: 12 }}
+            >
+              {added ? "Added ✓" : "+ Quick Add"}
+            </button>
+            <button
+              type="button"
+              onClick={handleBuyNow}
+              className="card-buy-now"
+              style={{
+                flex: 1,
+                minHeight: 44,
+                padding: "8px 6px",
+                fontSize: 12,
+                fontWeight: 700,
+                background: "var(--black, #111)",
+                color: "var(--white, #fff)",
+                border: "1.5px solid var(--black, #111)",
+                borderRadius: 2,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+                transition: "all 0.15s ease",
+              }}
+            >
+              Buy Now
+            </button>
+          </div>
         )}
       </div>
     </div>

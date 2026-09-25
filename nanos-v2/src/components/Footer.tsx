@@ -42,25 +42,21 @@ export function Footer() {
               <li>
                 <Link href="/crocs">
                   <span className="footer-link-text">Crocs</span>
-                  <span className="footer-link-arrow">→</span>
                 </Link>
               </li>
               <li>
                 <Link href="/trousers">
                   <span className="footer-link-text">Trousers</span>
-                  <span className="footer-link-arrow">→</span>
                 </Link>
               </li>
               <li>
                 <Link href="/products?sale=true">
                   <span className="footer-link-text">Sale Items</span>
-                  <span className="footer-link-arrow">→</span>
                 </Link>
               </li>
               <li>
                 <Link href="/products">
                   <span className="footer-link-text">All Products</span>
-                  <span className="footer-link-arrow">→</span>
                 </Link>
               </li>
             </ul>
@@ -73,25 +69,21 @@ export function Footer() {
               <li>
                 <Link href="/login">
                   <span className="footer-link-text">Log In / Register</span>
-                  <span className="footer-link-arrow">→</span>
                 </Link>
               </li>
               <li>
                 <Link href="/account">
                   <span className="footer-link-text">My Account</span>
-                  <span className="footer-link-arrow">→</span>
                 </Link>
               </li>
               <li>
                 <Link href="/account">
                   <span className="footer-link-text">Order History</span>
-                  <span className="footer-link-arrow">→</span>
                 </Link>
               </li>
               <li>
                 <Link href="/cart">
                   <span className="footer-link-text">Shopping Cart</span>
-                  <span className="footer-link-arrow">→</span>
                 </Link>
               </li>
             </ul>
@@ -104,25 +96,21 @@ export function Footer() {
               <li>
                 <Link href="#">
                   <span className="footer-link-text">Track Order</span>
-                  <span className="footer-link-arrow">→</span>
                 </Link>
               </li>
               <li>
                 <Link href="#">
                   <span className="footer-link-text">Shipping Policy</span>
-                  <span className="footer-link-arrow">→</span>
                 </Link>
               </li>
               <li>
                 <Link href="#">
                   <span className="footer-link-text">Returns &amp; Exchanges</span>
-                  <span className="footer-link-arrow">→</span>
                 </Link>
               </li>
               <li>
                 <Link href="#">
                   <span className="footer-link-text">Contact Support</span>
-                  <span className="footer-link-arrow">→</span>
                 </Link>
               </li>
             </ul>
@@ -159,7 +147,7 @@ export function Footer() {
           <div className="footer-social">
             {/* Instagram */}
             <a
-              href="https://www.instagram.com/nanos_pk/"
+              href="https://www.instagram.com/nanos_pk?utm_source=ig_web_button_share_sheet&stkn=ZDNlZDc0MzIxNw=="
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Instagram"
@@ -168,12 +156,6 @@ export function Footer() {
                 <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
                 <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
                 <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
-              </svg>
-            </a>
-            {/* TikTok */}
-            <a href="#" aria-label="TikTok">
-              <svg viewBox="0 0 24 24" fill="currentColor">
-                <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 1 1-5.2-1.74 2.89 2.89 0 0 1 2.31-2.82V7.58a6.34 6.34 0 0 0-5.61 6.27A6.34 6.34 0 0 0 10.2 20.2a6.34 6.34 0 0 0 6.34-6.34V9.37a8.16 8.16 0 0 0 4.93 1.63V7.55a4.85 4.85 0 0 1-1.88-.86z" />
               </svg>
             </a>
             {/* Facebook */}

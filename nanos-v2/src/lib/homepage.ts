@@ -137,7 +137,7 @@ export const DEFAULT_HOMEPAGE_CONFIG: HomePageConfig = {
       subtitle: "Hand-picked favorites for everyday comfort",
       layout: "scroll",
       buttons: [
-        { id: "btn_feat_all", label: "View All →", url: "/products", style: "link", isHidden: false },
+        { id: "btn_feat_all", label: "View All", url: "/products", style: "link", isHidden: false },
       ],
       products: [], // Empty means dynamically take first 10 products if none specified
       isHidden: false,
@@ -230,11 +230,23 @@ export const DEFAULT_HOMEPAGE_CONFIG: HomePageConfig = {
     text: "Premium lightweight clogs & relaxed utility trousers engineered for everyday movement and built to last.",
     bgImage: "",
     buttons: [
-      { id: "btn_edit_1", label: "Explore All Products →", url: "/products", style: "primary", isHidden: false },
+      { id: "btn_edit_1", label: "Explore All Products", url: "/products", style: "primary", isHidden: false },
     ],
     isHidden: false,
   },
 };
+
+function cleanButtonLabel(label?: string): string {
+  if (!label) return "";
+  return label.replace(/\s*→\s*$/, "").replace(/\s*&rarr;\s*$/i, "").trim();
+}
+
+function sanitizeButtons(buttons: SectionButton[] = []): SectionButton[] {
+  return buttons.map((b) => ({
+    ...b,
+    label: cleanButtonLabel(b.label),
+  }));
+}
 
 // Memory fallback store
 let memoryHomePageConfig: HomePageConfig | null = null;
@@ -247,10 +259,33 @@ export async function getHomePageConfig(): Promise<HomePageConfig> {
 
     if (setting && setting.value) {
       const parsed = JSON.parse(setting.value);
+      const productSections = (Array.isArray(parsed.productSections) ? parsed.productSections : DEFAULT_HOMEPAGE_CONFIG.productSections).map((sec: ProductSectionConfig) => ({
+        ...sec,
+        buttons: sanitizeButtons(sec.buttons),
+      }));
+
+      const editorialSection = {
+        ...DEFAULT_HOMEPAGE_CONFIG.editorialSection,
+        ...(parsed.editorialSection || {}),
+        buttons: sanitizeButtons(parsed.editorialSection?.buttons || DEFAULT_HOMEPAGE_CONFIG.editorialSection.buttons),
+      };
+
+      const categorySection = {
+        ...DEFAULT_HOMEPAGE_CONFIG.categorySection,
+        ...(parsed.categorySection || {}),
+        buttons: sanitizeButtons(parsed.categorySection?.buttons || DEFAULT_HOMEPAGE_CONFIG.categorySection.buttons),
+      };
+
+      const hero = {
+        ...DEFAULT_HOMEPAGE_CONFIG.hero,
+        ...(parsed.hero || {}),
+        buttons: sanitizeButtons(parsed.hero?.buttons || DEFAULT_HOMEPAGE_CONFIG.hero.buttons),
+      };
+
       return {
-        hero: { ...DEFAULT_HOMEPAGE_CONFIG.hero, ...(parsed.hero || {}) },
-        productSections: Array.isArray(parsed.productSections) ? parsed.productSections : DEFAULT_HOMEPAGE_CONFIG.productSections,
-        categorySection: { ...DEFAULT_HOMEPAGE_CONFIG.categorySection, ...(parsed.categorySection || {}) },
+        hero,
+        productSections,
+        categorySection,
         scrollingBanner: {
           ...DEFAULT_HOMEPAGE_CONFIG.scrollingBanner,
           ...(parsed.scrollingBanner || {}),
@@ -259,7 +294,7 @@ export async function getHomePageConfig(): Promise<HomePageConfig> {
             : DEFAULT_HOMEPAGE_CONFIG.scrollingBanner.items,
         },
         promoSection: { ...DEFAULT_HOMEPAGE_CONFIG.promoSection, ...(parsed.promoSection || {}) },
-        editorialSection: { ...DEFAULT_HOMEPAGE_CONFIG.editorialSection, ...(parsed.editorialSection || {}) },
+        editorialSection,
         updatedAt: setting.updatedAt.toISOString(),
       };
     }

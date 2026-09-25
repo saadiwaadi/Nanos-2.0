@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { CartProvider } from "@/context/CartContext";
+import { WishlistProvider } from "@/context/WishlistContext";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { CartDrawer } from "@/components/CartDrawer";
@@ -31,17 +32,19 @@ export default function RootLayout({
       <body suppressHydrationWarning>
         <MetaPixel />
         <AuthProvider>
-          <CartProvider>
-            <ScrollRestoration />
-            <SiteChrome>
-              <Navbar />
-            </SiteChrome>
-            {children}
-            <SiteChrome>
-              <Footer />
-              <CartDrawer />
-            </SiteChrome>
-          </CartProvider>
+          <WishlistProvider>
+            <CartProvider>
+              <ScrollRestoration />
+              <SiteChrome>
+                <Navbar />
+              </SiteChrome>
+              {children}
+              <SiteChrome>
+                <Footer />
+                <CartDrawer />
+              </SiteChrome>
+            </CartProvider>
+          </WishlistProvider>
         </AuthProvider>
       </body>
     </html>

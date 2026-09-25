@@ -3,11 +3,14 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
+import { useWishlist, WishlistItem } from "@/context/WishlistContext";
 import { fmtPrice } from "@/lib/cart";
 
 export function CartDrawer() {
   const router = useRouter();
   const cart = useCart();
+  const wishlist = useWishlist();
+  const [quickAddedId, setQuickAddedId] = useState<string | null>(null);
   const [promoInput, setPromoInput] = useState("");
   const [promoMsg, setPromoMsg] = useState<{ ok: boolean; message: string } | null>(null);
 
@@ -33,6 +36,22 @@ export function CartDrawer() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [cart.isOpen, cart]);
+
+  function handleQuickAddLiked(item: WishlistItem) {
+    cart.addItem(
+      {
+        productId: item.productId,
+        name: item.name,
+        color: item.color || "Standard",
+        size: item.size || "Standard",
+        price: item.price,
+        img: item.img,
+      },
+      1
+    );
+    setQuickAddedId(item.productId);
+    setTimeout(() => setQuickAddedId(null), 1400);
+  }
 
   async function handleApplyPromo(e: React.FormEvent) {
     e.preventDefault();
@@ -69,81 +88,212 @@ export function CartDrawer() {
         {/* Body */}
         <div className="cart-drawer-body">
           {cart.items.length === 0 ? (
-            <div className="cart-empty">
+            <div className="cart-empty" style={{ padding: "28px 16px 20px" }}>
               <svg
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="1.5"
-                style={{ width: 48, height: 48, margin: "0 auto 16px", color: "var(--stone)" }}
+                style={{ width: 44, height: 44, margin: "0 auto 12px", color: "var(--stone)" }}
               >
                 <circle cx="9" cy="21" r="1" />
                 <circle cx="20" cy="21" r="1" />
                 <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
               </svg>
-              <h3 style={{ fontFamily: "var(--font-head)", fontSize: 18, fontWeight: 700, marginBottom: 6 }}>
+              <h3 style={{ fontFamily: "var(--font-head)", fontSize: 17, fontWeight: 700, marginBottom: 4 }}>
                 Your cart is empty
               </h3>
-              <p style={{ fontSize: 13, color: "#666", marginBottom: 20 }}>
+              <p style={{ fontSize: 12.5, color: "#666", marginBottom: 16 }}>
                 Explore our collection to find your pair.
               </p>
               <button
                 type="button"
                 className="cart-checkout-btn"
-                style={{ maxWidth: 200, margin: "0 auto" }}
+                style={{ maxWidth: 180, margin: "0 auto 20px", minHeight: 40, padding: "10px 18px", fontSize: 13 }}
                 onClick={() => {
                   cart.closeCart();
                   router.push("/products");
                 }}
               >
-                Shop Now →
+                Shop Now
               </button>
-            </div>
-          ) : (
-            cart.items.map((item) => (
-              <div key={`${item.productId}-${item.color}-${item.size}`} className="cart-item">
-                {item.img ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img src={item.img} alt={item.name} className="cart-item-img" />
-                ) : (
-                  <div className="cart-item-img" style={{ background: "var(--stone)" }} />
-                )}
-                <div className="cart-item-info">
-                  <div className="cart-item-name">{item.name}</div>
-                  <div className="cart-item-meta">
-                    {item.color} · {item.size}
+
+              {/* Liked / Wishlist Quick Options */}
+              {wishlist.items.length > 0 && (
+                <div style={{ marginTop: 20, textAlign: "left", width: "100%", borderTop: "1px solid var(--stone, #e5e5e5)", paddingTop: 16 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, fontFamily: "var(--font-head)", letterSpacing: "-0.01em" }}>
+                      ❤️ Liked Items ({wishlist.items.length})
+                    </span>
                   </div>
-                  <div className="cart-item-price">{fmtPrice(item.price)}</div>
-                  <div className="cart-qty">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        cart.updateQty(item.productId, item.color, item.size, -1)
-                      }
-                    >
-                      −
-                    </button>
-                    <span>{item.qty}</span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        cart.updateQty(item.productId, item.color, item.size, 1)
-                      }
-                    >
-                      +
-                    </button>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {wishlist.items.map((liked) => (
+                      <div
+                        key={liked.productId}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 12,
+                          padding: "10px 12px",
+                          background: "var(--white, #fff)",
+                          border: "1px solid var(--stone, #e5e5e5)",
+                          borderRadius: 6,
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={liked.img}
+                            alt={liked.name}
+                            style={{ width: 44, height: 44, objectFit: "cover", borderRadius: 4, background: "#f0f0f0", flexShrink: 0 }}
+                          />
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                              {liked.name}
+                            </div>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--black, #111)", marginTop: 2 }}>
+                              {fmtPrice(liked.price)}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleQuickAddLiked(liked)}
+                          style={{
+                            background: quickAddedId === liked.productId ? "var(--black, #111)" : "var(--lime, #C8FF00)",
+                            color: quickAddedId === liked.productId ? "var(--lime, #C8FF00)" : "var(--black, #111)",
+                            border: "none",
+                            padding: "6px 12px",
+                            borderRadius: 4,
+                            fontSize: 11.5,
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            whiteSpace: "nowrap",
+                            flexShrink: 0,
+                            transition: "all 0.15s ease",
+                          }}
+                        >
+                          {quickAddedId === liked.productId ? "Added ✓" : "+ Add"}
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  className="cart-remove"
-                  onClick={() => cart.removeItem(item.productId, item.color, item.size)}
-                  aria-label="Remove item"
-                >
-                  ×
-                </button>
-              </div>
-            ))
+              )}
+            </div>
+          ) : (
+            <>
+              {cart.items.map((item) => (
+                <div key={`${item.productId}-${item.color}-${item.size}`} className="cart-item">
+                  {item.img ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img src={item.img} alt={item.name} className="cart-item-img" />
+                  ) : (
+                    <div className="cart-item-img" style={{ background: "var(--stone)" }} />
+                  )}
+                  <div className="cart-item-info">
+                    <div className="cart-item-name">{item.name}</div>
+                    <div className="cart-item-meta">
+                      {item.color} · {item.size}
+                    </div>
+                    <div className="cart-item-price">{fmtPrice(item.price)}</div>
+                    <div className="cart-qty">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          cart.updateQty(item.productId, item.color, item.size, -1)
+                        }
+                      >
+                        −
+                      </button>
+                      <span>{item.qty}</span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          cart.updateQty(item.productId, item.color, item.size, 1)
+                        }
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="cart-remove"
+                    onClick={() => cart.removeItem(item.productId, item.color, item.size)}
+                    aria-label="Remove item"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+
+              {/* From Wishlist quick-add options inside active cart */}
+              {wishlist.items.filter((w) => !cart.items.some((ci) => ci.productId === w.productId)).length > 0 && (
+                <div style={{ marginTop: 18, paddingTop: 14, borderTop: "1px dashed var(--stone, #e5e5e5)" }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#666", marginBottom: 10, letterSpacing: "-0.01em" }}>
+                    From Your Wishlist
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {wishlist.items
+                      .filter((w) => !cart.items.some((ci) => ci.productId === w.productId))
+                      .slice(0, 3)
+                      .map((liked) => (
+                        <div
+                          key={liked.productId}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: 10,
+                            padding: "8px 10px",
+                            background: "rgba(200, 255, 0, 0.06)",
+                            border: "1px solid rgba(200, 255, 0, 0.3)",
+                            borderRadius: 6,
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={liked.img}
+                              alt={liked.name}
+                              style={{ width: 36, height: 36, objectFit: "cover", borderRadius: 4, background: "#f0f0f0", flexShrink: 0 }}
+                            />
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                {liked.name}
+                              </div>
+                              <div style={{ fontSize: 11.5, color: "#666" }}>
+                                {fmtPrice(liked.price)}
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleQuickAddLiked(liked)}
+                            style={{
+                              background: quickAddedId === liked.productId ? "var(--black, #111)" : "var(--lime, #C8FF00)",
+                              color: quickAddedId === liked.productId ? "var(--lime, #C8FF00)" : "var(--black, #111)",
+                              border: "none",
+                              padding: "5px 10px",
+                              borderRadius: 4,
+                              fontSize: 11,
+                              fontWeight: 700,
+                              cursor: "pointer",
+                              whiteSpace: "nowrap",
+                              flexShrink: 0,
+                              transition: "all 0.15s ease",
+                            }}
+                          >
+                            {quickAddedId === liked.productId ? "Added ✓" : "+ Add"}
+                          </button>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -233,7 +383,7 @@ export function CartDrawer() {
             </div>
 
             <button type="button" className="cart-checkout-btn" onClick={handleCheckout}>
-              Proceed to Checkout →
+              Proceed to Checkout
             </button>
           </div>
         )}

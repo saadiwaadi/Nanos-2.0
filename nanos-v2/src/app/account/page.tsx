@@ -263,7 +263,7 @@ export default function AccountPage() {
                     <h2>No orders yet</h2>
                     <p>When you place an order, it&apos;ll show up here.</p>
                     <Link href="/products" className="btn btn-primary">
-                      Start shopping →
+                      Start shopping
                     </Link>
                   </div>
                 ) : (

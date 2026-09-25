@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
+import { useWishlist } from "@/context/WishlistContext";
 import { fmtPrice } from "@/lib/cart";
 import { trackMeta } from "@/lib/fpixel";
 import type { ProductColor } from "@/lib/types";
@@ -63,8 +64,9 @@ export function PdpActions({
   const [size, setSize] = useState<string | null>(null);
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
-  const [wished, setWished] = useState(false);
   const cart = useCart();
+  const wishlist = useWishlist();
+  const isItemWished = wishlist.isWished(p.id);
 
   useEffect(() => {
     setMounted(true);
@@ -437,14 +439,15 @@ export function PdpActions({
                 style={{
                   position: "relative",
                   padding: "14px 18px",
-                  borderRadius: 10,
+                  borderRadius: 8,
                   cursor: "pointer",
                   transition: "all 0.18s ease",
-                  border: bundleTier === 1 ? "1.5px solid #8C6D46" : "1px solid var(--border, #333)",
+                  border: bundleTier === 1 ? "2px solid var(--black, #111111)" : "1.5px solid var(--stone, #D9D6CF)",
                   background:
                     bundleTier === 1
-                      ? "rgba(140, 109, 70, 0.08)"
-                      : "var(--surface-2, #1e1e1e)",
+                      ? "rgba(200, 255, 0, 0.14)"
+                      : "var(--white, #FFFFFF)",
+                  boxShadow: bundleTier === 1 ? "0 4px 14px rgba(0,0,0,0.06)" : "none",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
@@ -458,10 +461,11 @@ export function PdpActions({
                       width: 20,
                       height: 20,
                       borderRadius: "50%",
-                      border: bundleTier === 1 ? "2px solid #8C6D46" : "2px solid #777",
+                      border: bundleTier === 1 ? "2px solid var(--black, #111111)" : "2px solid #BBB",
                       display: "grid",
                       placeItems: "center",
                       flexShrink: 0,
+                      background: "var(--white, #FFFFFF)",
                     }}
                   >
                     {bundleTier === 1 && (
@@ -470,7 +474,7 @@ export function PdpActions({
                           width: 10,
                           height: 10,
                           borderRadius: "50%",
-                          background: "#8C6D46",
+                          background: "var(--black, #111111)",
                         }}
                       />
                     )}
@@ -483,8 +487,8 @@ export function PdpActions({
                       height: 38,
                       borderRadius: 6,
                       overflow: "hidden",
-                      background: "#000",
-                      border: "1px solid rgba(255,255,255,0.1)",
+                      background: "var(--off-white, #F7F5F0)",
+                      border: "1px solid var(--stone, #D9D6CF)",
                       flexShrink: 0,
                     }}
                   >
@@ -498,8 +502,8 @@ export function PdpActions({
 
                   {/* Text info */}
                   <div>
-                    <div style={{ fontSize: 14, fontWeight: 700 }}>Buy 1</div>
-                    <div style={{ fontSize: 12, color: "var(--text-soft, #888)", marginTop: 2 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "var(--black, #111111)" }}>Buy 1</div>
+                    <div style={{ fontSize: 12, color: "#666666", marginTop: 2 }}>
                       {fmtPrice(b1Price)} each · Pick your article and size
                     </div>
                   </div>
@@ -507,7 +511,7 @@ export function PdpActions({
 
                 {/* Price */}
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: "-0.01em" }}>
+                  <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: "-0.01em", color: "var(--black, #111111)" }}>
                     {fmtPrice(b1Price)}
                   </div>
                 </div>
@@ -519,14 +523,15 @@ export function PdpActions({
                 style={{
                   position: "relative",
                   padding: "14px 18px",
-                  borderRadius: 10,
+                  borderRadius: 8,
                   cursor: "pointer",
                   transition: "all 0.18s ease",
-                  border: bundleTier === 2 ? "1.5px solid #8C6D46" : "1px solid var(--border, #333)",
+                  border: bundleTier === 2 ? "2px solid var(--black, #111111)" : "1.5px solid var(--stone, #D9D6CF)",
                   background:
                     bundleTier === 2
-                      ? "rgba(140, 109, 70, 0.08)"
-                      : "var(--surface-2, #1e1e1e)",
+                      ? "rgba(200, 255, 0, 0.14)"
+                      : "var(--white, #FFFFFF)",
+                  boxShadow: bundleTier === 2 ? "0 4px 14px rgba(0,0,0,0.06)" : "none",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
@@ -539,14 +544,16 @@ export function PdpActions({
                     position: "absolute",
                     top: -10,
                     right: 14,
-                    background: "#8C6D46",
-                    color: "#fff",
+                    background: "var(--lime, #C8FF00)",
+                    color: "var(--black, #111111)",
                     fontSize: 10,
                     fontWeight: 800,
                     letterSpacing: "0.06em",
                     padding: "2px 10px",
                     borderRadius: 12,
                     textTransform: "uppercase",
+                    border: "1px solid rgba(0,0,0,0.12)",
+                    boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
                   }}
                 >
                   MOST POPULAR
@@ -559,10 +566,11 @@ export function PdpActions({
                       width: 20,
                       height: 20,
                       borderRadius: "50%",
-                      border: bundleTier === 2 ? "2px solid #8C6D46" : "2px solid #777",
+                      border: bundleTier === 2 ? "2px solid var(--black, #111111)" : "2px solid #BBB",
                       display: "grid",
                       placeItems: "center",
                       flexShrink: 0,
+                      background: "var(--white, #FFFFFF)",
                     }}
                   >
                     {bundleTier === 2 && (
@@ -571,7 +579,7 @@ export function PdpActions({
                           width: 10,
                           height: 10,
                           borderRadius: "50%",
-                          background: "#8C6D46",
+                          background: "var(--black, #111111)",
                         }}
                       />
                     )}
@@ -585,8 +593,8 @@ export function PdpActions({
                         height: 32,
                         borderRadius: 6,
                         overflow: "hidden",
-                        background: "#000",
-                        border: "1px solid rgba(255,255,255,0.1)",
+                        background: "var(--off-white, #F7F5F0)",
+                        border: "1px solid var(--stone, #D9D6CF)",
                         zIndex: 2,
                       }}
                     >
@@ -603,8 +611,8 @@ export function PdpActions({
                         height: 32,
                         borderRadius: 6,
                         overflow: "hidden",
-                        background: "#000",
-                        border: "1px solid rgba(255,255,255,0.1)",
+                        background: "var(--off-white, #F7F5F0)",
+                        border: "1px solid var(--stone, #D9D6CF)",
                         marginLeft: -8,
                         zIndex: 1,
                       }}
@@ -621,11 +629,12 @@ export function PdpActions({
                   {/* Text info */}
                   <div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontSize: 14, fontWeight: 700 }}>Buy 2</span>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: "var(--black, #111111)" }}>Buy 2</span>
                       <span
                         style={{
-                          background: "rgba(140, 109, 70, 0.25)",
-                          color: "#d9b382",
+                          background: "rgba(200, 255, 0, 0.35)",
+                          color: "var(--black, #111111)",
+                          border: "1px solid rgba(160, 204, 0, 0.6)",
                           fontSize: 10,
                           fontWeight: 800,
                           padding: "2px 7px",
@@ -636,7 +645,7 @@ export function PdpActions({
                         {b2DiscountText}
                       </span>
                     </div>
-                    <div style={{ fontSize: 12, color: "var(--text-soft, #888)", marginTop: 2 }}>
+                    <div style={{ fontSize: 12, color: "#666666", marginTop: 2 }}>
                       {fmtPrice(b2UnitPrice)} each · Pick two articles and sizes
                     </div>
                   </div>
@@ -644,11 +653,11 @@ export function PdpActions({
 
                 {/* Price */}
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: "-0.01em" }}>
+                  <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: "-0.01em", color: "var(--black, #111111)" }}>
                     {fmtPrice(b2Price)}
                   </div>
                   {b2Price < b1Price * 2 && (
-                    <div style={{ fontSize: 11, color: "var(--text-soft, #888)", textDecoration: "line-through" }}>
+                    <div style={{ fontSize: 11, color: "#888888", textDecoration: "line-through" }}>
                       {fmtPrice(b1Price * 2)}
                     </div>
                   )}
@@ -661,14 +670,15 @@ export function PdpActions({
                 style={{
                   position: "relative",
                   padding: "14px 18px",
-                  borderRadius: 10,
+                  borderRadius: 8,
                   cursor: "pointer",
                   transition: "all 0.18s ease",
-                  border: bundleTier === 3 ? "1.5px solid #8C6D46" : "1px solid var(--border, #333)",
+                  border: bundleTier === 3 ? "2px solid var(--black, #111111)" : "1.5px solid var(--stone, #D9D6CF)",
                   background:
                     bundleTier === 3
-                      ? "rgba(140, 109, 70, 0.08)"
-                      : "var(--surface-2, #1e1e1e)",
+                      ? "rgba(200, 255, 0, 0.14)"
+                      : "var(--white, #FFFFFF)",
+                  boxShadow: bundleTier === 3 ? "0 4px 14px rgba(0,0,0,0.06)" : "none",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
@@ -681,14 +691,16 @@ export function PdpActions({
                     position: "absolute",
                     top: -10,
                     right: 14,
-                    background: "#8C6D46",
-                    color: "#fff",
+                    background: "var(--lime, #C8FF00)",
+                    color: "var(--black, #111111)",
                     fontSize: 10,
                     fontWeight: 800,
                     letterSpacing: "0.06em",
                     padding: "2px 10px",
                     borderRadius: 12,
                     textTransform: "uppercase",
+                    border: "1px solid rgba(0,0,0,0.12)",
+                    boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
                   }}
                 >
                   BEST VALUE
@@ -701,10 +713,11 @@ export function PdpActions({
                       width: 20,
                       height: 20,
                       borderRadius: "50%",
-                      border: bundleTier === 3 ? "2px solid #8C6D46" : "2px solid #777",
+                      border: bundleTier === 3 ? "2px solid var(--black, #111111)" : "2px solid #BBB",
                       display: "grid",
                       placeItems: "center",
                       flexShrink: 0,
+                      background: "var(--white, #FFFFFF)",
                     }}
                   >
                     {bundleTier === 3 && (
@@ -713,7 +726,7 @@ export function PdpActions({
                           width: 10,
                           height: 10,
                           borderRadius: "50%",
-                          background: "#8C6D46",
+                          background: "var(--black, #111111)",
                         }}
                       />
                     )}
@@ -727,8 +740,8 @@ export function PdpActions({
                         height: 28,
                         borderRadius: 5,
                         overflow: "hidden",
-                        background: "#000",
-                        border: "1px solid rgba(255,255,255,0.1)",
+                        background: "var(--off-white, #F7F5F0)",
+                        border: "1px solid var(--stone, #D9D6CF)",
                         zIndex: 3,
                       }}
                     >
@@ -745,8 +758,8 @@ export function PdpActions({
                         height: 28,
                         borderRadius: 5,
                         overflow: "hidden",
-                        background: "#000",
-                        border: "1px solid rgba(255,255,255,0.1)",
+                        background: "var(--off-white, #F7F5F0)",
+                        border: "1px solid var(--stone, #D9D6CF)",
                         marginLeft: -8,
                         zIndex: 2,
                       }}
@@ -764,8 +777,8 @@ export function PdpActions({
                         height: 28,
                         borderRadius: 5,
                         overflow: "hidden",
-                        background: "#000",
-                        border: "1px solid rgba(255,255,255,0.1)",
+                        background: "var(--off-white, #F7F5F0)",
+                        border: "1px solid var(--stone, #D9D6CF)",
                         marginLeft: -8,
                         zIndex: 1,
                       }}
@@ -782,11 +795,12 @@ export function PdpActions({
                   {/* Text info */}
                   <div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontSize: 14, fontWeight: 700 }}>Buy 3</span>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: "var(--black, #111111)" }}>Buy 3</span>
                       <span
                         style={{
-                          background: "rgba(140, 109, 70, 0.25)",
-                          color: "#d9b382",
+                          background: "rgba(200, 255, 0, 0.35)",
+                          color: "var(--black, #111111)",
+                          border: "1px solid rgba(160, 204, 0, 0.6)",
                           fontSize: 10,
                           fontWeight: 800,
                           padding: "2px 7px",
@@ -797,7 +811,7 @@ export function PdpActions({
                         {b3DiscountText}
                       </span>
                     </div>
-                    <div style={{ fontSize: 12, color: "var(--text-soft, #888)", marginTop: 2 }}>
+                    <div style={{ fontSize: 12, color: "#666666", marginTop: 2 }}>
                       {fmtPrice(b3UnitPrice)} each · Pick three articles and sizes
                     </div>
                   </div>
@@ -805,11 +819,11 @@ export function PdpActions({
 
                 {/* Price */}
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: "-0.01em" }}>
+                  <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: "-0.01em", color: "var(--black, #111111)" }}>
                     {fmtPrice(b3Price)}
                   </div>
                   {b3Price < b1Price * 3 && (
-                    <div style={{ fontSize: 11, color: "var(--text-soft, #888)", textDecoration: "line-through" }}>
+                    <div style={{ fontSize: 11, color: "#888888", textDecoration: "line-through" }}>
                       {fmtPrice(b1Price * 3)}
                     </div>
                   )}
@@ -846,9 +860,20 @@ export function PdpActions({
           )}
           <button
             type="button"
-            className={`wish-toggle ${wished ? "active" : ""}`}
-            onClick={() => setWished(!wished)}
-            aria-label="Wishlist toggle"
+            className={`wish-toggle ${isItemWished ? "active" : ""}`}
+            onClick={() =>
+              wishlist.toggleWishlist({
+                productId: p.id,
+                name: p.name,
+                price: p.price,
+                oldPrice: p.oldPrice,
+                img: displayedImage,
+                color,
+                size: size || p.sizes[0] || "Standard",
+                category: p.category,
+              })
+            }
+            aria-label={isItemWished ? "Remove from wishlist" : "Add to wishlist"}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z" />

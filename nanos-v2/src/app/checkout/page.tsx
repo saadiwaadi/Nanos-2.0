@@ -36,6 +36,7 @@ export default function CheckoutPage() {
 
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const submittingRef = useRef(false);
+  const isOrderPlacedRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -43,6 +44,9 @@ export default function CheckoutPage() {
   const [promoMsg, setPromoMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
+    // If order was successfully placed, don't trigger the empty cart redirect to home
+    if (isOrderPlacedRef.current) return;
+
     if (cart.items.length === 0) {
       router.push("/");
       return;
@@ -179,7 +183,8 @@ export default function CheckoutPage() {
         return;
       }
 
-      // 3. Clear Cart & Direct Redirect to Confirmation
+      // 3. Mark order placed, clear cart & direct redirect to Confirmation
+      isOrderPlacedRef.current = true;
       cart.clear();
 
       const redirectUrl = currentToken
@@ -194,7 +199,7 @@ export default function CheckoutPage() {
     }
   }
 
-  if (cart.items.length === 0) {
+  if (cart.items.length === 0 && !isOrderPlacedRef.current) {
     return null;
   }
 

@@ -189,7 +189,7 @@ export default function CartPage() {
               className="btn btn-primary btn-block"
               style={{ marginTop: 18 }}
             >
-              Proceed to Checkout →
+              Proceed to Checkout
             </Link>
             <Link
               href="/"

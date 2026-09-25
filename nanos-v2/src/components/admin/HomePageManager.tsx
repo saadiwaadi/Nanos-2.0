@@ -249,7 +249,7 @@ export function HomePageManager({
       subtitle: "Curated collection",
       layout: "scroll",
       buttons: [
-        { id: "btn_" + Date.now().toString(36), label: "View All →", url: "/products", style: "link", isHidden: false },
+        { id: "btn_" + Date.now().toString(36), label: "View All", url: "/products", style: "link", isHidden: false },
       ],
       products: [],
       isHidden: false,

@@ -14,7 +14,22 @@ export const memoryOrders = new Map<string, any>();
 export async function POST(request: Request) {
   try {
     const authPayload = await verifyToken(request);
-    const userId = authPayload?.sub || null;
+    const candidateUserId = authPayload?.sub || null;
+
+    let validUserId: string | null = null;
+    if (candidateUserId) {
+      try {
+        const userExists = await prisma.user.findUnique({
+          where: { id: candidateUserId },
+          select: { id: true },
+        });
+        if (userExists) {
+          validUserId = userExists.id;
+        }
+      } catch {
+        // If DB query fails or is in dev mock mode
+      }
+    }
 
     const body = await request.json();
     const { items, shippingInfo, promoCode, guestEmail, guestName, fbp, fbc, eventId } = body || {};
@@ -108,9 +123,9 @@ export async function POST(request: Request) {
         const createdOrder = await tx.order.create({
           data: {
             id: orderId,
-            userId,
-            guestEmail: userId ? null : guestEmail || shippingInfo.email,
-            guestName: userId ? null : guestName || shippingInfo.name,
+            userId: validUserId,
+            guestEmail: validUserId ? null : guestEmail || shippingInfo.email,
+            guestName: validUserId ? null : guestName || shippingInfo.name,
             subtotal,
             discount,
             shipping,
@@ -143,7 +158,7 @@ export async function POST(request: Request) {
             orderId: createdOrder.id,
             type: "created",
             toValue: "placed",
-            actor: userId ? `user:${userId}` : "customer:guest",
+            actor: validUserId ? `user:${validUserId}` : "customer:guest",
           },
         });
       });

@@ -214,7 +214,7 @@ export default async function HomePage() {
                       </div>
                       <h3 className="cat-tile-title">{tile.title}</h3>
                       <span className="cat-tile-link">
-                        Explore Collection <span className="cat-tile-arrow">&rarr;</span>
+                        Explore Collection
                       </span>
                     </div>
                   </Link>
