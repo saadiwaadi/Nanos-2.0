@@ -7,6 +7,7 @@ import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { fmtPrice } from "@/lib/cart";
 import { trackMeta } from "@/lib/fpixel";
+import { PAKISTAN_CITIES } from "@/lib/cities";
 
 function getCookie(name: string): string | undefined {
   if (typeof document === "undefined") return undefined;
@@ -322,12 +323,11 @@ export default function CheckoutPage() {
                       onBlur={() => markTouched("city")}
                     >
                       <option value="">Select city</option>
-                      <option>Lahore</option>
-                      <option>Karachi</option>
-                      <option>Islamabad</option>
-                      <option>Faisalabad</option>
-                      <option>Rawalpindi</option>
-                      <option>Multan</option>
+                      {PAKISTAN_CITIES.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
                     </select>
                     {touched.city && !isCityValid && (
                       <span style={{ color: "#c0392b", fontSize: 12, marginTop: 4 }}>
