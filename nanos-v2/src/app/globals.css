@@ -1355,4 +1355,65 @@ noscript { display: none !important; }
   }
 }
 
+/* ==========================================================================
+   WhatsApp Floating Contact Button
+   ========================================================================== */
+.whatsapp-floating-btn {
+  position: fixed;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  right: calc(24px + env(safe-area-inset-right, 0px));
+  z-index: 90;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background-color: #25D366;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18), 0 2px 6px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, background-color 0.2s ease;
+  cursor: pointer;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.whatsapp-floating-btn:hover {
+  background-color: #20bd5a;
+  transform: translateY(-2px) scale(1.04);
+  box-shadow: 0 8px 22px rgba(37, 211, 102, 0.35), 0 4px 10px rgba(0, 0, 0, 0.12);
+  color: #ffffff;
+}
+
+.whatsapp-floating-btn:active {
+  transform: translateY(0) scale(0.96);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.whatsapp-floating-btn:focus-visible {
+  outline: 2px solid #25D366;
+  outline-offset: 3px;
+}
+
+.whatsapp-floating-btn .whatsapp-icon {
+  width: 32px;
+  height: 32px;
+  display: block;
+}
+
+@media (max-width: 768px) {
+  .whatsapp-floating-btn {
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    right: calc(16px + env(safe-area-inset-right, 0px));
+    width: 48px;
+    height: 48px;
+  }
+  .whatsapp-floating-btn .whatsapp-icon {
+    width: 26px;
+    height: 26px;
+  }
+}
+
+
 

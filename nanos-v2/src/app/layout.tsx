@@ -7,6 +7,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { CartDrawer } from "@/components/CartDrawer";
 import { ScrollRestoration } from "@/components/ScrollRestoration";
+import { WhatsAppButton } from "@/components/WhatsAppButton";
 
 import { MetaPixel } from "@/components/MetaPixel";
 
@@ -42,6 +43,7 @@ export default function RootLayout({
               <SiteChrome>
                 <Footer />
                 <CartDrawer />
+                <WhatsAppButton />
               </SiteChrome>
             </CartProvider>
           </WishlistProvider>
