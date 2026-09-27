@@ -47,11 +47,10 @@ export async function POST(request: Request) {
       !shippingInfo.phone ||
       !shippingInfo.email ||
       !shippingInfo.address ||
-      !shippingInfo.city ||
-      !shippingInfo.postal
+      !shippingInfo.city
     ) {
       return NextResponse.json(
-        { error: { code: "BAD_REQUEST", message: "All shipping details are required." } },
+        { error: { code: "BAD_REQUEST", message: "Name, phone, email, address, and city are required." } },
         { status: 400 }
       );
     }
