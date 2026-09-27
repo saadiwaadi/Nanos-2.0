@@ -374,19 +374,6 @@ export function PdpActions({
                     }}
                   >
                     {s}
-                    {isLowStock && (
-                      <span
-                        style={{
-                          fontSize: 10,
-                          color: "#b5860b",
-                          display: "block",
-                          lineHeight: 1,
-                          marginTop: 2,
-                        }}
-                      >
-                        Only {stk} left
-                      </span>
-                    )}
                   </button>
                 );
               })}
