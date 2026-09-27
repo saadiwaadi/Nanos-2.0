@@ -548,25 +548,6 @@ export function PdpActions({
                     )}
                   </div>
 
-                  <div
-                    style={{
-                      width: 34,
-                      height: 34,
-                      borderRadius: 6,
-                      overflow: "hidden",
-                      background: "var(--off-white, #F7F5F0)",
-                      border: "1px solid var(--stone, #D9D6CF)",
-                      flexShrink: 0,
-                    }}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={displayedImage}
-                      alt=""
-                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                    />
-                  </div>
-
                   <div>
                     <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--black, #111111)" }}>Buy 1</div>
                     <div style={{ fontSize: 11.5, color: "#666666" }}>
@@ -645,46 +626,6 @@ export function PdpActions({
                         }}
                       />
                     )}
-                  </div>
-
-                  <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
-                    <div
-                      style={{
-                        width: 30,
-                        height: 30,
-                        borderRadius: 5,
-                        overflow: "hidden",
-                        background: "var(--off-white, #F7F5F0)",
-                        border: "1px solid var(--stone, #D9D6CF)",
-                        zIndex: 2,
-                      }}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={displayedImage}
-                        alt=""
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                      />
-                    </div>
-                    <div
-                      style={{
-                        width: 30,
-                        height: 30,
-                        borderRadius: 5,
-                        overflow: "hidden",
-                        background: "var(--off-white, #F7F5F0)",
-                        border: "1px solid var(--stone, #D9D6CF)",
-                        marginLeft: -8,
-                        zIndex: 1,
-                      }}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={gallery[1] || displayedImage}
-                        alt=""
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                      />
-                    </div>
                   </div>
 
                   <div>
@@ -785,65 +726,6 @@ export function PdpActions({
                         }}
                       />
                     )}
-                  </div>
-
-                  <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
-                    <div
-                      style={{
-                        width: 26,
-                        height: 26,
-                        borderRadius: 4,
-                        overflow: "hidden",
-                        background: "var(--off-white, #F7F5F0)",
-                        border: "1px solid var(--stone, #D9D6CF)",
-                        zIndex: 3,
-                      }}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={displayedImage}
-                        alt=""
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                      />
-                    </div>
-                    <div
-                      style={{
-                        width: 26,
-                        height: 26,
-                        borderRadius: 4,
-                        overflow: "hidden",
-                        background: "var(--off-white, #F7F5F0)",
-                        border: "1px solid var(--stone, #D9D6CF)",
-                        marginLeft: -6,
-                        zIndex: 2,
-                      }}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={gallery[1] || displayedImage}
-                        alt=""
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                      />
-                    </div>
-                    <div
-                      style={{
-                        width: 26,
-                        height: 26,
-                        borderRadius: 4,
-                        overflow: "hidden",
-                        background: "var(--off-white, #F7F5F0)",
-                        border: "1px solid var(--stone, #D9D6CF)",
-                        marginLeft: -6,
-                        zIndex: 1,
-                      }}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={gallery[2] || gallery[0] || displayedImage}
-                        alt=""
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                      />
-                    </div>
                   </div>
 
                   <div>

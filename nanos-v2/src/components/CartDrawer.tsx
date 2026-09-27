@@ -122,9 +122,14 @@ export function CartDrawer() {
               {wishlist.items.length > 0 && (
                 <div style={{ marginTop: 20, textAlign: "left", width: "100%", borderTop: "1px solid var(--stone, #e5e5e5)", paddingTop: 16 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, fontFamily: "var(--font-head)", letterSpacing: "-0.01em" }}>
-                      ❤️ Liked Items ({wishlist.items.length})
-                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <svg viewBox="0 0 24 24" fill="#e11d48" stroke="#e11d48" strokeWidth="1.5" style={{ width: 15, height: 15 }}>
+                        <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z" />
+                      </svg>
+                      <span style={{ fontSize: 13, fontWeight: 700, fontFamily: "var(--font-head)", letterSpacing: "-0.01em" }}>
+                        Liked Items ({wishlist.items.length})
+                      </span>
+                    </div>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                     {wishlist.items.map((liked) => (
