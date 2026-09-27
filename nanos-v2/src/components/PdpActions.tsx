@@ -485,20 +485,113 @@ export function PdpActions({
           <span>({p.reviews} reviews)</span>
         </div>
 
-        {/* Choose your bundle */}
+        {/* SINGLE PAIR SELECTOR (TIER 1) - Color, Size, Quantity directly under Reviews */}
+        {bundleTier === 1 && (
+          <div style={{ marginTop: 16 }}>
+            {/* Color Option Group */}
+            {p.colors.length > 0 && (
+              <div className="option-group">
+                <div className="label-row">
+                  <label className="title">Color</label>
+                  <span className="selected-val">{color}</span>
+                </div>
+                <div className="color-options">
+                  {p.colors.map((c) => (
+                    <button
+                      key={c.name}
+                      type="button"
+                      title={c.name}
+                      aria-label={`Select color ${c.name}`}
+                      className={`color-opt ${color === c.name ? "selected" : ""}`}
+                      onClick={() => handleColorSelect(c)}
+                    >
+                      <span className="swatch-inner" style={{ background: c.hex }} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Size Option Group */}
+            {p.sizes.length > 0 && (
+              <div className="option-group">
+                <div className="label-row">
+                  <label className="title">Size</label>
+                  <span className="selected-val">{size ?? "Select a size"}</span>
+                </div>
+                <div className="size-options">
+                  {p.sizes.map((s) => {
+                    const stk = getStockForSize(s);
+                    const isOutOfStock = stk === 0;
+
+                    return (
+                      <button
+                        key={s}
+                        type="button"
+                        disabled={isOutOfStock || p.category === "trousers"}
+                        aria-label={`Select size ${s}`}
+                        className={`size-opt ${size === s ? "selected" : ""} ${isOutOfStock ? "out-of-stock" : ""}`}
+                        style={{
+                          opacity: isOutOfStock || p.category === "trousers" ? 0.35 : 1,
+                          textDecoration: isOutOfStock ? "line-through" : "none",
+                          cursor: isOutOfStock || p.category === "trousers" ? "not-allowed" : "pointer",
+                          position: "relative",
+                        }}
+                        onClick={() => {
+                          if (!isOutOfStock && p.category !== "trousers") setSize(s);
+                        }}
+                      >
+                        {s}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Quantity Row */}
+            <div className="qty-row" style={{ marginBottom: 18 }}>
+              <label className="title">Quantity</label>
+              <div className="qty-stepper">
+                <button
+                  type="button"
+                  disabled={p.category === "trousers"}
+                  aria-label="Decrease quantity"
+                  onClick={() => setQty(Math.max(1, qty - 1))}
+                >
+                  −
+                </button>
+                <span className="qty-val">{qty}</span>
+                <button
+                  type="button"
+                  disabled={p.category === "trousers"}
+                  aria-label="Increase quantity"
+                  onClick={() => setQty(qty + 1)}
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Choose your bundle / Buy Pair Offer - Positioned under Color, Size, and Quantity */}
         {bundleEnabled && (
-          <div style={{ margin: "18px 0 24px 0" }}>
+          <div style={{ margin: bundleTier === 1 ? "14px 0 24px 0" : "18px 0 20px 0" }}>
             <div
               style={{
-                fontSize: 14,
+                fontSize: 13.5,
                 fontWeight: 700,
                 marginBottom: 10,
                 letterSpacing: "-0.01em",
                 textTransform: "uppercase",
                 color: "#222",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
               }}
             >
-              Choose your bundle
+              <span>Bundle &amp; Save Offer</span>
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -565,7 +658,17 @@ export function PdpActions({
 
               {/* TIER 2: BUY 2 */}
               <div
-                onClick={() => setBundleTier(2)}
+                onClick={() => {
+                  setBundleTier(2);
+                  setBundlePairs((prev) => {
+                    const next = [...prev];
+                    next[0] = {
+                      color: color,
+                      size: size && getStockForColorAndSize(color, size) > 0 ? size : next[0]?.size || null,
+                    };
+                    return next;
+                  });
+                }}
                 style={{
                   position: "relative",
                   padding: "12px 16px",
@@ -630,7 +733,7 @@ export function PdpActions({
 
                   <div>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <span style={{ fontSize: 13.5, fontWeight: 700, color: "var(--black, #111111)" }}>Buy 2</span>
+                      <span style={{ fontSize: 13.5, fontWeight: 700, color: "var(--black, #111111)" }}>Buy 2 (Pair)</span>
                       <span
                         style={{
                           background: "rgba(200, 255, 0, 0.35)",
@@ -665,7 +768,17 @@ export function PdpActions({
 
               {/* TIER 3: BUY 3 */}
               <div
-                onClick={() => setBundleTier(3)}
+                onClick={() => {
+                  setBundleTier(3);
+                  setBundlePairs((prev) => {
+                    const next = [...prev];
+                    next[0] = {
+                      color: color,
+                      size: size && getStockForColorAndSize(color, size) > 0 ? size : next[0]?.size || null,
+                    };
+                    return next;
+                  });
+                }}
                 style={{
                   position: "relative",
                   padding: "12px 16px",
@@ -764,96 +877,6 @@ export function PdpActions({
               </div>
             </div>
           </div>
-        )}
-
-        {/* SINGLE PAIR SELECTOR (TIER 1) */}
-        {bundleTier === 1 && (
-          <>
-            {/* Color Option Group */}
-            {p.colors.length > 0 && (
-              <div className="option-group">
-                <div className="label-row">
-                  <label className="title">Color</label>
-                  <span className="selected-val">{color}</span>
-                </div>
-                <div className="color-options">
-                  {p.colors.map((c) => (
-                    <button
-                      key={c.name}
-                      type="button"
-                      title={c.name}
-                      aria-label={`Select color ${c.name}`}
-                      className={`color-opt ${color === c.name ? "selected" : ""}`}
-                      onClick={() => handleColorSelect(c)}
-                    >
-                      <span className="swatch-inner" style={{ background: c.hex }} />
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Size Option Group */}
-            {p.sizes.length > 0 && (
-              <div className="option-group">
-                <div className="label-row">
-                  <label className="title">Size</label>
-                  <span className="selected-val">{size ?? "Select a size"}</span>
-                </div>
-                <div className="size-options">
-                  {p.sizes.map((s) => {
-                    const stk = getStockForSize(s);
-                    const isOutOfStock = stk === 0;
-
-                    return (
-                      <button
-                        key={s}
-                        type="button"
-                        disabled={isOutOfStock || p.category === "trousers"}
-                        aria-label={`Select size ${s}`}
-                        className={`size-opt ${size === s ? "selected" : ""} ${isOutOfStock ? "out-of-stock" : ""}`}
-                        style={{
-                          opacity: isOutOfStock || p.category === "trousers" ? 0.35 : 1,
-                          textDecoration: isOutOfStock ? "line-through" : "none",
-                          cursor: isOutOfStock || p.category === "trousers" ? "not-allowed" : "pointer",
-                          position: "relative",
-                        }}
-                        onClick={() => {
-                          if (!isOutOfStock && p.category !== "trousers") setSize(s);
-                        }}
-                      >
-                        {s}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Quantity Row */}
-            <div className="qty-row">
-              <label className="title">Quantity</label>
-              <div className="qty-stepper">
-                <button
-                  type="button"
-                  disabled={p.category === "trousers"}
-                  aria-label="Decrease quantity"
-                  onClick={() => setQty(Math.max(1, qty - 1))}
-                >
-                  −
-                </button>
-                <span className="qty-val">{qty}</span>
-                <button
-                  type="button"
-                  disabled={p.category === "trousers"}
-                  aria-label="Increase quantity"
-                  onClick={() => setQty(qty + 1)}
-                >
-                  +
-                </button>
-              </div>
-            </div>
-          </>
         )}
 
         {/* MULTI-PAIR BUNDLE SELECTOR (TIER 2 & TIER 3) */}
