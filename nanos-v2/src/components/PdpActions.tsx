@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
@@ -50,6 +51,11 @@ export interface BundlePricingInfo {
   enabled: boolean;
 }
 
+interface BundlePairSelection {
+  color: string;
+  size: string | null;
+}
+
 export function PdpActions({
   product: p,
   bundlePricing,
@@ -57,13 +63,22 @@ export function PdpActions({
   product: ProductData;
   bundlePricing?: BundlePricingInfo;
 }) {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [imgIdx, setImgIdx] = useState(0);
   const [activeImage, setActiveImage] = useState<string | null>(null);
-  const [color, setColor] = useState<string>(p.colors[0]?.name || "");
+  const [color, setColor] = useState<string>(p.colors[0]?.name || "Standard");
   const [size, setSize] = useState<string | null>(null);
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
+
+  // Independent configuration per pair for bundle tiers (up to 3 pairs)
+  const [bundlePairs, setBundlePairs] = useState<BundlePairSelection[]>([
+    { color: p.colors[0]?.name || "Standard", size: null },
+    { color: p.colors[0]?.name || "Standard", size: null },
+    { color: p.colors[0]?.name || "Standard", size: null },
+  ]);
+
   const cart = useCart();
   const wishlist = useWishlist();
   const isItemWished = wishlist.isWished(p.id);
@@ -143,6 +158,18 @@ export function PdpActions({
     return 999;
   }
 
+  function getStockForColorAndSize(colorName: string, sz: string): number {
+    if (p.stockLevels && p.stockLevels.length > 0) {
+      const found = p.stockLevels.find(
+        (s) =>
+          s.color.toLowerCase() === colorName.toLowerCase() &&
+          s.size.toLowerCase() === sz.toLowerCase()
+      );
+      return found ? found.quantity : 0;
+    }
+    return 999;
+  }
+
   const [bundleTier, setBundleTier] = useState<1 | 2 | 3>(1);
 
   const b1Price = bundlePricing?.buy1Price ?? p.price;
@@ -161,48 +188,176 @@ export function PdpActions({
       ? b3UnitPrice
       : b1Price;
 
-  const effectiveQty = bundleTier;
   const effectiveTotal =
-    bundleTier === 2 ? b2Price : bundleTier === 3 ? b3Price : b1Price;
-
-  function handleAdd() {
-    if (!size) return;
-    const sizeStock = getStockForSize(size);
-    if (sizeStock === 0) return;
-
-    const bundleNameSuffix =
-      bundleTier === 2
-        ? ` · 2-Pack (${b2DiscountText})`
-        : bundleTier === 3
-        ? ` · 3-Pack (${b3DiscountText})`
-        : "";
-
-    cart.addItem(
-      {
-        productId: p.id,
-        name: p.name + bundleNameSuffix,
-        color,
-        size,
-        price: effectiveUnitPrice,
-        img: displayedImage,
-      },
-      effectiveQty
-    );
-
-    setAdded(true);
-    setTimeout(() => setAdded(false), 1500);
-  }
+    bundleTier === 2 ? b2Price : bundleTier === 3 ? b3Price : b1Price * qty;
 
   function handleColorSelect(c: ProductColor) {
     setColor(c.name);
     setImgIdx(0);
     setActiveImage(null);
 
-    // If currently selected size is out of stock in new color, clear size
-    if (size && getStockForSize(size) === 0) {
+    if (size && getStockForColorAndSize(c.name, size) === 0) {
       setSize(null);
     }
   }
+
+  function handleAdd() {
+    if (!isAllBundleSizesSelected || p.category === "trousers") return;
+
+    if (bundleTier === 1) {
+      if (!size) return;
+      cart.addItem(
+        {
+          productId: p.id,
+          name: p.name,
+          color,
+          size,
+          price: b1Price,
+          img: displayedImage,
+        },
+        qty
+      );
+    } else {
+      // Add each pair as its own line item with bundle unit price
+      for (let i = 0; i < bundleTier; i++) {
+        const pair = bundlePairs[i];
+        const pairColorObj = p.productColors?.find(
+          (c) => c.name.toLowerCase() === pair.color.toLowerCase()
+        );
+        let pairImg = displayedImage;
+        if (pairColorObj) {
+          try {
+            const parsed = JSON.parse(pairColorObj.imagesJson || "[]");
+            if (parsed[0]) pairImg = parsed[0];
+          } catch {}
+        }
+
+        const tierLabel = bundleTier === 2 ? b2DiscountText : b3DiscountText;
+        cart.addItem(
+          {
+            productId: p.id,
+            name: `${p.name} (Pair #${i + 1} of ${bundleTier} · ${tierLabel})`,
+            color: pair.color,
+            size: pair.size!,
+            price: effectiveUnitPrice,
+            img: pairImg,
+          },
+          1
+        );
+      }
+    }
+
+    setAdded(true);
+    setTimeout(() => setAdded(false), 1500);
+  }
+
+  function handleBuyNow(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isAllBundleSizesSelected || p.category === "trousers") return;
+
+    if (bundleTier === 1) {
+      if (!size) return;
+      cart.addItem(
+        {
+          productId: p.id,
+          name: p.name,
+          color,
+          size,
+          price: b1Price,
+          img: displayedImage,
+        },
+        qty
+      );
+    } else {
+      for (let i = 0; i < bundleTier; i++) {
+        const pair = bundlePairs[i];
+        const pairColorObj = p.productColors?.find(
+          (c) => c.name.toLowerCase() === pair.color.toLowerCase()
+        );
+        let pairImg = displayedImage;
+        if (pairColorObj) {
+          try {
+            const parsed = JSON.parse(pairColorObj.imagesJson || "[]");
+            if (parsed[0]) pairImg = parsed[0];
+          } catch {}
+        }
+
+        const tierLabel = bundleTier === 2 ? b2DiscountText : b3DiscountText;
+        cart.addItem(
+          {
+            productId: p.id,
+            name: `${p.name} (Pair #${i + 1} of ${bundleTier} · ${tierLabel})`,
+            color: pair.color,
+            size: pair.size!,
+            price: effectiveUnitPrice,
+            img: pairImg,
+          },
+          1
+        );
+      }
+    }
+
+    router.push("/checkout");
+  }
+
+  function handlePairColorSelect(pairIndex: number, newColorName: string) {
+    setBundlePairs((prev) => {
+      const next = [...prev];
+      const currentSize = next[pairIndex]?.size;
+      const stock = currentSize ? getStockForColorAndSize(newColorName, currentSize) : 0;
+      next[pairIndex] = {
+        color: newColorName,
+        size: stock > 0 ? currentSize : null,
+      };
+      return next;
+    });
+
+    const pairColorObj = p.productColors?.find(
+      (c) => c.name.toLowerCase() === newColorName.toLowerCase()
+    );
+    if (pairColorObj) {
+      try {
+        const parsed = JSON.parse(pairColorObj.imagesJson || "[]");
+        if (parsed[0]) {
+          setActiveImage(parsed[0]);
+        }
+      } catch {}
+    }
+  }
+
+  function handlePairSizeSelect(pairIndex: number, newSize: string) {
+    setBundlePairs((prev) => {
+      const next = [...prev];
+      next[pairIndex] = {
+        ...next[pairIndex],
+        size: newSize,
+      };
+      return next;
+    });
+  }
+
+  const missingPairIndex =
+    bundleTier === 1
+      ? (!size ? 0 : -1)
+      : bundlePairs
+          .slice(0, bundleTier)
+          .findIndex((pair) => !pair.size || getStockForColorAndSize(pair.color, pair.size) === 0);
+
+  const isAllBundleSizesSelected = missingPairIndex === -1;
+
+  const buttonText = (() => {
+    if (added) return "Added ✓";
+    if (p.category === "trousers") return "Coming Soon";
+    if (bundleTier === 1) {
+      if (!size) return "Select a size";
+      return `Add to Cart — ${fmtPrice(effectiveTotal)}`;
+    }
+    if (missingPairIndex !== -1) {
+      return `Select size for Pair ${missingPairIndex + 1}`;
+    }
+    return `Add to Cart — ${fmtPrice(effectiveTotal)}`;
+  })();
 
   if (!mounted) {
     return (
@@ -305,12 +460,23 @@ export function PdpActions({
         </div>
 
         <div className="pdp-price-row">
-          <span className="price">{fmtPrice(p.price)}</span>
-          {p.oldPrice && (
+          <span className="price">{fmtPrice(effectiveTotal)}</span>
+          {p.oldPrice && bundleTier === 1 && (
             <>
               <span className="price-old">{fmtPrice(p.oldPrice)}</span>
               <span className="badge badge-sale">SALE</span>
             </>
+          )}
+          {bundleTier > 1 && (
+            <span
+              style={{
+                fontSize: "13px",
+                color: "#666",
+                fontWeight: 500,
+              }}
+            >
+              ({fmtPrice(effectiveUnitPrice)} / pair)
+            </span>
           )}
         </div>
 
@@ -319,113 +485,29 @@ export function PdpActions({
           <span>({p.reviews} reviews)</span>
         </div>
 
-        {/* Color Option Group */}
-        {p.colors.length > 0 && (
-          <div className="option-group">
-            <div className="label-row">
-              <label className="title">Color</label>
-              <span className="selected-val">{color}</span>
-            </div>
-            <div className="color-options">
-              {p.colors.map((c) => (
-                <button
-                  key={c.name}
-                  type="button"
-                  title={c.name}
-                  aria-label={`Select color ${c.name}`}
-                  className={`color-opt ${color === c.name ? "selected" : ""}`}
-                  onClick={() => handleColorSelect(c)}
-                >
-                  <span className="swatch-inner" style={{ background: c.hex }} />
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Size Option Group */}
-        {p.sizes.length > 0 && (
-          <div className="option-group">
-            <div className="label-row">
-              <label className="title">Size</label>
-              <span className="selected-val">{size ?? "Select a size"}</span>
-            </div>
-            <div className="size-options">
-              {p.sizes.map((s) => {
-                const stk = getStockForSize(s);
-                const isOutOfStock = stk === 0;
-                const isLowStock = stk > 0 && stk <= 3;
-
-                return (
-                  <button
-                    key={s}
-                    type="button"
-                    disabled={isOutOfStock || p.category === "trousers"}
-                    aria-label={`Select size ${s}`}
-                    className={`size-opt ${size === s ? "selected" : ""} ${isOutOfStock ? "out-of-stock" : ""}`}
-                    style={{
-                      opacity: isOutOfStock || p.category === "trousers" ? 0.35 : 1,
-                      textDecoration: isOutOfStock ? "line-through" : "none",
-                      cursor: isOutOfStock || p.category === "trousers" ? "not-allowed" : "pointer",
-                      position: "relative",
-                    }}
-                    onClick={() => {
-                      if (!isOutOfStock && p.category !== "trousers") setSize(s);
-                    }}
-                  >
-                    {s}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Quantity Row */}
-        <div className="qty-row">
-          <label className="title">Quantity</label>
-          <div className="qty-stepper">
-            <button
-              type="button"
-              disabled={p.category === "trousers"}
-              aria-label="Decrease quantity"
-              onClick={() => setQty(Math.max(1, qty - 1))}
-            >
-              −
-            </button>
-            <span className="qty-val">{qty}</span>
-            <button
-              type="button"
-              disabled={p.category === "trousers"}
-              aria-label="Increase quantity"
-              onClick={() => setQty(qty + 1)}
-            >
-              +
-            </button>
-          </div>
-        </div>
-
         {/* Choose your bundle */}
         {bundleEnabled && (
-          <div style={{ margin: "24px 0 24px 0" }}>
+          <div style={{ margin: "18px 0 24px 0" }}>
             <div
               style={{
-                fontSize: 15,
+                fontSize: 14,
                 fontWeight: 700,
-                marginBottom: 12,
+                marginBottom: 10,
                 letterSpacing: "-0.01em",
+                textTransform: "uppercase",
+                color: "#222",
               }}
             >
               Choose your bundle
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {/* TIER 1: BUY 1 */}
               <div
                 onClick={() => setBundleTier(1)}
                 style={{
                   position: "relative",
-                  padding: "14px 18px",
+                  padding: "12px 16px",
                   borderRadius: 8,
                   cursor: "pointer",
                   transition: "all 0.18s ease",
@@ -442,11 +524,10 @@ export function PdpActions({
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  {/* Custom Radio Circle */}
                   <div
                     style={{
-                      width: 20,
-                      height: 20,
+                      width: 18,
+                      height: 18,
                       borderRadius: "50%",
                       border: bundleTier === 1 ? "2px solid var(--black, #111111)" : "2px solid #BBB",
                       display: "grid",
@@ -458,8 +539,8 @@ export function PdpActions({
                     {bundleTier === 1 && (
                       <div
                         style={{
-                          width: 10,
-                          height: 10,
+                          width: 8,
+                          height: 8,
                           borderRadius: "50%",
                           background: "var(--black, #111111)",
                         }}
@@ -467,11 +548,10 @@ export function PdpActions({
                     )}
                   </div>
 
-                  {/* 1 Thumbnail */}
                   <div
                     style={{
-                      width: 38,
-                      height: 38,
+                      width: 34,
+                      height: 34,
                       borderRadius: 6,
                       overflow: "hidden",
                       background: "var(--off-white, #F7F5F0)",
@@ -487,18 +567,16 @@ export function PdpActions({
                     />
                   </div>
 
-                  {/* Text info */}
                   <div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: "var(--black, #111111)" }}>Buy 1</div>
-                    <div style={{ fontSize: 12, color: "#666666", marginTop: 2 }}>
-                      {fmtPrice(b1Price)} each · Pick your article and size
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--black, #111111)" }}>Buy 1</div>
+                    <div style={{ fontSize: 11.5, color: "#666666" }}>
+                      {fmtPrice(b1Price)} each · 1 Pair
                     </div>
                   </div>
                 </div>
 
-                {/* Price */}
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: "-0.01em", color: "var(--black, #111111)" }}>
+                  <div style={{ fontSize: 14.5, fontWeight: 800, color: "var(--black, #111111)" }}>
                     {fmtPrice(b1Price)}
                   </div>
                 </div>
@@ -509,7 +587,7 @@ export function PdpActions({
                 onClick={() => setBundleTier(2)}
                 style={{
                   position: "relative",
-                  padding: "14px 18px",
+                  padding: "12px 16px",
                   borderRadius: 8,
                   cursor: "pointer",
                   transition: "all 0.18s ease",
@@ -525,33 +603,30 @@ export function PdpActions({
                   gap: 12,
                 }}
               >
-                {/* Floating Badge: MOST POPULAR */}
                 <div
                   style={{
                     position: "absolute",
-                    top: -10,
+                    top: -9,
                     right: 14,
                     background: "var(--lime, #C8FF00)",
                     color: "var(--black, #111111)",
-                    fontSize: 10,
+                    fontSize: 9.5,
                     fontWeight: 800,
                     letterSpacing: "0.06em",
-                    padding: "2px 10px",
-                    borderRadius: 12,
+                    padding: "2px 8px",
+                    borderRadius: 10,
                     textTransform: "uppercase",
                     border: "1px solid rgba(0,0,0,0.12)",
-                    boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
                   }}
                 >
                   MOST POPULAR
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  {/* Custom Radio Circle */}
                   <div
                     style={{
-                      width: 20,
-                      height: 20,
+                      width: 18,
+                      height: 18,
                       borderRadius: "50%",
                       border: bundleTier === 2 ? "2px solid var(--black, #111111)" : "2px solid #BBB",
                       display: "grid",
@@ -563,8 +638,8 @@ export function PdpActions({
                     {bundleTier === 2 && (
                       <div
                         style={{
-                          width: 10,
-                          height: 10,
+                          width: 8,
+                          height: 8,
                           borderRadius: "50%",
                           background: "var(--black, #111111)",
                         }}
@@ -572,13 +647,12 @@ export function PdpActions({
                     )}
                   </div>
 
-                  {/* 2 Thumbnails */}
                   <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
                     <div
                       style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 6,
+                        width: 30,
+                        height: 30,
+                        borderRadius: 5,
                         overflow: "hidden",
                         background: "var(--off-white, #F7F5F0)",
                         border: "1px solid var(--stone, #D9D6CF)",
@@ -594,9 +668,9 @@ export function PdpActions({
                     </div>
                     <div
                       style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 6,
+                        width: 30,
+                        height: 30,
+                        borderRadius: 5,
                         overflow: "hidden",
                         background: "var(--off-white, #F7F5F0)",
                         border: "1px solid var(--stone, #D9D6CF)",
@@ -613,34 +687,31 @@ export function PdpActions({
                     </div>
                   </div>
 
-                  {/* Text info */}
                   <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontSize: 14, fontWeight: 700, color: "var(--black, #111111)" }}>Buy 2</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 13.5, fontWeight: 700, color: "var(--black, #111111)" }}>Buy 2</span>
                       <span
                         style={{
                           background: "rgba(200, 255, 0, 0.35)",
                           color: "var(--black, #111111)",
                           border: "1px solid rgba(160, 204, 0, 0.6)",
-                          fontSize: 10,
+                          fontSize: 9.5,
                           fontWeight: 800,
-                          padding: "2px 7px",
-                          borderRadius: 10,
-                          letterSpacing: "0.02em",
+                          padding: "1px 6px",
+                          borderRadius: 8,
                         }}
                       >
                         {b2DiscountText}
                       </span>
                     </div>
-                    <div style={{ fontSize: 12, color: "#666666", marginTop: 2 }}>
-                      {fmtPrice(b2UnitPrice)} each · Pick two articles and sizes
+                    <div style={{ fontSize: 11.5, color: "#666666" }}>
+                      {fmtPrice(b2UnitPrice)} each · Mix & match colors & sizes
                     </div>
                   </div>
                 </div>
 
-                {/* Price */}
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: "-0.01em", color: "var(--black, #111111)" }}>
+                  <div style={{ fontSize: 14.5, fontWeight: 800, color: "var(--black, #111111)" }}>
                     {fmtPrice(b2Price)}
                   </div>
                   {b2Price < b1Price * 2 && (
@@ -656,7 +727,7 @@ export function PdpActions({
                 onClick={() => setBundleTier(3)}
                 style={{
                   position: "relative",
-                  padding: "14px 18px",
+                  padding: "12px 16px",
                   borderRadius: 8,
                   cursor: "pointer",
                   transition: "all 0.18s ease",
@@ -672,33 +743,30 @@ export function PdpActions({
                   gap: 12,
                 }}
               >
-                {/* Floating Badge: BEST VALUE */}
                 <div
                   style={{
                     position: "absolute",
-                    top: -10,
+                    top: -9,
                     right: 14,
                     background: "var(--lime, #C8FF00)",
                     color: "var(--black, #111111)",
-                    fontSize: 10,
+                    fontSize: 9.5,
                     fontWeight: 800,
                     letterSpacing: "0.06em",
-                    padding: "2px 10px",
-                    borderRadius: 12,
+                    padding: "2px 8px",
+                    borderRadius: 10,
                     textTransform: "uppercase",
                     border: "1px solid rgba(0,0,0,0.12)",
-                    boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
                   }}
                 >
                   BEST VALUE
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  {/* Custom Radio Circle */}
                   <div
                     style={{
-                      width: 20,
-                      height: 20,
+                      width: 18,
+                      height: 18,
                       borderRadius: "50%",
                       border: bundleTier === 3 ? "2px solid var(--black, #111111)" : "2px solid #BBB",
                       display: "grid",
@@ -710,8 +778,8 @@ export function PdpActions({
                     {bundleTier === 3 && (
                       <div
                         style={{
-                          width: 10,
-                          height: 10,
+                          width: 8,
+                          height: 8,
                           borderRadius: "50%",
                           background: "var(--black, #111111)",
                         }}
@@ -719,13 +787,12 @@ export function PdpActions({
                     )}
                   </div>
 
-                  {/* 3 Thumbnails */}
                   <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
                     <div
                       style={{
-                        width: 28,
-                        height: 28,
-                        borderRadius: 5,
+                        width: 26,
+                        height: 26,
+                        borderRadius: 4,
                         overflow: "hidden",
                         background: "var(--off-white, #F7F5F0)",
                         border: "1px solid var(--stone, #D9D6CF)",
@@ -741,13 +808,13 @@ export function PdpActions({
                     </div>
                     <div
                       style={{
-                        width: 28,
-                        height: 28,
-                        borderRadius: 5,
+                        width: 26,
+                        height: 26,
+                        borderRadius: 4,
                         overflow: "hidden",
                         background: "var(--off-white, #F7F5F0)",
                         border: "1px solid var(--stone, #D9D6CF)",
-                        marginLeft: -8,
+                        marginLeft: -6,
                         zIndex: 2,
                       }}
                     >
@@ -760,13 +827,13 @@ export function PdpActions({
                     </div>
                     <div
                       style={{
-                        width: 28,
-                        height: 28,
-                        borderRadius: 5,
+                        width: 26,
+                        height: 26,
+                        borderRadius: 4,
                         overflow: "hidden",
                         background: "var(--off-white, #F7F5F0)",
                         border: "1px solid var(--stone, #D9D6CF)",
-                        marginLeft: -8,
+                        marginLeft: -6,
                         zIndex: 1,
                       }}
                     >
@@ -779,34 +846,31 @@ export function PdpActions({
                     </div>
                   </div>
 
-                  {/* Text info */}
                   <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontSize: 14, fontWeight: 700, color: "var(--black, #111111)" }}>Buy 3</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 13.5, fontWeight: 700, color: "var(--black, #111111)" }}>Buy 3</span>
                       <span
                         style={{
                           background: "rgba(200, 255, 0, 0.35)",
                           color: "var(--black, #111111)",
                           border: "1px solid rgba(160, 204, 0, 0.6)",
-                          fontSize: 10,
+                          fontSize: 9.5,
                           fontWeight: 800,
-                          padding: "2px 7px",
-                          borderRadius: 10,
-                          letterSpacing: "0.02em",
+                          padding: "1px 6px",
+                          borderRadius: 8,
                         }}
                       >
                         {b3DiscountText}
                       </span>
                     </div>
-                    <div style={{ fontSize: 12, color: "#666666", marginTop: 2 }}>
-                      {fmtPrice(b3UnitPrice)} each · Pick three articles and sizes
+                    <div style={{ fontSize: 11.5, color: "#666666" }}>
+                      {fmtPrice(b3UnitPrice)} each · Mix & match colors & sizes
                     </div>
                   </div>
                 </div>
 
-                {/* Price */}
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: "-0.01em", color: "var(--black, #111111)" }}>
+                  <div style={{ fontSize: 14.5, fontWeight: 800, color: "var(--black, #111111)" }}>
                     {fmtPrice(b3Price)}
                   </div>
                   {b3Price < b1Price * 3 && (
@@ -820,30 +884,307 @@ export function PdpActions({
           </div>
         )}
 
-        {/* PDP Actions */}
-        <div className="pdp-actions">
+        {/* SINGLE PAIR SELECTOR (TIER 1) */}
+        {bundleTier === 1 && (
+          <>
+            {/* Color Option Group */}
+            {p.colors.length > 0 && (
+              <div className="option-group">
+                <div className="label-row">
+                  <label className="title">Color</label>
+                  <span className="selected-val">{color}</span>
+                </div>
+                <div className="color-options">
+                  {p.colors.map((c) => (
+                    <button
+                      key={c.name}
+                      type="button"
+                      title={c.name}
+                      aria-label={`Select color ${c.name}`}
+                      className={`color-opt ${color === c.name ? "selected" : ""}`}
+                      onClick={() => handleColorSelect(c)}
+                    >
+                      <span className="swatch-inner" style={{ background: c.hex }} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Size Option Group */}
+            {p.sizes.length > 0 && (
+              <div className="option-group">
+                <div className="label-row">
+                  <label className="title">Size</label>
+                  <span className="selected-val">{size ?? "Select a size"}</span>
+                </div>
+                <div className="size-options">
+                  {p.sizes.map((s) => {
+                    const stk = getStockForSize(s);
+                    const isOutOfStock = stk === 0;
+
+                    return (
+                      <button
+                        key={s}
+                        type="button"
+                        disabled={isOutOfStock || p.category === "trousers"}
+                        aria-label={`Select size ${s}`}
+                        className={`size-opt ${size === s ? "selected" : ""} ${isOutOfStock ? "out-of-stock" : ""}`}
+                        style={{
+                          opacity: isOutOfStock || p.category === "trousers" ? 0.35 : 1,
+                          textDecoration: isOutOfStock ? "line-through" : "none",
+                          cursor: isOutOfStock || p.category === "trousers" ? "not-allowed" : "pointer",
+                          position: "relative",
+                        }}
+                        onClick={() => {
+                          if (!isOutOfStock && p.category !== "trousers") setSize(s);
+                        }}
+                      >
+                        {s}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Quantity Row */}
+            <div className="qty-row">
+              <label className="title">Quantity</label>
+              <div className="qty-stepper">
+                <button
+                  type="button"
+                  disabled={p.category === "trousers"}
+                  aria-label="Decrease quantity"
+                  onClick={() => setQty(Math.max(1, qty - 1))}
+                >
+                  −
+                </button>
+                <span className="qty-val">{qty}</span>
+                <button
+                  type="button"
+                  disabled={p.category === "trousers"}
+                  aria-label="Increase quantity"
+                  onClick={() => setQty(qty + 1)}
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* MULTI-PAIR BUNDLE SELECTOR (TIER 2 & TIER 3) */}
+        {bundleTier > 1 && (
+          <div style={{ marginBottom: 24 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 12,
+              }}
+            >
+              <span style={{ fontSize: 13.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.02em" }}>
+                Choose Your Pairs ({bundleTier} Pairs)
+              </span>
+              <span style={{ fontSize: 12, color: "#666" }}>
+                Select independent color &amp; size per pair
+              </span>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {Array.from({ length: bundleTier }).map((_, idx) => {
+                const pair = bundlePairs[idx] || { color: p.colors[0]?.name || "Standard", size: null };
+                const pairColorObj = p.colors.find((c) => c.name.toLowerCase() === pair.color.toLowerCase()) || p.colors[0];
+
+                return (
+                  <div
+                    key={`pair-card-${idx}`}
+                    style={{
+                      border: "1.5px solid var(--stone, #D9D6CF)",
+                      borderRadius: 8,
+                      padding: "14px 16px",
+                      background: "var(--white, #FFFFFF)",
+                      boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+                    }}
+                  >
+                    {/* Header: Pair Number & Color Tag */}
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        marginBottom: 10,
+                        paddingBottom: 8,
+                        borderBottom: "1px solid #ECEAE5",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span
+                          style={{
+                            background: "var(--black, #111111)",
+                            color: "var(--white, #FFFFFF)",
+                            fontSize: 10.5,
+                            fontWeight: 800,
+                            padding: "2px 8px",
+                            borderRadius: 4,
+                            letterSpacing: "0.06em",
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          Pair {idx + 1}
+                        </span>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: "#222" }}>
+                          {pair.color}
+                        </span>
+                      </div>
+
+                      <div style={{ fontSize: 12, color: pair.size ? "var(--black, #111111)" : "#888", fontWeight: 600 }}>
+                        {pair.size ? `Size: ${pair.size}` : "Size not selected"}
+                      </div>
+                    </div>
+
+                    {/* Color Swatches for this pair */}
+                    {p.colors.length > 1 && (
+                      <div style={{ marginBottom: 12 }}>
+                        <div style={{ fontSize: 11.5, color: "#666", marginBottom: 6, fontWeight: 500 }}>
+                          Select Color:
+                        </div>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          {p.colors.map((c) => (
+                            <button
+                              key={`pair-${idx}-color-${c.name}`}
+                              type="button"
+                              title={c.name}
+                              aria-label={`Select ${c.name} for pair ${idx + 1}`}
+                              onClick={() => handlePairColorSelect(idx, c.name)}
+                              style={{
+                                width: 32,
+                                height: 32,
+                                minWidth: 32,
+                                minHeight: 32,
+                                borderRadius: "50%",
+                                border: pair.color === c.name ? "2px solid var(--black, #111)" : "1.5px solid transparent",
+                                padding: 2,
+                                cursor: "pointer",
+                                background: "none",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  width: "100%",
+                                  height: "100%",
+                                  borderRadius: "50%",
+                                  background: c.hex,
+                                  border: "1px solid rgba(0,0,0,0.15)",
+                                  display: "block",
+                                }}
+                              />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Size Selector for this pair */}
+                    <div>
+                      <div style={{ fontSize: 11.5, color: "#666", marginBottom: 6, fontWeight: 500 }}>
+                        Select Size:
+                      </div>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        {p.sizes.map((s) => {
+                          const stk = getStockForColorAndSize(pair.color, s);
+                          const isOutOfStock = stk === 0;
+                          const isSelected = pair.size === s;
+
+                          return (
+                            <button
+                              key={`pair-${idx}-size-${s}`}
+                              type="button"
+                              disabled={isOutOfStock || p.category === "trousers"}
+                              aria-label={`Select size ${s} for pair ${idx + 1}`}
+                              onClick={() => {
+                                if (!isOutOfStock && p.category !== "trousers") {
+                                  handlePairSizeSelect(idx, s);
+                                }
+                              }}
+                              style={{
+                                minWidth: 42,
+                                height: 38,
+                                padding: "0 12px",
+                                borderRadius: 4,
+                                fontSize: 13,
+                                fontWeight: isSelected ? 700 : 500,
+                                border: isSelected ? "2px solid var(--black, #111)" : "1.5px solid var(--stone, #D9D6CF)",
+                                background: isSelected ? "var(--black, #111)" : "var(--white, #FFF)",
+                                color: isSelected ? "var(--white, #FFF)" : isOutOfStock ? "#AAA" : "var(--black, #111)",
+                                textDecoration: isOutOfStock ? "line-through" : "none",
+                                opacity: isOutOfStock || p.category === "trousers" ? 0.35 : 1,
+                                cursor: isOutOfStock || p.category === "trousers" ? "not-allowed" : "pointer",
+                                transition: "all 0.15s ease",
+                              }}
+                            >
+                              {s}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* PDP Actions (Add to Cart & Buy Now) */}
+        <div className="pdp-actions" style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           {p.category === "trousers" ? (
             <button
               type="button"
               className="btn btn-primary"
               disabled
-              style={{ opacity: 0.6, cursor: "not-allowed", background: "var(--surface-2, #2a2a2a)" }}
+              style={{ opacity: 0.6, cursor: "not-allowed", background: "var(--surface-2, #2a2a2a)", flex: 1 }}
             >
               Coming Soon
             </button>
           ) : (
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={!size}
-              onClick={handleAdd}
-            >
-              {added
-                ? "Added ✓"
-                : !size
-                ? "Select a size"
-                : `Add to Cart — ${fmtPrice(effectiveTotal)}`}
-            </button>
+            <>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={!isAllBundleSizesSelected}
+                onClick={handleAdd}
+                style={{ flex: 1, minHeight: 48 }}
+              >
+                {buttonText}
+              </button>
+              <button
+                type="button"
+                disabled={!isAllBundleSizesSelected}
+                onClick={handleBuyNow}
+                style={{
+                  background: "var(--lime, #C8FF00)",
+                  color: "#111",
+                  fontWeight: 800,
+                  fontSize: "14px",
+                  letterSpacing: "0.02em",
+                  border: "1.5px solid rgba(0,0,0,0.15)",
+                  cursor: !isAllBundleSizesSelected ? "not-allowed" : "pointer",
+                  opacity: !isAllBundleSizesSelected ? 0.4 : 1,
+                  transition: "all 0.15s ease",
+                  padding: "0 22px",
+                  minHeight: "48px",
+                  borderRadius: "2px",
+                }}
+              >
+                Buy Now
+              </button>
+            </>
           )}
           <button
             type="button"
