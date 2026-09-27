@@ -62,9 +62,9 @@ export default function CartPage() {
         <div className="cart-layout">
           {/* Left: Cart Items */}
           <div className="cart-items">
-            {cart.items.map((item) => (
+            {cart.items.map((item, idx) => (
               <div
-                key={`${item.productId}|${item.color}|${item.size}`}
+                key={`${item.productId}|${item.name}|${item.color}|${item.size}|${idx}`}
                 className="cart-line"
               >
                 <Link href={`/product/${item.productId}`}>
@@ -85,7 +85,7 @@ export default function CartPage() {
                         type="button"
                         aria-label="Decrease quantity"
                         onClick={() =>
-                          cart.updateQty(item.productId, item.color, item.size, -1)
+                          cart.updateQty(item.productId, item.color, item.size, -1, item.name)
                         }
                       >
                         −
@@ -95,7 +95,7 @@ export default function CartPage() {
                         type="button"
                         aria-label="Increase quantity"
                         onClick={() =>
-                          cart.updateQty(item.productId, item.color, item.size, 1)
+                          cart.updateQty(item.productId, item.color, item.size, 1, item.name)
                         }
                       >
                         +
@@ -105,7 +105,7 @@ export default function CartPage() {
                       type="button"
                       className="remove-link"
                       onClick={() =>
-                        cart.removeItem(item.productId, item.color, item.size)
+                        cart.removeItem(item.productId, item.color, item.size, item.name)
                       }
                     >
                       Remove

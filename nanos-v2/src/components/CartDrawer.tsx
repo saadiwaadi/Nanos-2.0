@@ -184,8 +184,8 @@ export function CartDrawer() {
             </div>
           ) : (
             <>
-              {cart.items.map((item) => (
-                <div key={`${item.productId}-${item.color}-${item.size}`} className="cart-item">
+              {cart.items.map((item, idx) => (
+                <div key={`${item.productId}-${item.name}-${item.color}-${item.size}-${idx}`} className="cart-item">
                   {item.img ? (
                     /* eslint-disable-next-line @next/next/no-img-element */
                     <img src={item.img} alt={item.name} className="cart-item-img" />
@@ -202,7 +202,7 @@ export function CartDrawer() {
                       <button
                         type="button"
                         onClick={() =>
-                          cart.updateQty(item.productId, item.color, item.size, -1)
+                          cart.updateQty(item.productId, item.color, item.size, -1, item.name)
                         }
                       >
                         −
@@ -211,7 +211,7 @@ export function CartDrawer() {
                       <button
                         type="button"
                         onClick={() =>
-                          cart.updateQty(item.productId, item.color, item.size, 1)
+                          cart.updateQty(item.productId, item.color, item.size, 1, item.name)
                         }
                       >
                         +
@@ -221,7 +221,7 @@ export function CartDrawer() {
                   <button
                     type="button"
                     className="cart-remove"
-                    onClick={() => cart.removeItem(item.productId, item.color, item.size)}
+                    onClick={() => cart.removeItem(item.productId, item.color, item.size, item.name)}
                     aria-label="Remove item"
                   >
                     ×
@@ -229,70 +229,144 @@ export function CartDrawer() {
                 </div>
               ))}
 
-              {/* From Wishlist quick-add options inside active cart */}
-              {wishlist.items.filter((w) => !cart.items.some((ci) => ci.productId === w.productId)).length > 0 && (
-                <div style={{ marginTop: 18, paddingTop: 14, borderTop: "1px dashed var(--stone, #e5e5e5)" }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#666", marginBottom: 10, letterSpacing: "-0.01em" }}>
-                    From Your Wishlist
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {wishlist.items
-                      .filter((w) => !cart.items.some((ci) => ci.productId === w.productId))
-                      .slice(0, 3)
-                      .map((liked) => (
+              {/* Wishlist / Suggestions Carousel (Horizontal lightweight row) */}
+              {(() => {
+                const cartProductIds = new Set(cart.items.map((i) => i.productId));
+                const userLiked = wishlist.items.filter((w) => !cartProductIds.has(w.productId));
+
+                const popularFallbacks: WishlistItem[] = [
+                  {
+                    productId: "clog-sand",
+                    name: "Everyday Comfort Clogs",
+                    price: 1650,
+                    img: "https://res.cloudinary.com/wj34wxob/image/upload/v1790489954/IMG_4223_3_c8n15a.jpg",
+                    color: "Sand",
+                    size: "PK 8",
+                  },
+                  {
+                    productId: "clog-black",
+                    name: "Double sole Crocs",
+                    price: 1850,
+                    img: "https://res.cloudinary.com/wj34wxob/image/upload/v1790489958/IMG_4228_3_mkvqch.jpg",
+                    color: "Black",
+                    size: "PK 8",
+                  },
+                ].filter((p) => !cartProductIds.has(p.productId));
+
+                const displayItems = userLiked.length > 0 ? userLiked : popularFallbacks;
+                const sectionTitle = userLiked.length > 0 ? "From Your Wishlist" : "Popular Right Now";
+
+                if (displayItems.length === 0) return null;
+
+                return (
+                  <div style={{ marginTop: 20, paddingTop: 14, borderTop: "1px dashed var(--stone, #e5e5e5)" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        marginBottom: 10,
+                      }}
+                    >
+                      <span style={{ fontSize: 12, fontWeight: 700, color: "#444", textTransform: "uppercase", letterSpacing: "0.03em" }}>
+                        {sectionTitle}
+                      </span>
+                      {userLiked.length > 0 && (
+                        <span style={{ fontSize: 11, color: "#888" }}>{userLiked.length} saved</span>
+                      )}
+                    </div>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 10,
+                        overflowX: "auto",
+                        paddingBottom: 6,
+                        scrollbarWidth: "none",
+                      }}
+                    >
+                      {displayItems.map((sug) => (
                         <div
-                          key={liked.productId}
+                          key={sug.productId}
                           style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            gap: 10,
-                            padding: "8px 10px",
-                            background: "rgba(200, 255, 0, 0.06)",
-                            border: "1px solid rgba(200, 255, 0, 0.3)",
+                            minWidth: 155,
+                            maxWidth: 165,
+                            flexShrink: 0,
+                            background: "var(--white, #fff)",
+                            border: "1px solid var(--stone, #e5e5e5)",
                             borderRadius: 6,
+                            padding: 10,
+                            display: "flex",
+                            flexDirection: "column",
+                            justifyContent: "space-between",
                           }}
                         >
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={liked.img}
-                              alt={liked.name}
-                              style={{ width: 36, height: 36, objectFit: "cover", borderRadius: 4, background: "#f0f0f0", flexShrink: 0 }}
-                            />
-                            <div style={{ minWidth: 0 }}>
-                              <div style={{ fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                {liked.name}
-                              </div>
-                              <div style={{ fontSize: 11.5, color: "#666" }}>
-                                {fmtPrice(liked.price)}
-                              </div>
+                          <div>
+                            <div
+                              style={{
+                                width: "100%",
+                                aspectRatio: "1/1",
+                                borderRadius: 4,
+                                overflow: "hidden",
+                                background: "#f5f5f5",
+                                marginBottom: 6,
+                              }}
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={sug.img}
+                                alt={sug.name}
+                                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                              />
                             </div>
+                            <div
+                              style={{
+                                fontSize: 11.5,
+                                fontWeight: 600,
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                color: "#111",
+                              }}
+                            >
+                              {sug.name}
+                            </div>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: "#222", marginTop: 2 }}>
+                              {fmtPrice(sug.price)}
+                            </div>
+                            {sug.size && (
+                              <div style={{ fontSize: 10, color: "#888", marginTop: 1 }}>
+                                {sug.color ? `${sug.color} · ` : ""}{sug.size}
+                              </div>
+                            )}
                           </div>
+
                           <button
                             type="button"
-                            onClick={() => handleQuickAddLiked(liked)}
+                            onClick={() => handleQuickAddLiked(sug)}
                             style={{
-                              background: quickAddedId === liked.productId ? "var(--black, #111)" : "var(--lime, #C8FF00)",
-                              color: quickAddedId === liked.productId ? "var(--lime, #C8FF00)" : "var(--black, #111)",
-                              border: "none",
-                              padding: "5px 10px",
+                              marginTop: 8,
+                              width: "100%",
+                              background: quickAddedId === sug.productId ? "var(--black, #111)" : "var(--lime, #C8FF00)",
+                              color: quickAddedId === sug.productId ? "var(--lime, #C8FF00)" : "var(--black, #111)",
+                              border: "1px solid rgba(0,0,0,0.1)",
+                              padding: "5px 0",
                               borderRadius: 4,
                               fontSize: 11,
                               fontWeight: 700,
                               cursor: "pointer",
-                              whiteSpace: "nowrap",
-                              flexShrink: 0,
+                              textAlign: "center",
                               transition: "all 0.15s ease",
                             }}
                           >
-                            {quickAddedId === liked.productId ? "Added ✓" : "+ Add"}
+                            {quickAddedId === sug.productId ? "Added ✓" : "+ Add to Cart"}
                           </button>
                         </div>
                       ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
             </>
           )}
         </div>

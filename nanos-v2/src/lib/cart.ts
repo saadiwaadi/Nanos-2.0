@@ -116,7 +116,7 @@ export function useCart() {
 
     addItem(item: Omit<CartItem, "qty">, qty = 1) {
       const cur = load();
-      const key = (i: CartItem) => `${i.productId}|${i.color}|${i.size}`;
+      const key = (i: CartItem) => `${i.productId}|${i.name}|${i.color}|${i.size}`;
       const targetKey = key(item as CartItem);
       const existing = cur.items.find((i) => key(i) === targetKey);
       if (existing) {
@@ -145,10 +145,10 @@ export function useCart() {
       }
     },
 
-    updateQty(productId: string, color: string, size: string, delta: number) {
+    updateQty(productId: string, color: string, size: string, delta: number, name?: string) {
       const cur = load();
       const it = cur.items.find(
-        (i) => i.productId === productId && i.color === color && i.size === size
+        (i) => i.productId === productId && i.color === color && i.size === size && (name ? i.name === name : true)
       );
       if (!it) return;
       it.qty += delta;
@@ -161,14 +161,15 @@ export function useCart() {
       save(cur);
     },
 
-    removeItem(productId: string, color: string, size: string) {
+    removeItem(productId: string, color: string, size: string, name?: string) {
       const cur = load();
       cur.items = cur.items.filter(
         (i) =>
           !(
             i.productId === productId &&
             i.color === color &&
-            i.size === size
+            i.size === size &&
+            (name ? i.name === name : true)
           )
       );
       if (cur.items.length === 0) {
