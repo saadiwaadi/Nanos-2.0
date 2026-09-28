@@ -36,6 +36,7 @@ model Product {
   orderItems    OrderItem[]
   wishlistItems WishlistItem[]
   productColors ProductColor[]
+  reviewsList   Review[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -81,6 +82,7 @@ model User {
   cart     Cart?
   orders   Order[]
   wishlist WishlistItem[]
+  reviews  Review[]
 }
 
 // ─── CART ───────────────────────────────────────────────
@@ -156,6 +158,7 @@ model Order {
   items       OrderItem[]
   bookingLogs PostexBookingLog[]
   events      OrderEvent[]
+  reviews     Review[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -234,4 +237,26 @@ model HomeSetting {
   value     String   @default("{}") // JSON string value
   updatedAt DateTime @updatedAt
 }
+
+// ─── REVIEWS ────────────────────────────────────────────
+
+model Review {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  orderId   String
+  rating    Int
+  text      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId, orderId])
+  @@index([productId])
+  @@index([userId])
+}
+
 

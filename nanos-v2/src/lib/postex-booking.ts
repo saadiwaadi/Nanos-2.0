@@ -94,12 +94,15 @@ function parseShippingInfo(val: any) {
 }
 
 export function buildPostexPayload(order: any, city: string) {
+  const pickupAddressCode = process.env.POSTEX_PICKUP_ADDRESS_CODE;
+  if (!pickupAddressCode) {
+    throw new Error("POSTEX_PICKUP_ADDRESS_CODE is not set");
+  }
+
   const sInfo = parseShippingInfo(order.shippingInfo);
   const customerName = sInfo.name || order.customerName || order.guestName || "Customer";
   const customerPhone = sInfo.phone || "";
   const deliveryAddress = `${sInfo.address || ""}, ${city}`.trim();
-  const pickupAddressCode =
-    process.env.POSTEX_PICKUP_ADDRESS_CODE || order.pickupAddressCode || "001";
 
   const orderItems = order.items || order.orderItems || [];
   const itemDetails =

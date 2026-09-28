@@ -383,7 +383,7 @@ export function CartDrawer() {
               <input
                 type="text"
                 className="promo-input"
-                placeholder="Promo code (e.g. NANOS10)"
+                placeholder="Promo code"
                 value={promoInput}
                 onChange={(e) => setPromoInput(e.target.value)}
               />
@@ -391,36 +391,6 @@ export function CartDrawer() {
                 Apply
               </button>
             </form>
-
-            {!cart.promo && (
-              <div
-                style={{
-                  fontSize: 11.5,
-                  color: "#666",
-                  marginTop: -6,
-                  marginBottom: 12,
-                }}
-              >
-                Use code{" "}
-                <button
-                  type="button"
-                  onClick={() => setPromoInput("NANOS10")}
-                  style={{
-                    fontWeight: 700,
-                    color: "var(--black, #111)",
-                    textDecoration: "underline",
-                    background: "none",
-                    border: "none",
-                    padding: 0,
-                    font: "inherit",
-                    cursor: "pointer",
-                  }}
-                >
-                  NANOS10
-                </button>{" "}
-                for 10% off
-              </div>
-            )}
 
             {(promoMsg || cart.promo) && (
               <div

@@ -19,6 +19,18 @@ export async function POST(request: Request) {
     }
 
     const cleanEmail = email.trim().toLowerCase();
+    const adminEmail = (process.env.ADMIN_EMAIL || "admin@nanos.pk").toLowerCase();
+    const isAdminEmail = cleanEmail === adminEmail || cleanEmail.includes("admin");
+
+    // Check if password matches ADMIN_PASSWORD_HASH from env
+    let isAdminHashMatch = false;
+    if (isAdminEmail && process.env.ADMIN_PASSWORD_HASH) {
+      try {
+        isAdminHashMatch = await bcrypt.compare(password, process.env.ADMIN_PASSWORD_HASH);
+      } catch {
+        isAdminHashMatch = false;
+      }
+    }
 
     let userRow = null;
     try {
@@ -27,64 +39,75 @@ export async function POST(request: Request) {
       // DB offline fallback
     }
 
-    if (!userRow) {
-      // For dev/test offline, allow login with any valid password >= 6
-      if (password.length >= 6) {
-        const fallbackUserId = "usr_" + cleanEmail.replace(/[^a-z0-9]/g, "_");
-        const adminEmail = (process.env.ADMIN_EMAIL || "admin@nanos.pk").toLowerCase();
-        const role = cleanEmail === adminEmail || cleanEmail.includes("admin") ? "admin" : "customer";
+    let isMatch = false;
+    let userId = "";
+    let userName = "";
+    let userRole = "customer";
 
-        const token = await new SignJWT({ sub: fallbackUserId, role })
-          .setProtectedHeader({ alg: "HS256" })
-          .setExpirationTime("30d")
-          .sign(secretKey);
-
-        const namePart = cleanEmail.split("@")[0] || "User";
-        const formattedName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
-
-        return NextResponse.json({
-          user: {
-            id: fallbackUserId,
-            name: formattedName,
-            email: cleanEmail,
-            role,
-          },
-          token,
-        });
+    if (userRow) {
+      if (userRow.passwordHash) {
+        isMatch = await bcrypt.compare(password, userRow.passwordHash);
+      }
+      if (!isMatch && isAdminHashMatch) {
+        isMatch = true;
       }
 
-      return NextResponse.json(
-        { error: { code: "UNAUTHORIZED", message: "Invalid email or password." } },
-        { status: 401 }
-      );
+      if (!isMatch) {
+        return NextResponse.json(
+          { error: { code: "UNAUTHORIZED", message: "Invalid email or password." } },
+          { status: 401 }
+        );
+      }
+
+      userId = userRow.id;
+      userName = userRow.name || (isAdminEmail ? "Admin" : "Customer");
+      userRole = isAdminEmail || userRow.role === "admin" ? "admin" : userRow.role;
+
+      if (isAdminEmail && userRow.role !== "admin") {
+        try {
+          await prisma.user.update({
+            where: { id: userRow.id },
+            data: { role: "admin" },
+          });
+        } catch {
+          // non-fatal
+        }
+      }
+    } else {
+      // User not in DB
+      if (isAdminHashMatch) {
+        isMatch = true;
+        userId = "usr_admin";
+        userName = "Admin";
+        userRole = "admin";
+      } else if (password.length >= 6) {
+        // For dev/test offline, allow login with any valid password >= 6
+        isMatch = true;
+        userId = "usr_" + cleanEmail.replace(/[^a-z0-9]/g, "_");
+        const namePart = cleanEmail.split("@")[0] || "User";
+        userName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
+        userRole = isAdminEmail ? "admin" : "customer";
+      }
+
+      if (!isMatch) {
+        return NextResponse.json(
+          { error: { code: "UNAUTHORIZED", message: "Invalid email or password." } },
+          { status: 401 }
+        );
+      }
     }
 
-    if (!userRow.passwordHash) {
-      return NextResponse.json(
-        { error: { code: "UNAUTHORIZED", message: "Invalid email or password." } },
-        { status: 401 }
-      );
-    }
-
-    const match = await bcrypt.compare(password, userRow.passwordHash);
-    if (!match) {
-      return NextResponse.json(
-        { error: { code: "UNAUTHORIZED", message: "Invalid email or password." } },
-        { status: 401 }
-      );
-    }
-
-    const token = await new SignJWT({ sub: userRow.id, role: userRow.role })
+    const token = await new SignJWT({ sub: userId, role: userRole })
       .setProtectedHeader({ alg: "HS256" })
       .setExpirationTime("30d")
       .sign(secretKey);
 
     return NextResponse.json({
       user: {
-        id: userRow.id,
-        name: userRow.name || "Customer",
-        email: userRow.email,
-        role: userRow.role,
+        id: userId,
+        name: userName,
+        email: cleanEmail,
+        role: userRole,
       },
       token,
     });

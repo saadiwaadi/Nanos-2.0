@@ -17,6 +17,7 @@ export interface Product {
   reviews: number;
   hero: string;
   isSale: boolean;
+  ignoreStock?: boolean;
   colors: ProductColor[];
   sizes: string[];
   gallery: string[];
@@ -45,6 +46,7 @@ export interface AdminProduct {
   price: number;
   oldPrice?: number | null;
   isSale?: boolean;
+  ignoreStock?: boolean;
   description: string | null;
   hero: string | null;
   gallery: string[];

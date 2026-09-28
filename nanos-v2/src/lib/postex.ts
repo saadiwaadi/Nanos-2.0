@@ -72,9 +72,16 @@ export async function getPickupAddresses() {
 export async function callCreateOrderApi(
   payload: PostexCreateOrderPayload
 ): Promise<PostexCreateOrderResponse> {
+  const pickupCode = payload.pickupAddressCode || process.env.POSTEX_PICKUP_ADDRESS_CODE;
+  if (!pickupCode) {
+    throw new Error("POSTEX_PICKUP_ADDRESS_CODE is not set");
+  }
   return postexFetch<PostexCreateOrderResponse>("/order/v1/create-order", {
     method: "POST",
-    body: payload,
+    body: {
+      ...payload,
+      pickupAddressCode: pickupCode,
+    },
   });
 }
 
@@ -119,6 +126,11 @@ export async function bookSingleOrder(
   order: any,
   customPayloadOverride?: Partial<PostexCreateOrderPayload>
 ) {
+  const pickupAddressCode = process.env.POSTEX_PICKUP_ADDRESS_CODE;
+  if (!pickupAddressCode && !customPayloadOverride?.pickupAddressCode) {
+    throw new Error("POSTEX_PICKUP_ADDRESS_CODE is not set");
+  }
+
   const shippingInfo = parseShippingInfo(order.shippingInfo);
   const customerName =
     shippingInfo.name || order.guestName || "Valued Customer";
@@ -145,7 +157,7 @@ export async function bookSingleOrder(
     invoicePayment: order.total,
     orderDetail: itemDetails,
     orderRefNumber: order.id,
-    pickupAddressCode: order.pickupAddressCode || "001",
+    pickupAddressCode: (pickupAddressCode || customPayloadOverride?.pickupAddressCode) as string,
     orderType: "Normal",
     ...customPayloadOverride,
   };

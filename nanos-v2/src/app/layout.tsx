@@ -21,6 +21,11 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "nanos.pk — Keep it simple. Wear it your way.",
   description: "Everyday essentials engineered for utility and effortless style. Delivered across Pakistan.",
+  icons: {
+    icon: "/icon.png",
+    shortcut: "/icon.png",
+    apple: "/apple-icon.png",
+  },
 };
 
 export default function RootLayout({

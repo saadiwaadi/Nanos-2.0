@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { OrderSummary, OrderStatus } from "@/lib/types";
+import { OverviewTab } from "@/components/account/OverviewTab";
 
 function getInitials(name?: string): string {
   if (!name) return "N";
@@ -52,7 +53,7 @@ function getStatusBadgeStyle(status: OrderStatus | string): { bg: string; color:
 export default function AccountPage() {
   const auth = useAuth();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"orders" | "wishlist" | "details">("orders");
+  const [activeTab, setActiveTab] = useState<"overview" | "orders" | "wishlist" | "details">("overview");
   const [nameInput, setNameInput] = useState("");
   const [emailInput, setEmailInput] = useState("");
 
@@ -129,120 +130,141 @@ export default function AccountPage() {
   }
 
   return (
-    <div className="page">
+    <div className="page" style={{ background: "var(--cream, #fdfbf7)", minHeight: "80vh" }}>
       <div className="wrap account-wrap">
         {/* Account Header */}
         <div
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 20,
-            paddingBottom: 28,
+            gap: 18,
+            paddingBottom: 24,
             borderBottom: "1px solid var(--stone)",
-            marginBottom: 32,
+            marginBottom: 28,
           }}
         >
           <div
             style={{
-              width: 56,
-              height: 56,
-              minWidth: 56,
+              width: 54,
+              height: 54,
+              minWidth: 54,
               borderRadius: "50%",
               background: "var(--black)",
               color: "var(--lime)",
               fontFamily: "var(--font-head)",
-              fontSize: 20,
+              fontSize: 19,
               fontWeight: 700,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
+              letterSpacing: "0.02em",
             }}
           >
             {initials}
           </div>
           <div>
-            <h1 style={{ fontFamily: "var(--font-head)", fontSize: 24, fontWeight: 700 }}>
+            <h1
+              style={{
+                fontFamily: "var(--font-head)",
+                fontSize: 22,
+                fontWeight: 700,
+                color: "var(--black)",
+                letterSpacing: "-0.01em",
+                margin: 0,
+              }}
+            >
               {auth.user.name}
             </h1>
-            <p style={{ color: "#666", fontSize: 13.5 }}>{auth.user.email}</p>
+            <p style={{ color: "#666", fontSize: 13, margin: "3px 0 0" }}>{auth.user.email}</p>
           </div>
         </div>
 
         {/* Account Grid */}
         <div className="account-grid">
-          {/* Sidebar Nav */}
-          <nav className="account-nav">
+          {/* Nav */}
+          <nav className="account-nav" aria-label="Account navigation">
+            <button
+              type="button"
+              onClick={() => setActiveTab("overview")}
+              className={`account-nav-btn ${activeTab === "overview" ? "active" : ""}`}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="7" height="7" />
+                <rect x="14" y="3" width="7" height="7" />
+                <rect x="14" y="14" width="7" height="7" />
+                <rect x="3" y="14" width="7" height="7" />
+              </svg>
+              <span>Overview</span>
+            </button>
+
             <button
               type="button"
               onClick={() => setActiveTab("orders")}
-              style={{
-                textAlign: "left",
-                padding: "10px 16px",
-                borderRadius: 4,
-                fontSize: 14,
-                fontWeight: 600,
-                background: activeTab === "orders" ? "var(--black)" : "transparent",
-                color: activeTab === "orders" ? "var(--off-white)" : "var(--black)",
-                transition: "all .15s",
-              }}
+              className={`account-nav-btn ${activeTab === "orders" ? "active" : ""}`}
             >
-              Orders
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+              </svg>
+              <span>Orders {orders.length > 0 && `(${orders.length})`}</span>
             </button>
+
             <button
               type="button"
               onClick={() => setActiveTab("wishlist")}
-              style={{
-                textAlign: "left",
-                padding: "10px 16px",
-                borderRadius: 4,
-                fontSize: 14,
-                fontWeight: 600,
-                background: activeTab === "wishlist" ? "var(--black)" : "transparent",
-                color: activeTab === "wishlist" ? "var(--off-white)" : "var(--black)",
-                transition: "all .15s",
-              }}
+              className={`account-nav-btn ${activeTab === "wishlist" ? "active" : ""}`}
             >
-              Wishlist
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l8.72-8.72 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+              </svg>
+              <span>Wishlist</span>
             </button>
+
             <button
               type="button"
               onClick={() => setActiveTab("details")}
-              style={{
-                textAlign: "left",
-                padding: "10px 16px",
-                borderRadius: 4,
-                fontSize: 14,
-                fontWeight: 600,
-                background: activeTab === "details" ? "var(--black)" : "transparent",
-                color: activeTab === "details" ? "var(--off-white)" : "var(--black)",
-                transition: "all .15s",
-              }}
+              className={`account-nav-btn ${activeTab === "details" ? "active" : ""}`}
             >
-              Account Details
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+              <span>Account Details</span>
             </button>
+
             <button
               type="button"
               onClick={handleLogout}
-              style={{
-                textAlign: "left",
-                padding: "10px 16px",
-                borderRadius: 4,
-                fontSize: 14,
-                fontWeight: 600,
-                color: "#c0392b",
-              }}
+              className="account-nav-btn"
+              style={{ color: "#c0392b" }}
             >
-              Log Out
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+              <span>Log Out</span>
             </button>
           </nav>
 
           {/* Tab Content */}
           <div>
+            {/* 1. OVERVIEW TAB */}
+            {activeTab === "overview" && (
+              <OverviewTab
+                userName={auth.user.name || undefined}
+                onNavigateTab={(tab) => setActiveTab(tab as any)}
+              />
+            )}
+
+            {/* 2. ORDERS TAB */}
             {activeTab === "orders" && (
               <section className="orders-section">
-                <h2 style={{ fontFamily: "var(--font-head)", fontSize: 22, fontWeight: 700, marginBottom: 24 }}>
-                  Order History
-                </h2>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                  <h2 style={{ fontFamily: "var(--font-head)", fontSize: 20, fontWeight: 700, margin: 0 }}>
+                    Order History
+                  </h2>
+                </div>
 
                 {ordersLoading ? (
                   <div style={{ padding: "32px 0", color: "#666", fontSize: 14 }}>
@@ -267,7 +289,7 @@ export default function AccountPage() {
                     </Link>
                   </div>
                 ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                     {orders.map((order) => {
                       const badgeStyle = getStatusBadgeStyle(order.status);
                       const shortId = order.id.replace("ord_", "").slice(0, 8);
@@ -386,6 +408,7 @@ export default function AccountPage() {
               </section>
             )}
 
+            {/* 3. WISHLIST TAB */}
             {activeTab === "wishlist" && (
               <div className="empty-state" style={{ padding: "40px 20px" }}>
                 <div className="icon-circle">
@@ -401,6 +424,7 @@ export default function AccountPage() {
               </div>
             )}
 
+            {/* 4. DETAILS TAB */}
             {activeTab === "details" && (
               <div className="form-section">
                 <h3>Account Details</h3>

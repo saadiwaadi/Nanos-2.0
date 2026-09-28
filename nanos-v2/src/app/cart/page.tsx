@@ -59,6 +59,19 @@ export default function CartPage() {
           </p>
         </div>
 
+        {/* Steps Bar */}
+        <div className="checkout-steps" style={{ marginBottom: 28 }}>
+          <div className="checkout-step active">1. Cart</div>
+          <Link
+            href="/checkout"
+            className="checkout-step"
+            style={{ cursor: "pointer", textDecoration: "none" }}
+          >
+            2. Details &amp; Payment
+          </Link>
+          <div className="checkout-step">3. Confirmation</div>
+        </div>
+
         <div className="cart-layout">
           {/* Left: Cart Items */}
           <div className="cart-items">
@@ -149,7 +162,7 @@ export default function CartPage() {
             <div className="promo-row">
               <input
                 type="text"
-                placeholder="Promo code (e.g. NANOS10)"
+                placeholder="Promo code"
                 value={promoInput}
                 onChange={(e) => setPromoInput(e.target.value)}
               />
@@ -165,36 +178,6 @@ export default function CartPage() {
                 Apply
               </button>
             </div>
-
-            {!cart.promo && (
-              <div
-                style={{
-                  fontSize: 12,
-                  color: "#666",
-                  marginTop: -6,
-                  marginBottom: 12,
-                }}
-              >
-                Use code{" "}
-                <button
-                  type="button"
-                  onClick={() => setPromoInput("NANOS10")}
-                  style={{
-                    fontWeight: 700,
-                    color: "var(--black, #111)",
-                    textDecoration: "underline",
-                    background: "none",
-                    border: "none",
-                    padding: 0,
-                    font: "inherit",
-                    cursor: "pointer",
-                  }}
-                >
-                  NANOS10
-                </button>{" "}
-                for 10% off
-              </div>
-            )}
 
             {promoMsg && (
               <div

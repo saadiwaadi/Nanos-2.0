@@ -252,6 +252,7 @@ function parseProduct(row: any): Product {
       size: s.size,
       quantity: s.quantity,
     })) : undefined,
+    ignoreStock: row.ignoreStock ?? false,
   };
 }
 

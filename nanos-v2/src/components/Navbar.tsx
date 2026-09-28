@@ -12,23 +12,52 @@ export function Navbar() {
   const { isLoggedIn } = useAuth();
   const cart = useCart();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [scrolledPastHero, setScrolledPastHero] = useState(false);
+  const [isVisible, setIsVisible] = useState(true);
 
-  // Scroll listener for hero threshold header visibility
+  // Scroll listener: hides navbar on scroll down, reveals immediately on scroll up
   useEffect(() => {
-    if (pathname !== "/") {
-      setScrolledPastHero(true);
-      return;
-    }
+    let lastScrollY = typeof window !== "undefined" ? window.scrollY : 0;
+    let ticking = false;
 
-    const checkScroll = () => {
-      setScrolledPastHero(window.scrollY > 80);
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          if (drawerOpen) {
+            setIsVisible(true);
+            lastScrollY = currentScrollY;
+            ticking = false;
+            return;
+          }
+
+          // Near the top of the page, always show
+          if (currentScrollY <= 20) {
+            setIsVisible(true);
+          }
+          // Scrolling down (past initial buffer): hide header
+          else if (currentScrollY > lastScrollY + 6 && currentScrollY > 70) {
+            setIsVisible(false);
+          }
+          // Scrolling UP: reveal header immediately
+          else if (currentScrollY < lastScrollY - 6) {
+            setIsVisible(true);
+          }
+
+          lastScrollY = currentScrollY <= 0 ? 0 : currentScrollY;
+          ticking = false;
+        });
+        ticking = true;
+      }
     };
 
-    checkScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [drawerOpen]);
 
-    window.addEventListener("scroll", checkScroll, { passive: true });
-    return () => window.removeEventListener("scroll", checkScroll);
+  // Reset visibility when navigating to a new route
+  useEffect(() => {
+    setIsVisible(true);
   }, [pathname]);
 
   // Lock body scroll when left drawer is open
@@ -57,12 +86,11 @@ export function Navbar() {
   const closeDrawer = () => setDrawerOpen(false);
 
   const isHomepage = pathname === "/";
-  const hideHeader = isHomepage && !scrolledPastHero;
 
   return (
     <>
       <header
-        className={`site-header ${isHomepage ? "header-overlay" : ""} ${hideHeader ? "header-hidden-hero" : ""}`}
+        className={`site-header ${isHomepage ? "header-overlay" : ""} ${!isVisible ? "header-hidden" : ""}`}
       >
         <div
           className="header-inner"

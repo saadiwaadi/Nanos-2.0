@@ -53,6 +53,7 @@ export async function GET(request: Request) {
         price: p.price,
         oldPrice: p.oldPrice ?? null,
         isSale: p.isSale,
+        ignoreStock: p.ignoreStock ?? false,
         description: p.description,
         hero: p.hero,
         gallery: parseJson<string>(p.gallery),

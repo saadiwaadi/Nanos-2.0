@@ -19,7 +19,7 @@ export function Footer() {
       <div className="wrap">
         <div className="footer-grid">
           {/* Brand Col */}
-          <div className="footer-col">
+          <div className="footer-col footer-brand-col">
             <Link href="/" aria-label="nanos.pk" style={{ display: "inline-block", marginBottom: 14 }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -35,10 +35,10 @@ export function Footer() {
             </p>
           </div>
 
-          {/* Categories Col */}
-          <div className="footer-col">
+          {/* Categories Col (2-column grid on mobile) */}
+          <div className="footer-col footer-categories-col">
             <h4>CATEGORIES</h4>
-            <ul>
+            <ul className="footer-categories-grid">
               <li>
                 <Link href="/crocs">
                   <span className="footer-link-text">Crocs</span>
@@ -62,58 +62,61 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Account Col */}
-          <div className="footer-col">
-            <h4>ACCOUNT</h4>
-            <ul>
-              <li>
-                <Link href="/login">
-                  <span className="footer-link-text">Log In / Register</span>
-                </Link>
-              </li>
-              <li>
-                <Link href="/account">
-                  <span className="footer-link-text">My Account</span>
-                </Link>
-              </li>
-              <li>
-                <Link href="/account">
-                  <span className="footer-link-text">Order History</span>
-                </Link>
-              </li>
-              <li>
-                <Link href="/cart">
-                  <span className="footer-link-text">Shopping Cart</span>
-                </Link>
-              </li>
-            </ul>
-          </div>
+          {/* Account and Help & Info Side-by-Side 2-Column Group */}
+          <div className="footer-account-help-group">
+            {/* Account Col */}
+            <div className="footer-col footer-sub-col">
+              <h4>ACCOUNT</h4>
+              <ul className="footer-links-list">
+                <li>
+                  <Link href="/login">
+                    <span className="footer-link-text">Log In / Register</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/account">
+                    <span className="footer-link-text">My Account</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/account">
+                    <span className="footer-link-text">Order History</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/cart">
+                    <span className="footer-link-text">Shopping Cart</span>
+                  </Link>
+                </li>
+              </ul>
+            </div>
 
-          {/* Help & Info Col */}
-          <div className="footer-col">
-            <h4>HELP &amp; INFO</h4>
-            <ul>
-              <li>
-                <Link href="#">
-                  <span className="footer-link-text">Track Order</span>
-                </Link>
-              </li>
-              <li>
-                <Link href="#">
-                  <span className="footer-link-text">Shipping Policy</span>
-                </Link>
-              </li>
-              <li>
-                <Link href="#">
-                  <span className="footer-link-text">Returns &amp; Exchanges</span>
-                </Link>
-              </li>
-              <li>
-                <Link href="#">
-                  <span className="footer-link-text">Contact Support</span>
-                </Link>
-              </li>
-            </ul>
+            {/* Help & Info Col */}
+            <div className="footer-col footer-sub-col">
+              <h4>HELP &amp; INFO</h4>
+              <ul className="footer-links-list">
+                <li>
+                  <Link href="#">
+                    <span className="footer-link-text">Track Order</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link href="#">
+                    <span className="footer-link-text">Shipping Policy</span>
+                  </Link>
+                </li>
+                <li className="footer-link-span-2">
+                  <Link href="#">
+                    <span className="footer-link-text">Returns &amp; Exchanges</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link href="#">
+                    <span className="footer-link-text">Contact Support</span>
+                  </Link>
+                </li>
+              </ul>
+            </div>
           </div>
 
           {/* Newsletter Col */}

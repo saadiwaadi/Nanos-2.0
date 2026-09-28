@@ -82,6 +82,7 @@ export async function PATCH(
     if (body.gallery !== undefined) updateData.gallery = JSON.stringify(body.gallery);
     if (body.sizes !== undefined) updateData.sizes = JSON.stringify(body.sizes);
     if (body.colors !== undefined) updateData.colors = JSON.stringify(body.colors);
+    if (body.ignoreStock !== undefined) updateData.ignoreStock = Boolean(body.ignoreStock);
 
     // Memory update
     if (memoryAdminProducts.has(id)) {

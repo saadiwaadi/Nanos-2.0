@@ -38,6 +38,7 @@ interface ProductData {
     size: string;
     quantity: number;
   }[];
+  ignoreStock?: boolean;
 }
 
 export interface BundlePricingInfo {
@@ -152,6 +153,9 @@ export function PdpActions({
     }, {} as Record<string, number>);
 
   function getStockForSize(sz: string): number {
+    if (p.ignoreStock) {
+      return 999;
+    }
     if (p.stockLevels && p.stockLevels.length > 0) {
       return stockForSelectedColor[sz] ?? 0;
     }
@@ -159,6 +163,9 @@ export function PdpActions({
   }
 
   function getStockForColorAndSize(colorName: string, sz: string): number {
+    if (p.ignoreStock) {
+      return 999;
+    }
     if (p.stockLevels && p.stockLevels.length > 0) {
       const found = p.stockLevels.find(
         (s) =>

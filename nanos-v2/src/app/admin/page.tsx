@@ -35,6 +35,7 @@ interface AdminProduct {
   price: number;
   oldPrice?: number | null;
   isSale: boolean;
+  ignoreStock?: boolean;
   description: string;
   hero: string;
   gallery: string[];
@@ -156,11 +157,28 @@ function getAuthToken(): string {
   }
 }
 
+function getAuthUser(): { id?: string; email?: string; name?: string; role?: string } | null {
+  if (typeof window === "undefined") return null;
+  const raw = localStorage.getItem("nanos_auth_v1");
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw).user || null;
+  } catch {
+    return null;
+  }
+}
+
 // ─── MAIN COMPONENT ────────────────────────────────────
 
 export default function AdminPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
+  const [isAdminAuthed, setIsAdminAuthed] = useState(false);
+  const [adminEmailInput, setAdminEmailInput] = useState("admin@nanos.pk");
+  const [adminPasswordInput, setAdminPasswordInput] = useState("");
+  const [adminLoginLoading, setAdminLoginLoading] = useState(false);
+  const [adminLoginError, setAdminLoginError] = useState<string | null>(null);
+
   const [activeTab, setActiveTab] = useState<
     | "dashboard"
     | "home"
@@ -222,7 +240,6 @@ export default function AdminPage() {
     isSale: false,
   });
 
-  // Product Edit Panel State (Tab 5)
   const [editingProduct, setEditingProduct] = useState<AdminProduct | null>(null);
   const [editFormName, setEditFormName] = useState("");
   const [editFormDesc, setEditFormDesc] = useState("");
@@ -231,6 +248,7 @@ export default function AdminPage() {
   const [editFormTag, setEditFormTag] = useState("");
   const [editFormHero, setEditFormHero] = useState("");
   const [editFormGallery, setEditFormGallery] = useState<string[]>([]);
+  const [editFormIgnoreStock, setEditFormIgnoreStock] = useState(false);
   const [savingProduct, setSavingProduct] = useState(false);
 
   // Bundle Pricing Settings & Product Override State
@@ -349,7 +367,7 @@ export default function AdminPage() {
     async (url: string, options: RequestInit = {}) => {
       const token = getAuthToken();
       if (!token) {
-        router.push("/login");
+        setIsAdminAuthed(false);
         throw new Error("Unauthorized");
       }
       const headers = {
@@ -359,12 +377,13 @@ export default function AdminPage() {
       };
       const res = await fetch(url, { ...options, headers });
       if (res.status === 401 || res.status === 403) {
-        router.push("/login");
+        setIsAdminAuthed(false);
+        setAdminLoginError("Access forbidden (403). Please sign in with an admin account.");
         throw new Error("Unauthorized");
       }
       return res;
     },
-    [router]
+    []
   );
 
   // Load Main Data (Products, Orders, Settings)
@@ -734,7 +753,16 @@ export default function AdminPage() {
     } else {
       document.documentElement.setAttribute("data-theme", "dark");
     }
-    loadMainData();
+
+    const token = getAuthToken();
+    const user = getAuthUser();
+    if (token && user?.role === "admin") {
+      setIsAdminAuthed(true);
+      loadMainData();
+    } else {
+      setIsAdminAuthed(false);
+      setLoading(false);
+    }
   }, [loadMainData]);
 
   // Tab Navigation Handler
@@ -757,7 +785,44 @@ export default function AdminPage() {
 
   function handleLogout() {
     localStorage.removeItem("nanos_auth_v1");
-    router.push("/login");
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("nanos-auth-changed"));
+    }
+    setIsAdminAuthed(false);
+  }
+
+  async function handleAdminLoginSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setAdminLoginLoading(true);
+    setAdminLoginError(null);
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: adminEmailInput, password: adminPasswordInput }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAdminLoginError(data.error?.message || data.message || "Invalid admin credentials");
+        setAdminLoginLoading(false);
+        return;
+      }
+      if (data.user?.role !== "admin") {
+        setAdminLoginError("This account does not have administrator privileges (Role: " + (data.user?.role || "user") + ")");
+        setAdminLoginLoading(false);
+        return;
+      }
+      localStorage.setItem("nanos_auth_v1", JSON.stringify({ user: data.user, token: data.token }));
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("nanos-auth-changed"));
+      }
+      setIsAdminAuthed(true);
+      setAdminLoginLoading(false);
+      loadMainData();
+    } catch (err: any) {
+      setAdminLoginError(err.message || "Failed to log in to admin");
+      setAdminLoginLoading(false);
+    }
   }
 
   // ─── ACTION HANDLERS ───────────────────────────────────
@@ -828,6 +893,7 @@ export default function AdminPage() {
     setEditFormTag(p.tag || "");
     setEditFormHero(p.hero || "");
     setEditFormGallery(Array.isArray(p.gallery) ? p.gallery : []);
+    setEditFormIgnoreStock(Boolean(p.ignoreStock));
     setShowColorAddForm(false);
 
     // Load bundle pricing for product
@@ -853,6 +919,31 @@ export default function AdminPage() {
     loadEditVariants(p.id);
   }
 
+  // Quick Toggle for Unlimited Stock
+  async function handleToggleIgnoreStock(newValue: boolean) {
+    if (!editingProduct) return;
+    setEditFormIgnoreStock(newValue);
+    try {
+      const res = await authFetch(`/api/admin/products/${editingProduct.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ ignoreStock: newValue }),
+      });
+      if (res.ok) {
+        setEditingProduct({ ...editingProduct, ignoreStock: newValue });
+        showToast(
+          newValue
+            ? "♾️ Unlimited stock enabled! Orders will never be blocked by inventory."
+            : "Stock limit tracking enabled."
+        );
+        loadMainData();
+      } else {
+        throw new Error("Failed to update stock mode");
+      }
+    } catch {
+      showToast("Failed to update stock mode", "error");
+    }
+  }
+
   // Save Product Main Fields
   async function handleSaveProductMain() {
     if (!editingProduct) return;
@@ -866,6 +957,7 @@ export default function AdminPage() {
         tag: editFormTag || null,
         hero: editFormHero,
         gallery: editFormGallery.filter((g) => g.trim() !== ""),
+        ignoreStock: editFormIgnoreStock,
       };
 
       const res = await authFetch(`/api/admin/products/${editingProduct.id}`, {
@@ -1448,6 +1540,188 @@ export default function AdminPage() {
     productSortKey === key ? (productSortDir === "asc" ? " ▲" : " ▼") : "";
 
   if (!mounted) return null;
+
+  if (!isAdminAuthed) {
+    return (
+      <div
+        style={{
+          minHeight: "100dvh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#0a0a0a",
+          color: "#f5f5f5",
+          padding: "24px",
+          fontFamily: "var(--font-heading, system-ui, sans-serif)",
+        }}
+      >
+        <div
+          style={{
+            width: "100%",
+            maxWidth: 440,
+            background: "#141414",
+            border: "1px solid rgba(255, 255, 255, 0.1)",
+            borderRadius: 16,
+            padding: "36px 32px",
+            boxShadow: "0 24px 64px rgba(0,0,0,0.6)",
+          }}
+        >
+          {/* Logo / Badge */}
+          <div style={{ textAlign: "center", marginBottom: 28 }}>
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "6px 14px",
+                background: "rgba(200, 255, 0, 0.1)",
+                border: "1px solid rgba(200, 255, 0, 0.3)",
+                borderRadius: 999,
+                fontSize: 12,
+                fontWeight: 700,
+                color: "#C8FF00",
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                marginBottom: 16,
+              }}
+            >
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#C8FF00" }} />
+              Admin Portal
+            </div>
+            <h1 style={{ fontSize: 28, fontWeight: 900, margin: 0, letterSpacing: "-0.03em" }}>
+              nanos<span style={{ color: "#C8FF00" }}>.pk</span>
+            </h1>
+            <p style={{ margin: "8px 0 0", color: "#888888", fontSize: 13 }}>
+              Enter administrator credentials to manage inventory, orders, and store settings.
+            </p>
+          </div>
+
+          {adminLoginError && (
+            <div
+              style={{
+                background: "rgba(239, 68, 68, 0.12)",
+                border: "1px solid rgba(239, 68, 68, 0.3)",
+                color: "#f87171",
+                padding: "12px 16px",
+                borderRadius: 8,
+                fontSize: 13,
+                lineHeight: 1.4,
+                marginBottom: 20,
+              }}
+            >
+              {adminLoginError}
+            </div>
+          )}
+
+          <form onSubmit={handleAdminLoginSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  color: "#aaaaaa",
+                  marginBottom: 6,
+                }}
+              >
+                Admin Email
+              </label>
+              <input
+                type="email"
+                required
+                value={adminEmailInput}
+                onChange={(e) => setAdminEmailInput(e.target.value)}
+                placeholder="admin@nanos.pk"
+                style={{
+                  width: "100%",
+                  padding: "12px 14px",
+                  background: "#1f1f1f",
+                  border: "1px solid rgba(255, 255, 255, 0.12)",
+                  borderRadius: 8,
+                  color: "#ffffff",
+                  fontSize: 14,
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  color: "#aaaaaa",
+                  marginBottom: 6,
+                }}
+              >
+                Password
+              </label>
+              <input
+                type="password"
+                required
+                value={adminPasswordInput}
+                onChange={(e) => setAdminPasswordInput(e.target.value)}
+                placeholder="••••••••"
+                style={{
+                  width: "100%",
+                  padding: "12px 14px",
+                  background: "#1f1f1f",
+                  border: "1px solid rgba(255, 255, 255, 0.12)",
+                  borderRadius: 8,
+                  color: "#ffffff",
+                  fontSize: 14,
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={adminLoginLoading}
+              style={{
+                marginTop: 8,
+                width: "100%",
+                padding: "13px",
+                background: "#C8FF00",
+                color: "#000000",
+                border: "none",
+                borderRadius: 8,
+                fontWeight: 800,
+                fontSize: 14,
+                letterSpacing: "0.02em",
+                cursor: adminLoginLoading ? "not-allowed" : "pointer",
+                opacity: adminLoginLoading ? 0.7 : 1,
+                transition: "opacity 0.2s, transform 0.1s",
+              }}
+            >
+              {adminLoginLoading ? "Signing In..." : "Sign In to Admin Dashboard"}
+            </button>
+          </form>
+
+          <div style={{ marginTop: 24, textAlign: "center" }}>
+            <Link
+              href="/"
+              style={{
+                color: "#888888",
+                fontSize: 13,
+                textDecoration: "none",
+                transition: "color 0.2s",
+              }}
+            >
+              ← Return to Main Store
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="admin-layout-shell">
@@ -2370,6 +2644,64 @@ export default function AdminPage() {
                   <label>Description</label>
                   <textarea rows={3} value={editFormDesc} onChange={(e) => setEditFormDesc(e.target.value)} />
                 </div>
+
+                {/* Unlimited Stock Policy Card */}
+                <div
+                  style={{
+                    marginTop: 18,
+                    padding: "16px 18px",
+                    background: editFormIgnoreStock ? "rgba(200, 255, 0, 0.08)" : "var(--admin-surface-2)",
+                    border: editFormIgnoreStock ? "1.5px solid var(--admin-accent)" : "1px solid var(--admin-border)",
+                    borderRadius: 8,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 16,
+                  }}
+                >
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 13.5, fontWeight: 700, color: editFormIgnoreStock ? "var(--admin-accent)" : "var(--admin-text)" }}>
+                        ♾️ Unlimited Stock Mode
+                      </span>
+                      {editFormIgnoreStock && (
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 800,
+                            background: "var(--admin-accent)",
+                            color: "#000",
+                            padding: "2px 7px",
+                            borderRadius: 4,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.04em",
+                          }}
+                        >
+                          ACTIVE
+                        </span>
+                      )}
+                    </div>
+                    <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--admin-text-soft)", lineHeight: 1.4 }}>
+                      When enabled, this product will continuously sell online without any thought about stock. Inventory counts will not block orders on the storefront.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${editFormIgnoreStock ? "btn-dark" : "btn-outline"}`}
+                    style={{
+                      flexShrink: 0,
+                      fontWeight: 700,
+                      fontSize: 12,
+                      padding: "8px 14px",
+                      background: editFormIgnoreStock ? "var(--admin-accent)" : undefined,
+                      color: editFormIgnoreStock ? "#000" : undefined,
+                      borderColor: editFormIgnoreStock ? "var(--admin-accent)" : undefined,
+                    }}
+                    onClick={() => handleToggleIgnoreStock(!editFormIgnoreStock)}
+                  >
+                    {editFormIgnoreStock ? "Disable Unlimited" : "Enable Unlimited"}
+                  </button>
+                </div>
               </div>
 
               {/* Bundle Pricing Section */}
@@ -2444,29 +2776,69 @@ export default function AdminPage() {
 
               {/* Color Galleries & Stock Manager Section */}
               <div className="panel" style={{ padding: 24 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 14 }}>
                   <div>
                     <h3 style={{ margin: 0, color: "var(--admin-text)" }}>Color Galleries &amp; Stock Manager</h3>
                     <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--admin-text-soft)" }}>
                       Manage images and size stock levels per color. Select a tab to edit that color.
                     </p>
                   </div>
-                  {dirtyColorTabs.size > 0 && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <span style={{ fontSize: 12, color: "var(--admin-accent)", fontWeight: 600 }}>
-                        • Unsaved changes on {dirtyColorTabs.size} tab{dirtyColorTabs.size > 1 ? "s" : ""}
-                      </span>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                    {/* Unlimited Mode Quick Switch */}
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: "6px 12px",
+                        background: editFormIgnoreStock ? "rgba(200, 255, 0, 0.1)" : "var(--admin-surface-2)",
+                        border: editFormIgnoreStock ? "1.5px solid var(--admin-accent)" : "1px solid var(--admin-border)",
+                        borderRadius: 6,
+                      }}
+                    >
+                      <div style={{ display: "flex", flexDirection: "column" }}>
+                        <span style={{ fontSize: 11.5, fontWeight: 700, color: editFormIgnoreStock ? "var(--admin-accent)" : "var(--admin-text)" }}>
+                          {editFormIgnoreStock ? "♾️ Unlimited Selling: ACTIVE" : "📦 Stock Tracking: STRICT"}
+                        </span>
+                        <span style={{ fontSize: 10, color: "var(--admin-text-soft)" }}>
+                          {editFormIgnoreStock ? "Orders never blocked by zero stock" : "Orders blocked when size reaches 0"}
+                        </span>
+                      </div>
                       <button
                         type="button"
-                        className="btn btn-dark btn-sm"
-                        onClick={() => {
-                          dirtyColorTabs.forEach((cId) => handleSaveColorTab(cId));
+                        className={`btn btn-sm ${editFormIgnoreStock ? "btn-dark" : "btn-outline"}`}
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          padding: "4px 10px",
+                          background: editFormIgnoreStock ? "var(--admin-accent)" : undefined,
+                          color: editFormIgnoreStock ? "#000" : undefined,
+                          borderColor: editFormIgnoreStock ? "var(--admin-accent)" : undefined,
                         }}
+                        onClick={() => handleToggleIgnoreStock(!editFormIgnoreStock)}
                       >
-                        Save All Dirty Tabs
+                        {editFormIgnoreStock ? "Turn OFF" : "Enable Unlimited"}
                       </button>
                     </div>
-                  )}
+
+                    {dirtyColorTabs.size > 0 && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span style={{ fontSize: 12, color: "var(--admin-accent)", fontWeight: 600 }}>
+                          • Unsaved changes on {dirtyColorTabs.size} tab{dirtyColorTabs.size > 1 ? "s" : ""}
+                        </span>
+                        <button
+                          type="button"
+                          className="btn btn-dark btn-sm"
+                          onClick={() => {
+                            dirtyColorTabs.forEach((cId) => handleSaveColorTab(cId));
+                          }}
+                        >
+                          Save All Dirty Tabs
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Color Add / Edit Form Modal/Drawer if open */}
@@ -2869,18 +3241,38 @@ export default function AdminPage() {
 
                         {/* PANEL 2: Stock */}
                         <div style={{ background: "var(--admin-surface-2)", padding: 18, borderRadius: 8, border: "1px solid var(--admin-border)" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                            <h4 style={{ margin: 0, color: "var(--admin-text)", fontSize: 14 }}>
-                              Panel 2: Stock ({activeColorObj.name})
-                            </h4>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <h4 style={{ margin: 0, color: "var(--admin-text)", fontSize: 14 }}>
+                                Panel 2: Stock ({activeColorObj.name})
+                              </h4>
+                              {editFormIgnoreStock && (
+                                <span
+                                  style={{
+                                    fontSize: 10,
+                                    fontWeight: 800,
+                                    color: "var(--admin-accent)",
+                                    background: "rgba(200, 255, 0, 0.12)",
+                                    border: "1px solid var(--admin-accent)",
+                                    padding: "2px 6px",
+                                    borderRadius: 4,
+                                    textTransform: "uppercase",
+                                    letterSpacing: "0.03em",
+                                  }}
+                                  title="Unlimited Selling is active for this product"
+                                >
+                                  ♾️ Unlimited
+                                </span>
+                              )}
+                            </div>
                             <span
                               style={{
                                 fontSize: 12,
                                 fontWeight: 600,
-                                color: activeTotalStock === 0 ? "var(--admin-danger)" : activeTotalStock <= 3 ? "var(--admin-warn)" : "var(--admin-accent)",
+                                color: editFormIgnoreStock ? "var(--admin-accent)" : activeTotalStock === 0 ? "var(--admin-danger)" : activeTotalStock <= 3 ? "var(--admin-warn)" : "var(--admin-accent)",
                               }}
                             >
-                              Total: {activeTotalStock} in stock
+                              {editFormIgnoreStock ? `Total: ${activeTotalStock} in stock (Unlimited Mode)` : `Total: ${activeTotalStock} in stock`}
                             </span>
                           </div>
 
@@ -3592,7 +3984,7 @@ export default function AdminPage() {
                     <input
                       type="text"
                       value={promoSettings.code}
-                      placeholder="e.g. NANOS10"
+                      placeholder="Promo code"
                       onChange={(e) =>
                         setPromoSettings((prev) => ({
                           ...prev,

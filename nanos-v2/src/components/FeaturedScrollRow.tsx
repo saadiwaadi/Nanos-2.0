@@ -70,7 +70,7 @@ export function FeaturedScrollRow({ products }: FeaturedScrollRowProps) {
           aria-label="Scroll right"
         >
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="9 18 15 12 15 6" />
+            <polyline points="9 18 15 12 9 6" />
           </svg>
         </button>
       )}

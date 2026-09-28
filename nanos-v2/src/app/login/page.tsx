@@ -24,9 +24,13 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (auth.isLoggedIn) {
-      router.push("/account");
+      if (auth.user?.role === "admin") {
+        router.push("/admin");
+      } else {
+        router.push("/account");
+      }
     }
-  }, [auth.isLoggedIn, router]);
+  }, [auth.isLoggedIn, auth.user, router]);
 
   async function handleLoginSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -48,7 +52,11 @@ export default function LoginPage() {
       }
 
       auth.login(data.user, data.token);
-      router.push("/account");
+      if (data.user?.role === "admin") {
+        router.push("/admin");
+      } else {
+        router.push("/account");
+      }
     } catch (err: any) {
       setErrorMsg(err.message || "An unexpected error occurred");
       setIsSubmitting(false);

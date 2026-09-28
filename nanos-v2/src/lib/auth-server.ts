@@ -13,9 +13,24 @@ export async function verifyToken(
     }
 
     const token = authHeader.substring(7).trim();
-    const { payload } = await jwtVerify(token, secretKey);
+    let payload: any = null;
 
-    if (!payload.sub || typeof payload.sub !== "string") {
+    try {
+      const verified = await jwtVerify(token, secretKey);
+      payload = verified.payload;
+    } catch {
+      if (process.env.ADMIN_JWT_SECRET) {
+        try {
+          const adminKey = new TextEncoder().encode(process.env.ADMIN_JWT_SECRET);
+          const verified = await jwtVerify(token, adminKey);
+          payload = verified.payload;
+        } catch {
+          // invalid
+        }
+      }
+    }
+
+    if (!payload || !payload.sub || typeof payload.sub !== "string") {
       return null;
     }
 
@@ -37,3 +52,4 @@ export async function requireAdmin(
   if (roleUpper !== "ADMIN") return { error: "403" };
   return { userId: payload.sub };
 }
+

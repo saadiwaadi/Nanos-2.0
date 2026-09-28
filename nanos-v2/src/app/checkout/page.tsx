@@ -69,6 +69,36 @@ export default function CheckoutPage() {
     }
   }, [cart.items.length, initiateCheckoutEventId, router]);
 
+  const DRAFT_STORAGE_KEY = "nanos_checkout_draft";
+
+  // Load draft from localStorage on initial mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
+      if (raw) {
+        const d = JSON.parse(raw);
+        if (d.name) setName(d.name);
+        if (d.phone) setPhone(d.phone);
+        if (d.email) setEmail(d.email);
+        if (d.address) setAddress(d.address);
+        if (d.city) setCity(d.city);
+        if (d.postal) setPostal(d.postal);
+      }
+    } catch {}
+  }, []);
+
+  // Persist draft to localStorage on changes
+  useEffect(() => {
+    try {
+      if (name || phone || email || address || city || postal) {
+        localStorage.setItem(
+          DRAFT_STORAGE_KEY,
+          JSON.stringify({ name, phone, email, address, city, postal })
+        );
+      }
+    } catch {}
+  }, [name, phone, email, address, city, postal]);
+
   useEffect(() => {
     if (auth.user) {
       if (auth.user.name && !name) setName(auth.user.name);
@@ -186,6 +216,9 @@ export default function CheckoutPage() {
       // 3. Mark order placed, clear cart & direct redirect to Confirmation
       isOrderPlacedRef.current = true;
       cart.clear();
+      try {
+        localStorage.removeItem(DRAFT_STORAGE_KEY);
+      } catch {}
 
       const redirectUrl = currentToken
         ? `/confirmation/${orderData.id}`
@@ -222,7 +255,13 @@ export default function CheckoutPage() {
 
         {/* Steps Bar */}
         <div className="checkout-steps">
-          <div className="checkout-step done">1. Cart</div>
+          <Link
+            href="/cart"
+            className="checkout-step done"
+            style={{ cursor: "pointer", textDecoration: "none" }}
+          >
+            1. Cart
+          </Link>
           <div className="checkout-step active">2. Details &amp; Payment</div>
           <div className="checkout-step">3. Confirmation</div>
         </div>
@@ -443,7 +482,7 @@ export default function CheckoutPage() {
               <div className="promo-row">
                 <input
                   type="text"
-                  placeholder="Promo code (e.g. NANOS10)"
+                  placeholder="Promo code"
                   value={promoInput}
                   onChange={(e) => setPromoInput(e.target.value)}
                 />
@@ -459,36 +498,6 @@ export default function CheckoutPage() {
                   Apply
                 </button>
               </div>
-
-              {!cart.promo && (
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: "#666",
-                    marginTop: -6,
-                    marginBottom: 12,
-                  }}
-                >
-                  Use coupon code{" "}
-                  <button
-                    type="button"
-                    onClick={() => setPromoInput("NANOS10")}
-                    style={{
-                      fontWeight: 700,
-                      color: "var(--black, #111)",
-                      textDecoration: "underline",
-                      background: "none",
-                      border: "none",
-                      padding: 0,
-                      font: "inherit",
-                      cursor: "pointer",
-                    }}
-                  >
-                    NANOS10
-                  </button>{" "}
-                  for 10% off
-                </div>
-              )}
 
               {promoMsg && (
                 <div

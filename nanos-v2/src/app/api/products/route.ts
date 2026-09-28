@@ -41,6 +41,7 @@ function toProduct(row: {
     reviews: row.reviews,
     hero: row.hero,
     isSale: row.isSale,
+    ignoreStock: (row as any).ignoreStock ?? false,
     colors: parseJson<{ name: string; hex: string }>(row.colors),
     sizes: parseJson<string>(row.sizes),
     gallery: parseJson<string>(row.gallery),
