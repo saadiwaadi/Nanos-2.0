@@ -30,6 +30,7 @@ export default function CheckoutPage() {
   const [email, setEmail] = useState("");
   const [address, setAddress] = useState("");
   const [city, setCity] = useState("");
+  const [customCity, setCustomCity] = useState("");
   const [postal, setPostal] = useState("");
 
   const [createAccount, setCreateAccount] = useState(false);
@@ -81,7 +82,16 @@ export default function CheckoutPage() {
         if (d.phone) setPhone(d.phone);
         if (d.email) setEmail(d.email);
         if (d.address) setAddress(d.address);
-        if (d.city) setCity(d.city);
+        if (d.city) {
+          if (PAKISTAN_CITIES.includes(d.city) && d.city !== "Other") {
+            setCity(d.city);
+            setCustomCity("");
+          } else {
+            setCity("Other");
+            setCustomCity(d.city === "Other" ? (d.customCity || "") : d.city);
+          }
+        }
+        if (d.customCity) setCustomCity(d.customCity);
         if (d.postal) setPostal(d.postal);
       }
     } catch {}
@@ -90,14 +100,14 @@ export default function CheckoutPage() {
   // Persist draft to localStorage on changes
   useEffect(() => {
     try {
-      if (name || phone || email || address || city || postal) {
+      if (name || phone || email || address || city || customCity || postal) {
         localStorage.setItem(
           DRAFT_STORAGE_KEY,
-          JSON.stringify({ name, phone, email, address, city, postal })
+          JSON.stringify({ name, phone, email, address, city, customCity, postal })
         );
       }
     } catch {}
-  }, [name, phone, email, address, city, postal]);
+  }, [name, phone, email, address, city, customCity, postal]);
 
   useEffect(() => {
     if (auth.user) {
@@ -106,12 +116,13 @@ export default function CheckoutPage() {
     }
   }, [auth.user, name, email]);
 
+  const effectiveCity = city === "Other" ? customCity.trim() : city.trim();
   const phoneDigits = (phone.match(/\d/g) || []).length;
   const isPhoneValid = phoneDigits >= 10;
   const isAddressValid = address.trim().length >= 5;
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const isNameValid = name.trim().length >= 2;
-  const isCityValid = city.trim().length > 0;
+  const isCityValid = city === "Other" ? customCity.trim().length >= 2 : city.trim().length > 0;
   const isPostalValid = true; // Postal code is optional
   const isPasswordValid = !createAccount || password.length >= 8;
 
@@ -190,7 +201,7 @@ export default function CheckoutPage() {
           size: i.size,
           qty: i.qty,
         })),
-        shippingInfo: { name, phone, email, address, city, postal },
+        shippingInfo: { name, phone, email, address, city: effectiveCity, postal },
         promoCode: cart.promo || undefined,
         guestEmail: currentToken ? undefined : email,
         guestName: currentToken ? undefined : name,
@@ -358,7 +369,12 @@ export default function CheckoutPage() {
                       id="ship-city"
                       required
                       value={city}
-                      onChange={(e) => setCity(e.target.value)}
+                      onChange={(e) => {
+                        setCity(e.target.value);
+                        if (e.target.value !== "Other") {
+                          setCustomCity("");
+                        }
+                      }}
                       onBlur={() => markTouched("city")}
                     >
                       <option value="">Select city</option>
@@ -368,7 +384,7 @@ export default function CheckoutPage() {
                         </option>
                       ))}
                     </select>
-                    {touched.city && !isCityValid && (
+                    {touched.city && !city && (
                       <span style={{ color: "#c0392b", fontSize: 12, marginTop: 4 }}>
                         Please select a city
                       </span>
@@ -385,6 +401,28 @@ export default function CheckoutPage() {
                     />
                   </div>
                 </div>
+
+                {city === "Other" && (
+                  <div className="form-row">
+                    <div className="form-group" style={{ flex: 1 }}>
+                      <label htmlFor="ship-custom-city">Enter City Name</label>
+                      <input
+                        type="text"
+                        id="ship-custom-city"
+                        required
+                        placeholder="e.g. Kot Radha Kishan, Risalpur, etc."
+                        value={customCity}
+                        onChange={(e) => setCustomCity(e.target.value)}
+                        onBlur={() => markTouched("customCity")}
+                      />
+                      {touched.customCity && customCity.trim().length < 2 && (
+                        <span style={{ color: "#c0392b", fontSize: 12, marginTop: 4 }}>
+                          Please enter your city name
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Optional Guest Registration */}
                 {!auth.isLoggedIn && (
