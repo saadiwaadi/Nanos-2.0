@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
-import { fmtPrice, FREE_SHIPPING_THRESHOLD } from "@/lib/cart";
+import { fmtPrice } from "@/lib/cart";
 
 export default function CartPage() {
   const cart = useCart();
@@ -40,8 +40,6 @@ export default function CartPage() {
       </div>
     );
   }
-
-  const freeShipGap = FREE_SHIPPING_THRESHOLD - (cart.subtotal - cart.discount);
 
   return (
     <div className="page">
@@ -153,9 +151,9 @@ export default function CartPage() {
               <span>{cart.shipping === 0 ? "Free" : fmtPrice(cart.shipping)}</span>
             </div>
 
-            {cart.shipping > 0 && freeShipGap > 0 && (
+            {cart.shipping > 0 && cart.freeShippingGap > 0 && (
               <div className="free-ship-note">
-                Add {fmtPrice(freeShipGap)} more for free shipping
+                Add {fmtPrice(cart.freeShippingGap)} more for free shipping
               </div>
             )}
 

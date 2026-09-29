@@ -3,6 +3,8 @@ import { requireAdmin } from "@/lib/auth-server";
 import { prisma } from "@/lib/prisma";
 import { memoryOrders } from "@/app/api/orders/route";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: Request) {
   const auth = await requireAdmin(request);
   if ("error" in auth) {
@@ -24,36 +26,61 @@ export async function GET(request: Request) {
         user: {
           select: { id: true, email: true, name: true },
         },
+        auditLogs: {
+          orderBy: { createdAt: "desc" },
+        },
       },
     });
 
-    const orders = dbOrders.map((o) => ({
-      id: o.id,
-      status: o.status,
-      subtotal: o.subtotal,
-      discount: o.discount,
-      shipping: o.shipping,
-      total: o.total,
-      shippingInfo: o.shippingInfo,
-      payment: o.payment,
-      guestEmail: o.guestEmail,
-      guestName: o.guestName,
-      createdAt: o.createdAt,
-      user: o.user,
-      orderItems: o.items.map((i) => ({
-        id: i.id,
-        productId: i.productId,
-        quantity: i.quantity,
-        price: i.unitPrice,
-        size: i.size,
-        color: i.color,
-        product: i.product || {
-          id: i.productId,
-          name: i.name || "Nanos Product",
-          hero: "",
-        },
-      })),
-    }));
+    const orders = dbOrders.map((o) => {
+      // Derive default orderStatus if not explicitly populated
+      const fallbackStatus =
+        o.status === "cancelled"
+          ? "CANCELLED"
+          : o.status === "on_hold"
+          ? "ON_HOLD"
+          : o.trackingNumber || o.postexTrackingNumber || o.courierBookingStatus === "booked"
+          ? "BOOKED"
+          : "READY_TO_SHIP";
+
+      return {
+        id: o.id,
+        orderStatus: (o as any).orderStatus || fallbackStatus,
+        status: o.status,
+        courierBookingStatus: o.courierBookingStatus,
+        courierStatusRaw: o.courierStatusRaw,
+        trackingNumber: o.trackingNumber,
+        postexTrackingNumber: o.postexTrackingNumber,
+        subtotal: o.subtotal,
+        discount: o.discount,
+        shipping: o.shipping,
+        total: o.total,
+        shippingInfo: o.shippingInfo,
+        payment: o.payment,
+        guestEmail: o.guestEmail,
+        guestName: o.guestName,
+        customerName: o.customerName,
+        customerEmail: o.customerEmail,
+        createdAt: o.createdAt,
+        version: o.version,
+        isTest: o.isTest,
+        user: o.user,
+        orderItems: o.items.map((i) => ({
+          id: i.id,
+          productId: i.productId,
+          quantity: i.quantity,
+          price: i.unitPrice,
+          size: i.size,
+          color: i.color,
+          product: i.product || {
+            id: i.productId,
+            name: i.name || "Nanos Product",
+            hero: "",
+          },
+        })),
+        auditLogs: (o as any).auditLogs || [],
+      };
+    });
 
     return NextResponse.json({ orders });
   } catch {
@@ -64,7 +91,12 @@ export async function GET(request: Request) {
 
     const orders = memList.map((o) => ({
       id: o.id,
+      orderStatus: o.orderStatus || (o.status === "CANCELLED" ? "CANCELLED" : o.status === "ON_HOLD" ? "ON_HOLD" : o.trackingNumber ? "BOOKED" : "READY_TO_SHIP"),
       status: o.status || "PENDING",
+      courierBookingStatus: o.courierBookingStatus || "not_booked",
+      courierStatusRaw: o.courierStatusRaw || null,
+      trackingNumber: o.trackingNumber || null,
+      postexTrackingNumber: o.postexTrackingNumber || null,
       subtotal: o.subtotal || 0,
       discount: o.discount || 0,
       shipping: o.shipping || 0,
@@ -73,7 +105,11 @@ export async function GET(request: Request) {
       payment: o.payment || "cod",
       guestEmail: o.guestEmail || null,
       guestName: o.guestName || null,
+      customerName: o.customerName || null,
+      customerEmail: o.customerEmail || null,
       createdAt: o.createdAt,
+      version: o.version || 0,
+      isTest: o.isTest || false,
       user: o.userId ? { id: o.userId, email: o.guestEmail || "user@nanos.pk", name: o.guestName || "Customer" } : null,
       orderItems: (o.items || []).map((i: any, idx: number) => ({
         id: `${o.id}_item_${idx}`,
@@ -88,6 +124,7 @@ export async function GET(request: Request) {
           hero: i.img || "",
         },
       })),
+      auditLogs: o.auditLogs || [],
     }));
 
     return NextResponse.json({ orders });

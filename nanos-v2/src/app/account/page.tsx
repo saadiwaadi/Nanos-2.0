@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { OrderSummary, OrderStatus } from "@/lib/types";
 import { OverviewTab } from "@/components/account/OverviewTab";
+import { useSWR } from "@/lib/swr";
 
 function getInitials(name?: string): string {
   if (!name) return "N";
@@ -57,9 +58,47 @@ export default function AccountPage() {
   const [nameInput, setNameInput] = useState("");
   const [emailInput, setEmailInput] = useState("");
 
-  const [orders, setOrders] = useState<OrderSummary[]>([]);
-  const [ordersLoading, setOrdersLoading] = useState(true);
-  const [ordersError, setOrdersError] = useState<string | null>(null);
+  const fetchOrders = useCallback(async () => {
+    let token: string | null = null;
+    if (typeof window !== "undefined") {
+      const raw = localStorage.getItem("nanos_auth_v1");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        token = parsed.token || null;
+      }
+    }
+
+    if (!token) {
+      throw new Error("Not authenticated");
+    }
+
+    const res = await fetch("/api/orders", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error("Failed to load order history");
+    }
+
+    const data = await res.json();
+    return (data.orders || []) as OrderSummary[];
+  }, []);
+
+  // SWR for Order History: instant render from cache, 60s background revalidation, quiet error handling
+  const {
+    data: cachedOrders,
+    isLoading: ordersLoading,
+    error: ordersErrorObj,
+  } = useSWR<OrderSummary[]>(
+    auth.isLoggedIn ? "account:orders" : null,
+    fetchOrders,
+    { staleTime: 60 * 1000 }
+  );
+
+  const orders = cachedOrders || [];
+  const ordersError = ordersErrorObj && !cachedOrders ? (ordersErrorObj.message || "An error occurred fetching orders.") : null;
 
   useEffect(() => {
     if (!auth.isLoggedIn) {
@@ -71,46 +110,6 @@ export default function AccountPage() {
       setNameInput(auth.user.name || "");
       setEmailInput(auth.user.email || "");
     }
-
-    // Fetch orders for authed user
-    async function fetchOrders() {
-      setOrdersLoading(true);
-      setOrdersError(null);
-      try {
-        let token: string | null = null;
-        if (typeof window !== "undefined") {
-          const raw = localStorage.getItem("nanos_auth_v1");
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            token = parsed.token || null;
-          }
-        }
-
-        if (!token) {
-          setOrdersLoading(false);
-          return;
-        }
-
-        const res = await fetch("/api/orders", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (!res.ok) {
-          throw new Error("Failed to load order history");
-        }
-
-        const data = await res.json();
-        setOrders(data.orders || []);
-      } catch (err: any) {
-        setOrdersError(err.message || "An error occurred fetching orders.");
-      } finally {
-        setOrdersLoading(false);
-      }
-    }
-
-    fetchOrders();
   }, [auth.isLoggedIn, auth.user, router]);
 
   if (!auth.isLoggedIn || !auth.user) {
@@ -266,7 +265,7 @@ export default function AccountPage() {
                   </h2>
                 </div>
 
-                {ordersLoading ? (
+                {ordersLoading && orders.length === 0 ? (
                   <div style={{ padding: "32px 0", color: "#666", fontSize: 14 }}>
                     Loading order history...
                   </div>

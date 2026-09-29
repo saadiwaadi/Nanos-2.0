@@ -62,6 +62,7 @@ export async function claim(id: string): Promise<boolean> {
   const r = await prisma.order.updateMany({
     where: {
       id,
+      orderStatus: { not: "ON_HOLD" },
       status: { in: ["placed", "confirmed"] },
       OR: [
         { courierBookingStatus: { in: ["queued", "booking_failed", "not_booked"] } },
@@ -140,6 +141,17 @@ export async function bookOne(id: string, actor = "system:batch") {
 
   if (!order) return { id, result: "skipped" as const };
 
+  if (order.orderStatus === "ON_HOLD" || order.status === "on_hold") {
+    await prisma.order.update({
+      where: { id },
+      data: {
+        courierBookingStatus: "not_booked",
+        bookingLockedAt: null,
+      },
+    });
+    return { id, result: "skipped" as const, reason: "Order is On Hold" };
+  }
+
   const sInfo = parseShippingInfo(order.shippingInfo);
   const rawCity = sInfo.city || (order as any).city || "";
   const city = await resolveCity(rawCity);
@@ -173,6 +185,7 @@ export async function bookOne(id: string, actor = "system:batch") {
         const updateRes = await tx.order.updateMany({
           where: { id, version: order.version },
           data: {
+            orderStatus: "BOOKED",
             courierBookingStatus: "booked",
             trackingNumber: tracking,
             bookingError: null,
@@ -192,6 +205,14 @@ export async function bookOne(id: string, actor = "system:batch") {
             toValue: "booked",
             actor,
             metadata: JSON.stringify({ tracking }),
+          },
+        });
+        await tx.orderAuditLog.create({
+          data: {
+            orderId: id,
+            action: "SEND_POSTEX",
+            adminUser: actor,
+            note: `Booked with PostEx (Tracking #${tracking})`,
           },
         });
       });
@@ -249,6 +270,8 @@ export async function bookOne(id: string, actor = "system:batch") {
       return { id, result: "failed" as const, error: e.message };
     }
   }
+
+  return { id, result: "failed" as const, error: "Max booking attempts reached" };
 }
 
 // ─── RUN BATCH ──────────────────────────────────────────
@@ -256,8 +279,9 @@ export async function runBatch(limit = 200, concurrency = 5) {
   const ids = (
     await prisma.order.findMany({
       where: {
-        courierBookingStatus: { in: ["queued", "queued_for_batch", "pending_auto"] },
+        orderStatus: { not: "ON_HOLD" },
         status: { in: ["placed", "confirmed"] },
+        courierBookingStatus: { in: ["queued", "queued_for_batch", "pending_auto"] },
       },
       orderBy: { createdAt: "asc" },
       take: limit,

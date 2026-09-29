@@ -1,65 +1,38 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import type { Product } from "@/lib/types";
+import { getProducts } from "@/lib/products";
 
-function parseJson<T>(val: string): T[] {
-  try {
-    const parsed = JSON.parse(val);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function toProduct(row: {
-  id: string;
-  sku: string;
-  name: string;
-  category: string;
-  tag: string | null;
-  price: number;
-  oldPrice: number | null;
-  description: string;
-  rating: number;
-  reviews: number;
-  hero: string;
-  isSale: boolean;
-  colors: string;
-  sizes: string;
-  gallery: string;
-}): Product {
-  return {
-    id: row.id,
-    sku: row.sku,
-    name: row.name,
-    category: row.category,
-    tag: row.tag,
-    price: row.price,
-    oldPrice: row.oldPrice,
-    description: row.description,
-    rating: row.rating,
-    reviews: row.reviews,
-    hero: row.hero,
-    isSale: row.isSale,
-    ignoreStock: (row as any).ignoreStock ?? false,
-    colors: parseJson<{ name: string; hex: string }>(row.colors),
-    sizes: parseJson<string>(row.sizes),
-    gallery: parseJson<string>(row.gallery),
-  };
-}
+export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const category = searchParams.get("category") || undefined;
+  const category = searchParams.get("category")?.toLowerCase() || undefined;
   const sale = searchParams.get("sale") === "true";
-
-  const where: Record<string, unknown> = {};
-  if (category) where.category = category;
-  if (sale) where.isSale = true;
+  const tag = searchParams.get("tag")?.toUpperCase() || undefined;
 
   try {
-    const rows = await prisma.product.findMany({ where });
-    return NextResponse.json(rows.map(toProduct));
+    let products = await getProducts();
+
+    if (category && category !== "all") {
+      products = products.filter((p) => p.category.toLowerCase() === category);
+    }
+
+    if (sale) {
+      products = products.filter(
+        (p) => p.isSale || (p.oldPrice != null && p.oldPrice > p.price)
+      );
+    }
+
+    if (tag) {
+      if (tag === "SALE") {
+        products = products.filter(
+          (p) => p.isSale || (p.oldPrice != null && p.oldPrice > p.price) || p.tag?.toUpperCase() === "SALE"
+        );
+      } else {
+        products = products.filter((p) => p.tag?.toUpperCase() === tag);
+      }
+    }
+
+    return NextResponse.json(products);
   } catch (error) {
     console.error("Failed to fetch products:", error);
     return NextResponse.json(

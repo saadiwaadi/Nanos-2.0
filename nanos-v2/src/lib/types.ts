@@ -61,6 +61,22 @@ export interface AdminProduct {
 
 export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
 
+export type InternalOrderStatus =
+  | 'NEW'
+  | 'ON_HOLD'
+  | 'READY_TO_SHIP'
+  | 'BOOKED'
+  | 'CANCELLED';
+
+export interface OrderAuditLog {
+  id: string;
+  orderId: string;
+  action: string;
+  adminUser: string;
+  note?: string | null;
+  createdAt: string;
+}
+
 export interface OrderItemSummary {
   id: string;
   productId: string;
@@ -74,8 +90,10 @@ export interface OrderItemSummary {
 export interface OrderSummary {
   id: string;
   status: OrderStatus;
+  orderStatus?: InternalOrderStatus | string;
   totalAmount: number;
   shippingFee: number;
   createdAt: string;
   orderItems: OrderItemSummary[];
+  auditLogs?: OrderAuditLog[];
 }

@@ -67,8 +67,18 @@ interface BookingLog {
   errorMessage?: string;
 }
 
+interface OrderAuditLog {
+  id: string;
+  orderId?: string;
+  action: string;
+  adminUser: string;
+  note?: string | null;
+  createdAt: string;
+}
+
 interface AdminOrder {
   id: string;
+  orderStatus?: string;
   status: string;
   subtotal: number;
   discount: number;
@@ -83,14 +93,17 @@ interface AdminOrder {
   createdAt: string;
   version?: number;
   isTest?: boolean;
+  trackingNumber?: string | null;
   postexTrackingNumber?: string | null;
   postexStatus?: string | null;
   courierBookingStatus?: string | null;
+  courierStatusRaw?: string | null;
   adminApproved?: boolean;
   user?: { id: string; email: string; name?: string | null } | null;
   orderItems: OrderItem[];
   bookingLogs?: BookingLog[];
   events?: any[];
+  auditLogs?: OrderAuditLog[];
 }
 
 interface QueueData {
@@ -202,13 +215,37 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Orders Tab Filters
+  // Orders Tab Filters & Lifecycle
   const [orderQuery, setOrderQuery] = useState("");
+  const [orderStatusTab, setOrderStatusTab] = useState<
+    "all" | "on_hold" | "ready_to_ship" | "booked" | "delivered" | "cancelled"
+  >("all");
   const [orderStatusFilter, setOrderStatusFilter] = useState("all");
   const [orderCustomerFilter, setOrderCustomerFilter] = useState("all");
   const [orderDateFilter, setOrderDateFilter] = useState("all");
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
+  const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
+
+  // Confirmation Modal State
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    actionLabel: string;
+    danger?: boolean;
+    requiresReason?: boolean;
+    reasonPlaceholder?: string;
+    onConfirm: (reason?: string) => Promise<void>;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    actionLabel: "Confirm",
+    onConfirm: async () => {},
+  });
+  const [modalReasonInput, setModalReasonInput] = useState("");
+  const [modalSubmitting, setModalSubmitting] = useState(false);
 
   // Delivered Orders Tab Filters
   const [deliveredQuery, setDeliveredQuery] = useState("");
@@ -291,6 +328,18 @@ export default function AdminPage() {
     description: "10% off",
   });
   const [savingPromoSettings, setSavingPromoSettings] = useState(false);
+
+  // Delivery & Shipping Fee Settings State
+  const [shippingSettings, setShippingSettings] = useState<{
+    standardDeliveryFee: number;
+    freeDeliveryThreshold: number;
+    enabled: boolean;
+  }>({
+    standardDeliveryFee: 250,
+    freeDeliveryThreshold: 5000,
+    enabled: true,
+  });
+  const [savingShippingSettings, setSavingShippingSettings] = useState(false);
 
   // Edit Panel — Colors Sub-section
   const [dbColors, setDbColors] = useState<ProductColor[]>([]);
@@ -391,13 +440,19 @@ export default function AdminPage() {
     setLoading(true);
     setError(null);
     try {
-      const [resProd, resOrd, resSet, resBundle, resPromo] = await Promise.all([
+      const [resProd, resOrd, resSet, resBundle, resPromo, resShipping] = await Promise.all([
         authFetch("/api/admin/products"),
         authFetch("/api/admin/orders"),
         authFetch("/api/admin/settings").catch(() => null),
         authFetch("/api/admin/bundle-pricing").catch(() => null),
         authFetch("/api/admin/promo").catch(() => null),
+        authFetch("/api/admin/shipping-settings").catch(() => null),
       ]);
+
+      if (resShipping && resShipping.ok) {
+        const sData = await resShipping.json();
+        setShippingSettings(sData);
+      }
 
       if (resPromo && resPromo.ok) {
         const pData = await resPromo.json();
@@ -432,10 +487,13 @@ export default function AdminPage() {
           }));
           return {
             ...o,
+            orderStatus: o.orderStatus || (o.status === "cancelled" ? "CANCELLED" : o.status === "on_hold" ? "ON_HOLD" : (o.trackingNumber || o.postexTrackingNumber || o.courierBookingStatus === "booked") ? "BOOKED" : "READY_TO_SHIP"),
+            trackingNumber: o.trackingNumber || o.postexTrackingNumber || null,
             customerName: cName,
             customerEmail: cEmail,
             shippingInfo: sInfo,
             orderItems: items,
+            auditLogs: o.auditLogs || [],
           };
         });
         setOrders(mappedOrders);
@@ -1230,6 +1288,166 @@ export default function AdminPage() {
     }
   }
 
+  // Order Lifecycle Handlers (POST /api/admin/orders/[id]/lifecycle)
+  async function handleOrderLifecycle(
+    orderId: string,
+    action: "SEND_POSTEX" | "HOLD" | "RELEASE" | "CANCEL",
+    reason?: string
+  ) {
+    setUpdatingStatusId(orderId);
+    try {
+      const res = await authFetch(`/api/admin/orders/${orderId}/lifecycle`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, reason }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || data.message || "Failed to execute lifecycle action");
+      }
+      showToast(data.message || "Order updated successfully!");
+      loadMainData();
+    } catch (err: any) {
+      showToast(err.message || "Action failed", "error");
+    } finally {
+      setUpdatingStatusId(null);
+    }
+  }
+
+  function promptCancelOrder(order: AdminOrder) {
+    const hasTracking = !!(order.trackingNumber || order.postexTrackingNumber || order.courierBookingStatus === "booked");
+    setModalReasonInput("");
+    setConfirmModal({
+      isOpen: true,
+      title: `Cancel Order #${order.id.slice(-8)}`,
+      message: hasTracking
+        ? `This order is booked with PostEx (Tracking: ${order.trackingNumber || order.postexTrackingNumber}). Cancelling will invoke PostEx's cancel-order API, release reserved stock, and set the status to Cancelled.`
+        : "Are you sure you want to cancel this order? Reserved stock will be returned to inventory.",
+      actionLabel: "Cancel Order",
+      danger: true,
+      requiresReason: false,
+      reasonPlaceholder: "Cancellation reason (optional)",
+      onConfirm: async (reason) => {
+        await handleOrderLifecycle(order.id, "CANCEL", reason);
+      },
+    });
+  }
+
+  function promptHoldOrder(order: AdminOrder) {
+    setModalReasonInput("");
+    setConfirmModal({
+      isOpen: true,
+      title: `Put Order #${order.id.slice(-8)} on Hold`,
+      message: "This order will be paused and excluded from any automatic or bulk dispatch flows until released.",
+      actionLabel: "Put on Hold",
+      danger: false,
+      requiresReason: false,
+      reasonPlaceholder: "Reason for hold (optional)",
+      onConfirm: async (reason) => {
+        await handleOrderLifecycle(order.id, "HOLD", reason);
+      },
+    });
+  }
+
+  async function handleBulkAction(
+    action: "send_postex" | "hold" | "release" | "cancel",
+    reason?: string
+  ) {
+    const ids = Array.from(selectedOrderIds);
+    if (ids.length === 0) return;
+
+    setLoading(true);
+    try {
+      const res = await authFetch("/api/admin/orders/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, action, reason }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Bulk action failed");
+      }
+
+      const successes = (data.results || []).filter((r: any) => r.ok).length;
+      const failures = (data.results || []).filter((r: any) => !r.ok);
+
+      if (failures.length > 0) {
+        const errMsgs = failures.map((f: any) => `${f.id.slice(-6)}: ${f.error}`).join("; ");
+        showToast(`${successes} succeeded, ${failures.length} failed (${errMsgs})`, "error");
+      } else {
+        const actionTitle =
+          action === "send_postex"
+            ? "sent to PostEx"
+            : action === "hold"
+            ? "placed on hold"
+            : action === "release"
+            ? "released from hold"
+            : "cancelled";
+        showToast(`Bulk action complete: ${successes} order(s) ${actionTitle}!`);
+      }
+
+      setSelectedOrderIds(new Set());
+      loadMainData();
+    } catch (err: any) {
+      showToast(err.message || "Bulk action failed", "error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function promptBulkAction(action: "send_postex" | "hold" | "cancel") {
+    const count = selectedOrderIds.size;
+    if (count === 0) return;
+
+    setModalReasonInput("");
+
+    if (action === "cancel") {
+      setConfirmModal({
+        isOpen: true,
+        title: `Cancel ${count} Selected Orders`,
+        message: `Are you sure you want to cancel ${count} orders? Any active PostEx bookings will be cancelled with PostEx and stock will be returned to inventory.`,
+        actionLabel: `Cancel ${count} Orders`,
+        danger: true,
+        requiresReason: false,
+        reasonPlaceholder: "Cancellation reason (optional)",
+        onConfirm: async (reason) => {
+          await handleBulkAction("cancel", reason);
+        },
+      });
+      return;
+    }
+
+    if (count >= 2) {
+      if (action === "send_postex") {
+        setConfirmModal({
+          isOpen: true,
+          title: `Send ${count} Orders to PostEx`,
+          message: `Are you sure you want to create courier bookings with PostEx for ${count} orders? (Orders on hold or already booked will be skipped).`,
+          actionLabel: `Send to PostEx (${count})`,
+          danger: false,
+          onConfirm: async () => {
+            await handleBulkAction("send_postex");
+          },
+        });
+      } else if (action === "hold") {
+        setConfirmModal({
+          isOpen: true,
+          title: `Put ${count} Orders on Hold`,
+          message: `Are you sure you want to pause ${count} orders? They will be excluded from shipping batches until released.`,
+          actionLabel: `Put on Hold (${count})`,
+          danger: false,
+          reasonPlaceholder: "Reason for hold (optional)",
+          onConfirm: async (reason) => {
+            await handleBulkAction("hold", reason);
+          },
+        });
+      }
+    } else {
+      // 1 order selected: execute directly
+      handleBulkAction(action);
+    }
+  }
+
   // Courier Queue Actions
   async function handleRunBatchNow() {
     setCourierActionId("batch");
@@ -1437,6 +1655,61 @@ export default function AdminPage() {
     }
   }
 
+  // Save Delivery Fee & Shipping Settings
+  async function handleSaveShippingSettings() {
+    setSavingShippingSettings(true);
+    try {
+      const res = await authFetch("/api/admin/shipping-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(shippingSettings),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.settings) setShippingSettings(data.settings);
+        showToast("Updated delivery fee and shipping settings!");
+      } else {
+        showToast("Failed to save delivery settings", "error");
+      }
+    } catch {
+      showToast("Failed to update delivery settings", "error");
+    } finally {
+      setSavingShippingSettings(false);
+    }
+  }
+
+  // ─── ORDER LIFECYCLE HELPERS ─────────────────────────
+  function isOrderOnHold(o: AdminOrder): boolean {
+    return o.orderStatus === "ON_HOLD" || o.status.toLowerCase() === "on_hold";
+  }
+
+  function isOrderCancelled(o: AdminOrder): boolean {
+    return o.orderStatus === "CANCELLED" || o.status.toLowerCase() === "cancelled";
+  }
+
+  function isOrderBooked(o: AdminOrder): boolean {
+    if (isOrderCancelled(o) || isOrderOnHold(o)) return false;
+    return (
+      o.orderStatus === "BOOKED" ||
+      o.courierBookingStatus === "booked" ||
+      !!(o.trackingNumber || o.postexTrackingNumber)
+    );
+  }
+
+  function isOrderDelivered(o: AdminOrder): boolean {
+    return (
+      o.status.toLowerCase() === "delivered" ||
+      (o.courierStatusRaw?.toLowerCase().includes("delivered") ?? false)
+    );
+  }
+
+  function isOrderReadyToShip(o: AdminOrder): boolean {
+    if (isOrderOnHold(o) || isOrderCancelled(o) || isOrderBooked(o) || isOrderDelivered(o)) {
+      return false;
+    }
+    return true;
+  }
+
   // ─── DERIVED FILTERED DATA ─────────────────────────────
 
   // Filtered Orders for Orders Tab
@@ -1447,7 +1720,14 @@ export default function AdminPage() {
     const thirtyDaysAgo = now.getTime() - 30 * 24 * 60 * 60 * 1000;
 
     return orders.filter((o) => {
-      // 1. Status Filter
+      // 0. Primary Status Filter Tab
+      if (orderStatusTab === "on_hold" && !isOrderOnHold(o)) return false;
+      if (orderStatusTab === "ready_to_ship" && !isOrderReadyToShip(o)) return false;
+      if (orderStatusTab === "booked" && !isOrderBooked(o)) return false;
+      if (orderStatusTab === "delivered" && !isOrderDelivered(o)) return false;
+      if (orderStatusTab === "cancelled" && !isOrderCancelled(o)) return false;
+
+      // 1. Secondary Status Dropdown Filter
       if (orderStatusFilter !== "all" && o.status.toLowerCase() !== orderStatusFilter.toLowerCase()) {
         return false;
       }
@@ -1469,12 +1749,13 @@ export default function AdminPage() {
         const mName = o.customerName?.toLowerCase().includes(q) ?? false;
         const mEmail = o.customerEmail?.toLowerCase().includes(q) ?? false;
         const mId = o.id.toLowerCase().includes(q);
-        if (!mName && !mEmail && !mId) return false;
+        const mTracking = (o.trackingNumber || o.postexTrackingNumber)?.toLowerCase().includes(q) ?? false;
+        if (!mName && !mEmail && !mId && !mTracking) return false;
       }
 
       return true;
     });
-  }, [orders, orderStatusFilter, orderCustomerFilter, orderDateFilter, orderQuery]);
+  }, [orders, orderStatusTab, orderStatusFilter, orderCustomerFilter, orderDateFilter, orderQuery]);
 
   // Filtered Delivered Orders for Delivered Tab
   const filteredDeliveredOrders = useMemo(() => {
@@ -2072,8 +2353,8 @@ export default function AdminPage() {
                           <td>{o.customerName}</td>
                           <td>{fmtPrice(o.total)}</td>
                           <td>
-                            <span className="badge" style={{ background: "var(--admin-surface-2)", textTransform: "capitalize" }}>
-                              {o.status}
+                            <span className={`badge badge-${o.orderStatus === "ON_HOLD" ? "warn" : o.orderStatus === "CANCELLED" ? "danger" : o.orderStatus === "BOOKED" ? "info" : "neutral"}`}>
+                              {o.orderStatus || o.status}
                             </span>
                           </td>
                         </tr>
@@ -2084,28 +2365,96 @@ export default function AdminPage() {
               </div>
             </div>
           ) : activeTab === "orders" ? (
-            /* TAB 2: ORDERS */
+            /* TAB 2: ORDERS WITH LIFECYCLE MANAGEMENT */
             <div className="panel">
-              {/* Filter Toolbar */}
-              <div className="panel-head" style={{ flexDirection: "column", alignItems: "stretch", gap: 12 }}>
+              {/* STATUS FILTER TABS */}
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  flexWrap: "wrap",
+                  padding: "16px 20px 12px",
+                  borderBottom: "1px solid var(--admin-border)",
+                  background: "var(--admin-surface)",
+                }}
+              >
+                {[
+                  { id: "all", label: "All", count: orders.length },
+                  { id: "on_hold", label: "On Hold", count: orders.filter(isOrderOnHold).length },
+                  { id: "ready_to_ship", label: "Ready to Ship", count: orders.filter(isOrderReadyToShip).length },
+                  { id: "booked", label: "Booked", count: orders.filter(isOrderBooked).length },
+                  { id: "delivered", label: "Delivered", count: orders.filter(isOrderDelivered).length },
+                  { id: "cancelled", label: "Cancelled", count: orders.filter(isOrderCancelled).length },
+                ].map((t) => {
+                  const isActive = orderStatusTab === t.id;
+                  let activeBg = "var(--admin-accent)";
+                  let activeColor = "#111";
+
+                  if (t.id === "on_hold") {
+                    activeBg = "#f59e0b";
+                    activeColor = "#111";
+                  } else if (t.id === "cancelled") {
+                    activeBg = "#ef4444";
+                    activeColor = "#fff";
+                  } else if (t.id === "delivered") {
+                    activeBg = "#10b981";
+                    activeColor = "#fff";
+                  } else if (t.id === "booked") {
+                    activeBg = "#3b82f6";
+                    activeColor = "#fff";
+                  }
+
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => {
+                        setOrderStatusTab(t.id as any);
+                        setSelectedOrderIds(new Set());
+                      }}
+                      style={{
+                        padding: "6px 14px",
+                        borderRadius: 20,
+                        border: isActive ? `1.5px solid ${activeBg}` : "1px solid var(--admin-border)",
+                        background: isActive ? activeBg : "var(--admin-surface-2)",
+                        color: isActive ? activeColor : "var(--admin-text)",
+                        fontWeight: isActive ? 800 : 600,
+                        fontSize: 13,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      <span>{t.label}</span>
+                      <span
+                        style={{
+                          background: isActive ? "rgba(0,0,0,0.2)" : "var(--admin-surface)",
+                          color: isActive ? activeColor : "var(--admin-text-soft)",
+                          padding: "1px 6px",
+                          borderRadius: 10,
+                          fontSize: 11,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {t.count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Secondary Filter Toolbar */}
+              <div className="panel-head" style={{ flexDirection: "column", alignItems: "stretch", gap: 12, padding: "14px 20px" }}>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
                   <input
                     type="text"
-                    placeholder="Search name, email, ID…"
+                    placeholder="Search customer, phone, ID, tracking #…"
                     value={orderQuery}
                     onChange={(e) => setOrderQuery(e.target.value)}
-                    style={{ minWidth: 200, flex: 1 }}
+                    style={{ minWidth: 240, flex: 1 }}
                   />
-                  <select value={orderStatusFilter} onChange={(e) => setOrderStatusFilter(e.target.value)}>
-                    <option value="all">All Statuses</option>
-                    <option value="placed">Placed</option>
-                    <option value="confirmed">Confirmed</option>
-                    <option value="on_hold">On Hold</option>
-                    <option value="shipped">Shipped</option>
-                    <option value="delivered">Delivered</option>
-                    <option value="returned">Returned</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
                   <select value={orderCustomerFilter} onChange={(e) => setOrderCustomerFilter(e.target.value)}>
                     <option value="all">All Customers</option>
                     <option value="account">Account Only</option>
@@ -2117,15 +2466,17 @@ export default function AdminPage() {
                     <option value="7days">Last 7 Days</option>
                     <option value="30days">Last 30 Days</option>
                   </select>
-                  {(orderStatusFilter !== "all" || orderCustomerFilter !== "all" || orderDateFilter !== "all" || orderQuery !== "") && (
+                  {(orderCustomerFilter !== "all" || orderDateFilter !== "all" || orderQuery !== "" || orderStatusTab !== "all") && (
                     <button
                       type="button"
                       className="btn btn-outline btn-sm"
                       onClick={() => {
+                        setOrderStatusTab("all");
                         setOrderStatusFilter("all");
                         setOrderCustomerFilter("all");
                         setOrderDateFilter("all");
                         setOrderQuery("");
+                        setSelectedOrderIds(new Set());
                       }}
                     >
                       Reset Filters
@@ -2134,63 +2485,288 @@ export default function AdminPage() {
                 </div>
               </div>
 
+              {/* BULK ACTION BAR */}
+              {selectedOrderIds.size > 0 && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    flexWrap: "wrap",
+                    gap: 12,
+                    background: "rgba(200, 255, 0, 0.08)",
+                    borderTop: "1px solid var(--admin-accent)",
+                    borderBottom: "1px solid var(--admin-accent)",
+                    padding: "10px 20px",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span
+                      style={{
+                        background: "var(--admin-accent)",
+                        color: "#111",
+                        fontWeight: 800,
+                        fontSize: 12,
+                        padding: "2px 8px",
+                        borderRadius: 12,
+                      }}
+                    >
+                      {selectedOrderIds.size}
+                    </span>
+                    <strong style={{ fontSize: 13.5 }}>
+                      {selectedOrderIds.size} order{selectedOrderIds.size > 1 ? "s" : ""} selected
+                    </strong>
+                  </div>
+
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      style={{ background: "var(--admin-accent)", color: "#111", fontWeight: 700 }}
+                      onClick={() => promptBulkAction("send_postex")}
+                    >
+                      Send to PostEx
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      onClick={() => promptBulkAction("hold")}
+                    >
+                      Put on Hold
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      style={{ color: "var(--admin-danger)", borderColor: "var(--admin-danger)" }}
+                      onClick={() => promptBulkAction("cancel")}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      onClick={() => setSelectedOrderIds(new Set())}
+                    >
+                      Deselect All
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Table */}
               <div className="table-scroll">
                 <table className="admin-table">
                   <thead>
                     <tr>
+                      <th style={{ width: 38, textAlign: "center" }}>
+                        <input
+                          type="checkbox"
+                          aria-label="Select all orders"
+                          checked={
+                            filteredOrders.length > 0 &&
+                            filteredOrders.every((o) => selectedOrderIds.has(o.id))
+                          }
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              const s = new Set<string>();
+                              filteredOrders.forEach((o) => s.add(o.id));
+                              setSelectedOrderIds(s);
+                            } else {
+                              setSelectedOrderIds(new Set());
+                            }
+                          }}
+                        />
+                      </th>
                       <th>Order ID</th>
                       <th>Date</th>
                       <th>Customer</th>
                       <th>Items</th>
                       <th>Total</th>
-                      <th>Payment</th>
-                      <th>Status</th>
-                      <th>Actions</th>
+                      <th>Lifecycle State</th>
+                      <th>PostEx / Tracking</th>
+                      <th>Quick Actions</th>
+                      <th>Details</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredOrders.length === 0 ? (
                       <tr>
-                        <td colSpan={8} style={{ textAlign: "center", padding: 32 }}>
+                        <td colSpan={10} style={{ textAlign: "center", padding: 36, color: "var(--admin-text-soft)" }}>
                           No orders match the selected filters.
                         </td>
                       </tr>
                     ) : (
                       filteredOrders.map((o) => {
-                        const st = o.status.toLowerCase();
-                        let badgeBg = "var(--admin-warn-bg)";
-                        let badgeColor = "var(--admin-warn)";
-
-                        if (st === "shipped") {
-                          badgeBg = "var(--admin-info-bg)";
-                          badgeColor = "var(--admin-info)";
-                        } else if (st === "delivered") {
-                          badgeBg = "var(--admin-success-bg)";
-                          badgeColor = "var(--admin-success)";
-                        } else if (st === "cancelled") {
-                          badgeBg = "var(--admin-danger-bg)";
-                          badgeColor = "var(--admin-danger)";
-                        }
-
                         const isExpanded = expandedOrderId === o.id;
+                        const isSelected = selectedOrderIds.has(o.id);
+                        const isUpdating = updatingStatusId === o.id;
+
+                        const onHold = isOrderOnHold(o);
+                        const cancelled = isOrderCancelled(o);
+                        const booked = isOrderBooked(o);
+                        const delivered = isOrderDelivered(o);
+                        const readyToShip = isOrderReadyToShip(o);
+
+                        const trackingNum = o.trackingNumber || o.postexTrackingNumber;
+
+                        let statusLabel = "READY TO SHIP";
+                        let statusBg = "rgba(200, 255, 0, 0.15)";
+                        let statusColor = "var(--admin-accent)";
+
+                        if (onHold) {
+                          statusLabel = "ON HOLD";
+                          statusBg = "rgba(245, 158, 11, 0.18)";
+                          statusColor = "#f59e0b";
+                        } else if (cancelled) {
+                          statusLabel = "CANCELLED";
+                          statusBg = "rgba(239, 68, 68, 0.18)";
+                          statusColor = "#ef4444";
+                        } else if (delivered) {
+                          statusLabel = "DELIVERED";
+                          statusBg = "rgba(16, 185, 129, 0.18)";
+                          statusColor = "#10b981";
+                        } else if (booked) {
+                          statusLabel = "BOOKED";
+                          statusBg = "rgba(59, 130, 246, 0.18)";
+                          statusColor = "#3b82f6";
+                        }
 
                         return (
                           <React.Fragment key={o.id}>
-                            <tr>
-                              <td><strong>#{o.id.slice(-8)}</strong></td>
-                              <td>{formatDate(o.createdAt)}</td>
+                            <tr style={{ background: isSelected ? "rgba(200, 255, 0, 0.04)" : undefined }}>
+                              <td style={{ textAlign: "center" }}>
+                                <input
+                                  type="checkbox"
+                                  aria-label={`Select order ${o.id}`}
+                                  checked={isSelected}
+                                  onChange={(e) => {
+                                    const next = new Set(selectedOrderIds);
+                                    if (e.target.checked) {
+                                      next.add(o.id);
+                                    } else {
+                                      next.delete(o.id);
+                                    }
+                                    setSelectedOrderIds(next);
+                                  }}
+                                />
+                              </td>
                               <td>
-                                <div><strong>{o.customerName}</strong></div>
-                                <div style={{ fontSize: 12, color: "var(--admin-text-soft)" }}>{o.customerEmail}</div>
+                                <strong>#{o.id.slice(-8)}</strong>
+                              </td>
+                              <td style={{ fontSize: 13, color: "var(--admin-text-soft)" }}>
+                                {formatDate(o.createdAt)}
+                              </td>
+                              <td>
+                                <div>
+                                  <strong>{o.customerName}</strong>
+                                </div>
+                                <div style={{ fontSize: 12, color: "var(--admin-text-soft)" }}>
+                                  {o.customerEmail}
+                                </div>
                               </td>
                               <td>{o.orderItems.reduce((s, i) => s + i.quantity, 0)}</td>
-                              <td>{fmtPrice(o.total)}</td>
-                              <td style={{ textTransform: "uppercase" }}>{o.payment}</td>
                               <td>
-                                <span className="badge" style={{ background: badgeBg, color: badgeColor, textTransform: "capitalize" }}>
-                                  {st}
+                                <strong>{fmtPrice(o.total)}</strong>
+                              </td>
+                              <td>
+                                <span
+                                  className="badge"
+                                  style={{
+                                    background: statusBg,
+                                    color: statusColor,
+                                    fontWeight: 700,
+                                    fontSize: 11,
+                                    letterSpacing: "0.03em",
+                                  }}
+                                >
+                                  {statusLabel}
                                 </span>
+                              </td>
+                              <td>
+                                {trackingNum ? (
+                                  <a
+                                    href={`https://postex.pk/tracking?trackingNumber=${trackingNum}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    style={{
+                                      color: "var(--admin-accent)",
+                                      textDecoration: "underline",
+                                      fontWeight: 700,
+                                      fontSize: 12.5,
+                                    }}
+                                  >
+                                    {trackingNum}
+                                  </a>
+                                ) : onHold ? (
+                                  <span style={{ fontSize: 12, color: "#f59e0b" }}>Paused (On Hold)</span>
+                                ) : (
+                                  <span style={{ fontSize: 12, color: "var(--admin-text-soft)" }}>Not booked</span>
+                                )}
+                              </td>
+                              <td>
+                                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                                  {readyToShip && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        className="btn btn-primary btn-sm"
+                                        disabled={isUpdating}
+                                        style={{ background: "var(--admin-accent)", color: "#111", fontSize: 11.5, padding: "4px 8px" }}
+                                        onClick={() => handleOrderLifecycle(o.id, "SEND_POSTEX")}
+                                      >
+                                        Send to PostEx
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="btn btn-outline btn-sm"
+                                        disabled={isUpdating}
+                                        style={{ fontSize: 11.5, padding: "4px 8px" }}
+                                        onClick={() => promptHoldOrder(o)}
+                                      >
+                                        Put on Hold
+                                      </button>
+                                    </>
+                                  )}
+
+                                  {onHold && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        className="btn btn-outline btn-sm"
+                                        disabled={isUpdating}
+                                        style={{ fontSize: 11.5, padding: "4px 8px", borderColor: "var(--admin-accent)", color: "var(--admin-accent)" }}
+                                        onClick={() => handleOrderLifecycle(o.id, "RELEASE")}
+                                      >
+                                        Release Hold
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="btn btn-outline btn-sm"
+                                        disabled={isUpdating}
+                                        style={{ fontSize: 11.5, padding: "4px 8px", color: "var(--admin-danger)", borderColor: "var(--admin-danger)" }}
+                                        onClick={() => promptCancelOrder(o)}
+                                      >
+                                        Cancel Order
+                                      </button>
+                                    </>
+                                  )}
+
+                                  {booked && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-outline btn-sm"
+                                      disabled={isUpdating}
+                                      style={{ fontSize: 11.5, padding: "4px 8px", color: "var(--admin-danger)", borderColor: "var(--admin-danger)" }}
+                                      onClick={() => promptCancelOrder(o)}
+                                    >
+                                      Cancel Order
+                                    </button>
+                                  )}
+
+                                  {cancelled && (
+                                    <span style={{ fontSize: 12, color: "var(--admin-danger)" }}>Cancelled</span>
+                                  )}
+                                </div>
                               </td>
                               <td>
                                 <button
@@ -2203,10 +2779,10 @@ export default function AdminPage() {
                               </td>
                             </tr>
 
-                            {/* EXPANDED INLINE DETAILS */}
+                            {/* EXPANDED INLINE DETAILS & AUDIT LOG */}
                             {isExpanded && (
                               <tr>
-                                <td colSpan={8} style={{ background: "var(--admin-surface-2)", padding: 20 }}>
+                                <td colSpan={10} style={{ background: "var(--admin-surface-2)", padding: 20 }}>
                                   <div className="order-details-grid">
                                     <div>
                                       <div style={{ fontWeight: 700, marginBottom: 6 }}>Customer Info</div>
@@ -2218,55 +2794,38 @@ export default function AdminPage() {
                                       <div style={{ fontWeight: 700, marginBottom: 6 }}>Shipping &amp; Payment</div>
                                       <div>Address: {o.shippingInfo?.address || "N/A"}</div>
                                       <div>City: {o.shippingInfo?.city || "N/A"}</div>
+                                      <div>Phone: {o.shippingInfo?.phone || "N/A"}</div>
                                       <div>Payment: {o.payment?.toUpperCase()}</div>
                                     </div>
                                     <div>
-                                      <div style={{ fontWeight: 700, marginBottom: 6 }}>PostEx Courier Status</div>
-                                      <div>Booking Status: <strong>{o.courierBookingStatus || "N/A"}</strong></div>
+                                      <div style={{ fontWeight: 700, marginBottom: 6 }}>Lifecycle &amp; Courier</div>
+                                      <div>
+                                        Lifecycle Status: <strong style={{ color: statusColor }}>{statusLabel}</strong>
+                                      </div>
+                                      <div>
+                                        Booking Status: <strong>{o.courierBookingStatus || "N/A"}</strong>
+                                      </div>
                                       <div>
                                         Tracking #:{" "}
-                                        {o.postexTrackingNumber ? (
+                                        {trackingNum ? (
                                           <a
-                                            href={`https://postex.pk/tracking?trackingNumber=${o.postexTrackingNumber}`}
+                                            href={`https://postex.pk/tracking?trackingNumber=${trackingNum}`}
                                             target="_blank"
                                             rel="noreferrer"
                                             style={{ color: "var(--admin-accent)", textDecoration: "underline", fontWeight: 700 }}
                                           >
-                                            {o.postexTrackingNumber}
+                                            {trackingNum}
                                           </a>
                                         ) : (
                                           "Not booked"
                                         )}
                                       </div>
-                                      <div>PostEx Status: {o.postexStatus || "N/A"}</div>
-                                      <div style={{ marginTop: 8 }}>
-                                        <label style={{ fontWeight: 700, marginRight: 8 }}>Update Status:</label>
-                                        {allowedNext(o.status as OrderStatus).length === 0 ? (
-                                          <span className="badge" style={{ textTransform: "capitalize", background: "#333", color: "#aaa" }}>
-                                            {o.status} (Final)
-                                          </span>
-                                        ) : (
-                                          <select
-                                            value={o.status}
-                                            disabled={updatingStatusId === o.id}
-                                            onChange={(e) => handleUpdateOrderStatus(o, e.target.value)}
-                                          >
-                                            <option value={o.status} disabled>
-                                              {o.status.toUpperCase()} (Current)
-                                            </option>
-                                            {allowedNext(o.status as OrderStatus).map((nextSt) => (
-                                              <option key={nextSt} value={nextSt}>
-                                                {nextSt.toUpperCase()}
-                                              </option>
-                                            ))}
-                                          </select>
-                                        )}
-                                      </div>
+                                      <div>Courier Status Raw: {o.courierStatusRaw || "N/A"}</div>
                                     </div>
                                   </div>
 
-                                  {/* Items List */}
-                                  <div style={{ fontWeight: 700, marginBottom: 8 }}>Order Items</div>
+                                  {/* Order Items */}
+                                  <div style={{ fontWeight: 700, marginTop: 18, marginBottom: 8 }}>Order Items</div>
                                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                                     {o.orderItems.map((item) => (
                                       <div
@@ -2275,8 +2834,8 @@ export default function AdminPage() {
                                           display: "flex",
                                           alignItems: "center",
                                           justifyContent: "space-between",
-                                          background: "#1f1f1f",
-                                          color: "#f5f5f5",
+                                          background: "var(--admin-surface)",
+                                          color: "var(--admin-text)",
                                           padding: "10px 14px",
                                           borderRadius: 6,
                                           border: "1px solid var(--admin-border)",
@@ -2293,24 +2852,113 @@ export default function AdminPage() {
                                               style={{ objectFit: "cover", borderRadius: 4 }}
                                             />
                                           )}
-                                          <div style={{ color: "#f5f5f5" }}>
-                                            <strong style={{ color: "#ffffff" }}>{item.product?.name || item.productId}</strong>{" "}
-                                            <span style={{ color: "rgba(245, 245, 245, 0.8)", fontSize: "12.5px" }}>
+                                          <div>
+                                            <strong>{item.product?.name || item.productId}</strong>{" "}
+                                            <span style={{ color: "var(--admin-text-soft)", fontSize: "12.5px" }}>
                                               ({item.color}/{item.size})
                                             </span>
                                           </div>
                                         </div>
-                                        <div style={{ color: "#f5f5f5", fontSize: "13.5px" }}>
+                                        <div style={{ fontSize: "13.5px" }}>
                                           {item.quantity} × {fmtPrice(item.price)} ={" "}
-                                          <strong style={{ color: "#ffffff" }}>{fmtPrice(item.quantity * item.price)}</strong>
+                                          <strong>{fmtPrice(item.quantity * item.price)}</strong>
                                         </div>
                                       </div>
                                     ))}
                                   </div>
 
                                   {/* Totals */}
-                                  <div style={{ textAlign: "right", marginTop: 12, fontWeight: 700 }}>
+                                  <div style={{ textAlign: "right", marginTop: 12, marginBottom: 20, fontWeight: 700 }}>
                                     Total: {fmtPrice(o.total)}
+                                  </div>
+
+                                  {/* ORDER AUDIT LOG */}
+                                  <div style={{ borderTop: "1px solid var(--admin-border)", paddingTop: 16 }}>
+                                    <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
+                                      <span>Order Lifecycle &amp; Audit History</span>
+                                      <span
+                                        style={{
+                                          fontSize: 11,
+                                          background: "var(--admin-surface)",
+                                          padding: "2px 8px",
+                                          borderRadius: 10,
+                                          color: "var(--admin-text-soft)",
+                                        }}
+                                      >
+                                        {o.auditLogs?.length || 0} events
+                                      </span>
+                                    </div>
+
+                                    {!o.auditLogs || o.auditLogs.length === 0 ? (
+                                      <div style={{ fontSize: 13, color: "var(--admin-text-soft)", padding: "8px 0" }}>
+                                        No audit entries recorded for this order yet.
+                                      </div>
+                                    ) : (
+                                      <div style={{ overflowX: "auto" }}>
+                                        <table className="admin-table" style={{ fontSize: 12.5, background: "var(--admin-surface)" }}>
+                                          <thead>
+                                            <tr>
+                                              <th style={{ padding: "6px 10px" }}>Timestamp</th>
+                                              <th style={{ padding: "6px 10px" }}>Action</th>
+                                              <th style={{ padding: "6px 10px" }}>Admin / Actor</th>
+                                              <th style={{ padding: "6px 10px" }}>Notes / Details</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {o.auditLogs.map((log) => {
+                                              let logBg = "var(--admin-surface-2)";
+                                              let logColor = "var(--admin-text)";
+                                              if (log.action === "HOLD") {
+                                                logBg = "rgba(245, 158, 11, 0.18)";
+                                                logColor = "#f59e0b";
+                                              } else if (log.action === "RELEASE") {
+                                                logBg = "rgba(200, 255, 0, 0.15)";
+                                                logColor = "var(--admin-accent)";
+                                              } else if (log.action === "CANCEL") {
+                                                logBg = "rgba(239, 68, 68, 0.18)";
+                                                logColor = "#ef4444";
+                                              } else if (log.action === "SEND_POSTEX") {
+                                                logBg = "rgba(59, 130, 246, 0.18)";
+                                                logColor = "#3b82f6";
+                                              }
+
+                                              return (
+                                                <tr key={log.id}>
+                                                  <td style={{ padding: "6px 10px", color: "var(--admin-text-soft)", whiteSpace: "nowrap" }}>
+                                                    {new Date(log.createdAt).toLocaleString("en-PK", {
+                                                      day: "2-digit",
+                                                      month: "short",
+                                                      year: "numeric",
+                                                      hour: "2-digit",
+                                                      minute: "2-digit",
+                                                    })}
+                                                  </td>
+                                                  <td style={{ padding: "6px 10px" }}>
+                                                    <span
+                                                      className="badge"
+                                                      style={{
+                                                        background: logBg,
+                                                        color: logColor,
+                                                        fontWeight: 700,
+                                                        fontSize: 10.5,
+                                                      }}
+                                                    >
+                                                      {log.action}
+                                                    </span>
+                                                  </td>
+                                                  <td style={{ padding: "6px 10px", fontWeight: 600 }}>
+                                                    {log.adminUser}
+                                                  </td>
+                                                  <td style={{ padding: "6px 10px", color: "var(--admin-text)" }}>
+                                                    {log.note || "-"}
+                                                  </td>
+                                                </tr>
+                                              );
+                                            })}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    )}
                                   </div>
                                 </td>
                               </tr>
@@ -3959,6 +4607,87 @@ export default function AdminPage() {
           ) : (
             /* TAB 8: SETTINGS */
             <div style={{ display: "flex", flexDirection: "column", gap: 24, maxWidth: 840 }}>
+              {/* Delivery & Shipping Fee Settings Panel */}
+              <div className="panel" style={{ padding: 24 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+                  <div>
+                    <h3 style={{ margin: 0 }}>Delivery &amp; Shipping Fee Settings</h3>
+                    <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--admin-text-soft)" }}>
+                      Configure flat-rate delivery charges, free delivery minimum order threshold, and storefront shipping rules.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-dark btn-sm"
+                    disabled={savingShippingSettings}
+                    onClick={handleSaveShippingSettings}
+                  >
+                    {savingShippingSettings ? "Saving…" : "Save Delivery Settings"}
+                  </button>
+                </div>
+
+                <div className="admin-form-grid-2" style={{ gap: 20, marginBottom: 16 }}>
+                  <div className="field">
+                    <label>Standard Delivery Fee (PKR)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={shippingSettings.standardDeliveryFee}
+                      onChange={(e) =>
+                        setShippingSettings((prev) => ({
+                          ...prev,
+                          standardDeliveryFee: Number(e.target.value),
+                        }))
+                      }
+                    />
+                    <span style={{ fontSize: 11.5, color: "var(--admin-text-soft)", marginTop: 4 }}>
+                      Flat delivery charge added to customer orders during checkout.
+                    </span>
+                  </div>
+
+                  <div className="field">
+                    <label>Free Delivery Minimum Subtotal (PKR)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={shippingSettings.freeDeliveryThreshold}
+                      onChange={(e) =>
+                        setShippingSettings((prev) => ({
+                          ...prev,
+                          freeDeliveryThreshold: Number(e.target.value),
+                        }))
+                      }
+                    />
+                    <span style={{ fontSize: 11.5, color: "var(--admin-text-soft)", marginTop: 4 }}>
+                      Orders at or above this subtotal qualify for free shipping. Set to 0 to disable free delivery.
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8, padding: "12px 16px", background: "var(--admin-surface-2)", borderRadius: 6 }}>
+                  <input
+                    type="checkbox"
+                    id="shipping-enabled-toggle"
+                    checked={shippingSettings.enabled}
+                    onChange={(e) =>
+                      setShippingSettings((prev) => ({
+                        ...prev,
+                        enabled: e.target.checked,
+                      }))
+                    }
+                    style={{ width: 16, height: 16, cursor: "pointer" }}
+                  />
+                  <label htmlFor="shipping-enabled-toggle" style={{ margin: 0, cursor: "pointer", fontWeight: 600, fontSize: 13.5 }}>
+                    Enable delivery fee charges on storefront
+                  </label>
+                  <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 600, color: shippingSettings.enabled ? "var(--admin-success)" : "var(--admin-text-soft)" }}>
+                    {shippingSettings.enabled
+                      ? `Active: PKR ${shippingSettings.standardDeliveryFee} Delivery${shippingSettings.freeDeliveryThreshold > 0 ? ` · Free above PKR ${shippingSettings.freeDeliveryThreshold.toLocaleString()}` : ""}`
+                      : "Free Delivery Across All Orders (Charges Disabled)"}
+                  </span>
+                </div>
+              </div>
+
               {/* Promo Code & Discount Settings Panel */}
               <div className="panel" style={{ padding: 24 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
@@ -4327,6 +5056,91 @@ export default function AdminPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {confirmModal.isOpen && (
+        <div
+          className="modal-overlay"
+          onClick={() => {
+            if (!modalSubmitting) {
+              setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+              setModalReasonInput("");
+            }
+          }}
+        >
+          <div
+            className="modal"
+            style={{ maxWidth: 480 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-head">
+              <h3 style={{ color: confirmModal.danger ? "var(--admin-danger, #ef4444)" : "inherit" }}>
+                {confirmModal.title}
+              </h3>
+              <button
+                type="button"
+                className="modal-close"
+                disabled={modalSubmitting}
+                onClick={() => {
+                  setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+                  setModalReasonInput("");
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <p style={{ margin: 0, fontSize: 14, color: "var(--admin-text)", lineHeight: 1.5 }}>
+                {confirmModal.message}
+              </p>
+
+              {confirmModal.requiresReason && (
+                <div className="field" style={{ marginTop: 6 }}>
+                  <label style={{ fontSize: 13, fontWeight: 600 }}>Reason / Note (optional):</label>
+                  <textarea
+                    rows={3}
+                    placeholder={confirmModal.reasonPlaceholder || "e.g. Customer requested cancellation via WhatsApp"}
+                    value={modalReasonInput}
+                    onChange={(e) => setModalReasonInput(e.target.value)}
+                    style={{ width: "100%", marginTop: 4 }}
+                  />
+                </div>
+              )}
+            </div>
+            <div className="modal-foot" style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                disabled={modalSubmitting}
+                onClick={() => {
+                  setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+                  setModalReasonInput("");
+                }}
+              >
+                Dismiss
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm ${confirmModal.danger ? "btn-danger" : "btn-dark"}`}
+                style={confirmModal.danger ? { backgroundColor: "#dc2626", color: "#fff", borderColor: "#dc2626" } : {}}
+                disabled={modalSubmitting}
+                onClick={async () => {
+                  setModalSubmitting(true);
+                  try {
+                    await confirmModal.onConfirm(modalReasonInput.trim() || undefined);
+                    setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+                    setModalReasonInput("");
+                  } finally {
+                    setModalSubmitting(false);
+                  }
+                }}
+              >
+                {modalSubmitting ? "Processing…" : confirmModal.actionLabel}
+              </button>
+            </div>
           </div>
         </div>
       )}

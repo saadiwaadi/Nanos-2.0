@@ -1,66 +1,60 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useCallback } from "react";
 import Link from "next/link";
 import { AccountSummaryData } from "@/lib/account-summary";
 import { StatsStrip } from "./StatsStrip";
 import { ActiveOrders } from "./ActiveOrders";
 import { ReviewPrompts } from "./ReviewPrompts";
+import { useSWR } from "@/lib/swr";
 
 interface OverviewTabProps {
   userName?: string;
   onNavigateTab?: (tab: string) => void;
 }
 
-export function OverviewTab({ userName, onNavigateTab }: OverviewTabProps) {
-  const [data, setData] = useState<AccountSummaryData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
+export function OverviewTab({ userName }: OverviewTabProps) {
   const fetchSummary = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      let token: string | null = null;
-      if (typeof window !== "undefined") {
-        const raw = localStorage.getItem("nanos_auth_v1");
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          token = parsed.token || null;
-        }
+    let token: string | null = null;
+    if (typeof window !== "undefined") {
+      const raw = localStorage.getItem("nanos_auth_v1");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        token = parsed.token || null;
       }
-
-      if (!token) {
-        setLoading(false);
-        return;
-      }
-
-      const res = await fetch("/api/account/summary", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!res.ok) {
-        throw new Error("Failed to load account summary.");
-      }
-
-      const json = await res.json();
-      setData(json);
-    } catch (err: any) {
-      setError(err?.message || "Failed to load account overview.");
-    } finally {
-      setLoading(false);
     }
+
+    if (!token) {
+      throw new Error("User is not authenticated.");
+    }
+
+    const res = await fetch("/api/account/summary", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error("Failed to load account summary.");
+    }
+
+    return (await res.json()) as AccountSummaryData;
   }, []);
 
-  useEffect(() => {
-    fetchSummary();
-  }, [fetchSummary]);
+  // SWR: instantaneous render on returning visits, 60s background revalidation, quiet error handling
+  const {
+    data,
+    isLoading: loading,
+    error,
+    revalidate: fetchSummaryData,
+  } = useSWR<AccountSummaryData>("account:summary", fetchSummary, {
+    staleTime: 60 * 1000,
+  });
 
-  // Loading skeleton
-  if (loading) {
+  const errorMessage = error?.message || null;
+
+  // Loading skeleton (only on first-ever visit when no cached data exists)
+  if (loading && !data) {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         {/* Stats Strip Skeleton */}
@@ -110,8 +104,8 @@ export function OverviewTab({ userName, onNavigateTab }: OverviewTabProps) {
     );
   }
 
-  // Error state
-  if (error) {
+  // Error state (only if first load failed and we have no cached data to display)
+  if (errorMessage && !data) {
     return (
       <div
         style={{
@@ -126,10 +120,10 @@ export function OverviewTab({ userName, onNavigateTab }: OverviewTabProps) {
         <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 6 }}>
           Could not load your account overview
         </div>
-        <div style={{ fontSize: 13.5, color: "#666", marginBottom: 16 }}>{error}</div>
+        <div style={{ fontSize: 13.5, color: "#666", marginBottom: 16 }}>{errorMessage}</div>
         <button
           type="button"
-          onClick={fetchSummary}
+          onClick={() => fetchSummaryData()}
           className="btn btn-outline btn-sm"
           style={{ padding: "8px 18px", fontSize: 13 }}
         >
@@ -216,7 +210,7 @@ export function OverviewTab({ userName, onNavigateTab }: OverviewTabProps) {
       {/* 3. Review Prompts */}
       <ReviewPrompts
         items={data?.unreviewedItems || []}
-        onReviewSubmitted={() => fetchSummary()}
+        onReviewSubmitted={() => fetchSummaryData()}
       />
     </div>
   );

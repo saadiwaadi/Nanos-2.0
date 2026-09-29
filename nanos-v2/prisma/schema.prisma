@@ -138,6 +138,7 @@ model Order {
   payment        String   @default("cod") // "cod" | "card" | "easypaisa"
 
   // Lifecycle & booking pipeline
+  orderStatus          String    @default("READY_TO_SHIP") // NEW | ON_HOLD | READY_TO_SHIP | BOOKED | CANCELLED
   status               String    @default("placed")       // lifecycle
   courierBookingStatus String    @default("not_booked") @map("courierStatus")  // booking pipeline
   courierStatusRaw     String?                            // last raw PostEx status
@@ -158,12 +159,14 @@ model Order {
   items       OrderItem[]
   bookingLogs PostexBookingLog[]
   events      OrderEvent[]
+  auditLogs   OrderAuditLog[]
   reviews     Review[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([status, courierBookingStatus])
+  @@index([orderStatus])
   @@index([trackingNumber])
 }
 
@@ -193,6 +196,18 @@ model OrderEvent {
   reason    String?
   metadata  Json?    @map("meta")
   createdAt DateTime @default(now())
+
+  @@index([orderId, createdAt])
+}
+
+model OrderAuditLog {
+  id        String   @id @default(cuid())
+  orderId   String
+  action    String   // HOLD | RELEASE | CANCEL | SEND_POSTEX | STATUS_CHANGE
+  adminUser String
+  note      String?
+  createdAt DateTime @default(now())
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId, createdAt])
 }
@@ -258,5 +273,3 @@ model Review {
   @@index([productId])
   @@index([userId])
 }
-
-

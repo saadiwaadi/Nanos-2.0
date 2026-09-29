@@ -20,7 +20,7 @@ export default async function CrocsPage() {
           <h1>Crocs</h1>
           <p>Premium clogs built for all-day comfort. Ventilated, lightweight, and yours.</p>
         </div>
-        <FilteredGrid products={crocs} hideFilter />
+        <FilteredGrid products={crocs} hideFilter category="crocs" />
       </div>
     </div>
   );

@@ -27,25 +27,63 @@ export type PromoInfo = {
   minOrderAmount?: number;
 };
 
+export type ShippingInfo = {
+  standardDeliveryFee: number;
+  freeDeliveryThreshold: number;
+  enabled: boolean;
+};
+
+export const DEFAULT_SHIPPING_INFO: ShippingInfo = {
+  standardDeliveryFee: 250,
+  freeDeliveryThreshold: 5000,
+  enabled: true,
+};
+
+const SHIPPING_STORAGE_KEY = "nanos_shipping_settings_v1";
+
+function loadShipping(): ShippingInfo {
+  if (typeof window === "undefined") return DEFAULT_SHIPPING_INFO;
+  try {
+    const raw = window.localStorage.getItem(SHIPPING_STORAGE_KEY);
+    if (!raw) return DEFAULT_SHIPPING_INFO;
+    const parsed = JSON.parse(raw);
+    return {
+      standardDeliveryFee: typeof parsed.standardDeliveryFee === "number" ? parsed.standardDeliveryFee : DEFAULT_SHIPPING_INFO.standardDeliveryFee,
+      freeDeliveryThreshold: typeof parsed.freeDeliveryThreshold === "number" ? parsed.freeDeliveryThreshold : DEFAULT_SHIPPING_INFO.freeDeliveryThreshold,
+      enabled: parsed.enabled !== false,
+    };
+  } catch {
+    return DEFAULT_SHIPPING_INFO;
+  }
+}
+
+function saveShipping(settings: ShippingInfo) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(SHIPPING_STORAGE_KEY, JSON.stringify(settings));
+}
+
 type CartState = {
   items: CartItem[];
   promo: string | null;
   promoInfo?: PromoInfo | null;
+  shippingInfo?: ShippingInfo;
 };
 
 function load(): CartState {
-  if (typeof window === "undefined") return { items: [], promo: null, promoInfo: null };
+  if (typeof window === "undefined") return { items: [], promo: null, promoInfo: null, shippingInfo: DEFAULT_SHIPPING_INFO };
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { items: [], promo: null, promoInfo: null };
+    const shipping = loadShipping();
+    if (!raw) return { items: [], promo: null, promoInfo: null, shippingInfo: shipping };
     const parsed = JSON.parse(raw) as CartState;
     return {
       items: Array.isArray(parsed.items) ? parsed.items : [],
       promo: typeof parsed.promo === "string" ? parsed.promo : null,
       promoInfo: parsed.promoInfo && typeof parsed.promoInfo === "object" ? parsed.promoInfo : null,
+      shippingInfo: shipping,
     };
   } catch {
-    return { items: [], promo: null, promoInfo: null };
+    return { items: [], promo: null, promoInfo: null, shippingInfo: DEFAULT_SHIPPING_INFO };
   }
 }
 
@@ -56,13 +94,25 @@ function save(state: CartState) {
 }
 
 export function useCart() {
-  const [state, setState] = useState<CartState>({ items: [], promo: null, promoInfo: null });
+  const [state, setState] = useState<CartState>({ items: [], promo: null, promoInfo: null, shippingInfo: DEFAULT_SHIPPING_INFO });
 
   useEffect(() => {
     const sync = () => setState(load());
     sync();
     window.addEventListener(CHANGE_EVENT, sync);
     window.addEventListener("storage", sync);
+
+    // Refresh shipping settings from server in the background
+    fetch("/api/shipping-settings")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data && typeof data.standardDeliveryFee === "number") {
+          saveShipping(data);
+          setState((prev) => ({ ...prev, shippingInfo: data }));
+        }
+      })
+      .catch(() => {});
+
     return () => {
       window.removeEventListener(CHANGE_EVENT, sync);
       window.removeEventListener("storage", sync);
@@ -96,10 +146,15 @@ export function useCart() {
   }
 
   const afterDiscount = Math.max(0, subtotal - discount);
-  const shipping =
-    items.length === 0 || afterDiscount >= FREE_SHIPPING_THRESHOLD
-      ? 0
-      : SHIPPING_FLAT;
+
+  const shippingSettings = state.shippingInfo || DEFAULT_SHIPPING_INFO;
+  const standardDeliveryFee = shippingSettings.standardDeliveryFee;
+  const freeDeliveryThreshold = shippingSettings.freeDeliveryThreshold;
+  const shippingEnabled = shippingSettings.enabled;
+
+  const isFreeShipping = !shippingEnabled || (freeDeliveryThreshold > 0 && afterDiscount >= freeDeliveryThreshold);
+  const shipping = items.length === 0 ? 0 : (isFreeShipping ? 0 : standardDeliveryFee);
+  const freeShippingGap = freeDeliveryThreshold > 0 ? Math.max(0, freeDeliveryThreshold - afterDiscount) : 0;
   const total = afterDiscount + shipping;
 
   return {
@@ -111,6 +166,11 @@ export function useCart() {
     afterDiscount,
     shipping,
     total,
+    shippingSettings,
+    standardDeliveryFee,
+    freeDeliveryThreshold,
+    freeShippingGap,
+    isFreeShipping,
     promo: promoValid ? state.promo : null,
     promoInfo: promoValid ? state.promoInfo : null,
 

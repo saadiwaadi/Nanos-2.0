@@ -36,7 +36,7 @@ export default async function TrousersPage() {
           </div>
           <p>Relaxed fits and utility cuts designed for your everyday rotation. Collection dropping soon!</p>
         </div>
-        <FilteredGrid products={trousers} hideFilter />
+        <FilteredGrid products={trousers} hideFilter category="trousers" />
       </div>
     </div>
   );

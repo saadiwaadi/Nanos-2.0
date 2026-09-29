@@ -7,6 +7,7 @@ import { MetaCapiService } from "@/lib/meta-capi";
 import { reserveStock } from "@/lib/stock";
 import { AppError } from "@/lib/order-state";
 import { getPromoSettings, calculatePromoDiscount } from "@/lib/promo-settings";
+import { getShippingSettings, calculateShippingFee } from "@/lib/shipping-settings";
 
 // In-memory fallback order store for dev when DB is offline
 export const memoryOrders = new Map<string, any>();
@@ -99,7 +100,16 @@ export async function POST(request: Request) {
       }
     }
     const afterDiscount = Math.max(0, subtotal - discount);
-    const shipping = afterDiscount >= 5000 ? 0 : 250;
+    
+    let shipping = 0;
+    try {
+      const shippingSettings = await getShippingSettings();
+      shipping = calculateShippingFee(afterDiscount, shippingSettings);
+    } catch (err) {
+      console.warn("Failed to fetch shipping settings, using default calculation:", err);
+      shipping = afterDiscount >= 5000 ? 0 : 250;
+    }
+
     const total = afterDiscount + shipping;
 
     const orderId = "ord_" + Math.random().toString(36).substring(2, 11);
