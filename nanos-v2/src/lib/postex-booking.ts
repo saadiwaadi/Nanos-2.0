@@ -8,11 +8,11 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// ─── 3.5 CITY RESOLUTION ────────────────────────────────
+// ─── 3.5 CITY RESOLUTION & PHONE CLEANING ────────────────
 let cityCache: { at: number; set: Map<string, string> } | null = null;
 
 const norm = (s: string) =>
-  s.toLowerCase().replace(/[^a-z\s]/g, "").replace(/\s+/g, " ").trim();
+  s.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
 
 const ALIASES: Record<string, string> = {
   lhr: "lahore",
@@ -20,21 +20,63 @@ const ALIASES: Record<string, string> = {
   isb: "islamabad",
   isalamabad: "islamabad",
   pindi: "rawalpindi",
+  rwp: "rawalpindi",
+  fsd: "faisalabad",
+  mul: "multan",
+  pesh: "peshawar",
+  psh: "peshawar",
+  hyd: "hyderabad",
+  skt: "sialkot",
+  gjt: "gujrat",
+  grw: "gujranwala",
+  bhv: "bahawalpur",
+  bwp: "bahawalpur",
+  swl: "sahiwal",
+  ryk: "rahim yar khan",
+  dgk: "dera ghazi khan",
+  dik: "dera ismail khan",
+  abb: "abbottabad",
+  atd: "abbottabad",
+  mzd: "muzaffarabad",
 };
+
+const STOP_WORDS = new Set([
+  "city", "district", "distt", "dist", "tehsil", "pakistan",
+  "punjab", "sindh", "kpk", "balochistan", "ajk", "cantt", "cantonment",
+  "phase", "sector", "block", "town", "society", "colony", "scheme",
+  "bazar", "bazaar", "market", "road", "street", "st", "rd", "near",
+  "opposite", "opp", "behind", "house", "h", "no", "flat", "floor",
+  "mohallah", "village", "vpo", "chak"
+]);
+
+export function cleanPhone(phone: string): string {
+  if (!phone) return "";
+  let digits = String(phone).replace(/\D/g, "");
+  if (digits.startsWith("0092")) {
+    digits = "0" + digits.slice(4);
+  } else if (digits.startsWith("92") && digits.length >= 12) {
+    digits = "0" + digits.slice(2);
+  } else if (digits.length === 10 && !digits.startsWith("0")) {
+    digits = "0" + digits;
+  }
+  return digits;
+}
 
 export async function resolveCity(input: string): Promise<string | null> {
   if (!input) return null;
   if (!cityCache || Date.now() - cityCache.at > 6 * 3600_000) {
     try {
       const r: any = await postexFetch(
-        "/order/v1/get-operational-city?operationalCityType=Delivery"
+        "/order/v1/get-operational-city"
       );
-      const cities = r?.dist ?? [];
+      const cities = Array.isArray(r) ? r : (Array.isArray(r?.dist) ? r.dist : []);
       if (Array.isArray(cities) && cities.length > 0) {
         cityCache = {
           at: Date.now(),
           set: new Map(
-            cities.map((c: any) => [norm(c.operationalCityName), c.operationalCityName])
+            cities
+              .filter((c: any) => c && c.operationalCityName)
+              .map((c: any) => [norm(c.operationalCityName), c.operationalCityName])
           ),
         };
       }
@@ -45,7 +87,8 @@ export async function resolveCity(input: string): Promise<string | null> {
     if (!cityCache) {
       const defaultOperational = [
         "Lahore", "Karachi", "Islamabad", "Rawalpindi", "Faisalabad",
-        "Multan", "Peshawar", "Quetta", "Sialkot", "Gujrat", "Gujranwala"
+        "Multan", "Peshawar", "Quetta", "Sialkot", "Gujrat", "Gujranwala",
+        "Vehari", "Sahiwal", "Bahawalpur", "Sargodha", "Hyderabad", "Sukkur"
       ];
       cityCache = {
         at: Date.now(),
@@ -53,8 +96,45 @@ export async function resolveCity(input: string): Promise<string | null> {
       };
     }
   }
+
   const k = norm(input);
-  return cityCache.set.get(ALIASES[k] ?? k) ?? null;
+  if (!k) return null;
+
+  // 1. Direct match or direct alias match
+  const direct = cityCache.set.get(ALIASES[k] ?? k);
+  if (direct) return direct;
+
+  // 2. Token / stripped match
+  const words = k.split(" ").filter((w) => w.length > 0);
+  const cleanWords = words.filter((w) => !STOP_WORDS.has(w));
+  const cleanStr = cleanWords.join(" ");
+  if (cleanStr && cityCache.set.has(ALIASES[cleanStr] ?? cleanStr)) {
+    return cityCache.set.get(ALIASES[cleanStr] ?? cleanStr)!;
+  }
+
+  // 3. Individual token search (e.g. "Vehari" or "Burewala" inside "Burewala district Vehari")
+  for (const w of words) {
+    if (w.length >= 3 && !STOP_WORDS.has(w)) {
+      const aliasW = ALIASES[w] ?? w;
+      if (cityCache.set.has(aliasW)) {
+        return cityCache.set.get(aliasW)!;
+      }
+    }
+  }
+
+  // 4. Longest dictionary match
+  let longest: string | null = null;
+  let maxLen = 0;
+  for (const [normCity, official] of cityCache.set.entries()) {
+    if (normCity.length >= 4 && k.includes(normCity)) {
+      if (normCity.length > maxLen) {
+        maxLen = normCity.length;
+        longest = official;
+      }
+    }
+  }
+
+  return longest;
 }
 
 // ─── CLAIM LOCK ─────────────────────────────────────────
@@ -65,7 +145,19 @@ export async function claim(id: string): Promise<boolean> {
       orderStatus: { not: "ON_HOLD" },
       status: { in: ["placed", "confirmed"] },
       OR: [
-        { courierBookingStatus: { in: ["queued", "booking_failed", "not_booked"] } },
+        {
+          courierBookingStatus: {
+            in: [
+              "queued",
+              "queued_for_batch",
+              "pending_auto",
+              "pending_manual_review",
+              "awaiting_approval",
+              "booking_failed",
+              "not_booked",
+            ],
+          },
+        },
         {
           courierBookingStatus: "booking_in_progress",
           bookingLockedAt: { lt: new Date(Date.now() - STALE_LOCK_MS) },
@@ -101,9 +193,10 @@ export function buildPostexPayload(order: any, city: string) {
   }
 
   const sInfo = parseShippingInfo(order.shippingInfo);
-  const customerName = sInfo.name || order.customerName || order.guestName || "Customer";
-  const customerPhone = sInfo.phone || "";
-  const deliveryAddress = `${sInfo.address || ""}, ${city}`.trim();
+  const customerName = (sInfo.name || order.customerName || order.guestName || "Valued Customer").trim();
+  const customerPhone = cleanPhone(sInfo.phone || "");
+  const baseAddress = (sInfo.address || "").trim();
+  const deliveryAddress = baseAddress ? `${baseAddress}, ${city}`.trim() : city;
 
   const orderItems = order.items || order.orderItems || [];
   const itemDetails =
@@ -122,7 +215,7 @@ export function buildPostexPayload(order: any, city: string) {
     customerPhone,
     deliveryAddress,
     invoiceDivision: 1,
-    invoicePayment: order.total,
+    invoicePayment: Math.max(0, Number(order.total) || 0),
     orderDetail: itemDetails,
     orderRefNumber: order.id,
     pickupAddressCode,
@@ -154,7 +247,10 @@ export async function bookOne(id: string, actor = "system:batch") {
 
   const sInfo = parseShippingInfo(order.shippingInfo);
   const rawCity = sInfo.city || (order as any).city || "";
-  const city = await resolveCity(rawCity);
+  let city = await resolveCity(rawCity);
+  if (!city && sInfo.address) {
+    city = await resolveCity(sInfo.address);
+  }
 
   if (!city) {
     await prisma.order.update({
@@ -275,13 +371,49 @@ export async function bookOne(id: string, actor = "system:batch") {
 }
 
 // ─── RUN BATCH ──────────────────────────────────────────
-export async function runBatch(limit = 200, concurrency = 5) {
+export async function runBatch(
+  limitOrOptions?: number | {
+    limit?: number;
+    concurrency?: number;
+    includeAllUnbooked?: boolean;
+  },
+  concurrencyArg?: number
+) {
+  let limit = 200;
+  let concurrency = 5;
+  let includeAllUnbooked = false;
+
+  if (typeof limitOrOptions === "number") {
+    limit = limitOrOptions;
+    if (typeof concurrencyArg === "number") {
+      concurrency = concurrencyArg;
+    }
+  } else if (limitOrOptions && typeof limitOrOptions === "object") {
+    limit = limitOrOptions.limit ?? 200;
+    concurrency = limitOrOptions.concurrency ?? 5;
+    includeAllUnbooked = limitOrOptions.includeAllUnbooked ?? false;
+  }
+
+  const targetStatuses = includeAllUnbooked
+    ? [
+        "queued",
+        "queued_for_batch",
+        "pending_auto",
+        "pending_manual_review",
+        "awaiting_approval",
+        "booking_failed",
+        "not_booked",
+      ]
+    : ["queued", "queued_for_batch", "pending_auto"];
+
   const ids = (
     await prisma.order.findMany({
       where: {
-        orderStatus: { not: "ON_HOLD" },
+        orderStatus: { notIn: ["ON_HOLD", "CANCELLED", "BOOKED"] },
         status: { in: ["placed", "confirmed"] },
-        courierBookingStatus: { in: ["queued", "queued_for_batch", "pending_auto"] },
+        trackingNumber: null,
+        postexTrackingNumber: null,
+        courierBookingStatus: { in: targetStatuses },
       },
       orderBy: { createdAt: "asc" },
       take: limit,
@@ -313,6 +445,8 @@ export async function runBatch(limit = 200, concurrency = 5) {
     booked: results.filter((r) => r?.result === "booked").length,
     failed: results.filter((r) => r?.result === "failed").length,
     needsReview: results.filter((r) => r?.result === "needs_review").length,
+    skipped: results.filter((r) => r?.result === "skipped").length,
     aborted,
+    details: results,
   };
 }

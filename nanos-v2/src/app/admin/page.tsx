@@ -1448,15 +1448,72 @@ export default function AdminPage() {
     }
   }
 
+  // Push All in Queue to PostEx
+  const [isPushingAllQueue, setIsPushingAllQueue] = useState(false);
+
+  function handlePushAllInQueue() {
+    const unbookedOrders = orders.filter(
+      (o) =>
+        (o.orderStatus === "READY_TO_SHIP" || o.status === "placed" || o.status === "confirmed") &&
+        !o.trackingNumber &&
+        !o.postexTrackingNumber &&
+        o.orderStatus !== "ON_HOLD" &&
+        o.orderStatus !== "CANCELLED" &&
+        o.courierBookingStatus !== "booked"
+    );
+
+    if (unbookedOrders.length === 0) {
+      showToast("No unbooked orders in queue to push.");
+      return;
+    }
+
+    setConfirmModal({
+      isOpen: true,
+      title: `⚡ Push All ${unbookedOrders.length} Orders in Queue to PostEx`,
+      message: `Are you sure you want to book all ${unbookedOrders.length} ready unbooked orders with PostEx now? Orders on hold or cancelled will remain untouched.`,
+      actionLabel: `Push All (${unbookedOrders.length})`,
+      danger: false,
+      requiresReason: false,
+      onConfirm: async () => {
+        setIsPushingAllQueue(true);
+        try {
+          const res = await authFetch("/api/admin/courier-queue/run-batch", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ includeAllUnbooked: true }),
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            throw new Error(data.error || "Failed to push orders in queue to PostEx");
+          }
+          showToast(
+            `Queue push completed! Booked: ${data.booked || 0}, Needs Review: ${data.needsReview || 0}, Failed: ${data.failed || 0}`
+          );
+          loadMainData();
+          loadCourierData();
+        } catch (err: any) {
+          showToast(err.message || "Failed to execute batch queue push", "error");
+        } finally {
+          setIsPushingAllQueue(false);
+        }
+      },
+    });
+  }
+
   // Courier Queue Actions
   async function handleRunBatchNow() {
     setCourierActionId("batch");
     try {
-      const res = await authFetch("/api/admin/courier-queue/run-batch", { method: "POST" });
+      const res = await authFetch("/api/admin/courier-queue/run-batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ includeAllUnbooked: true }),
+      });
       if (res.ok) {
         const results = await res.json();
-        showToast(`Batch completed! Processed ${results.length} orders.`);
+        showToast(`Batch completed! Booked ${results.booked ?? results.length ?? 0} orders.`);
         loadCourierData();
+        loadMainData();
       }
     } catch (err: any) {
       showToast(err.message || "Failed to run batch booking", "error");
@@ -2482,6 +2539,54 @@ export default function AdminPage() {
                       Reset Filters
                     </button>
                   )}
+
+                  {/* PUSH ALL IN QUEUE BUTTON */}
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    disabled={isPushingAllQueue || loading}
+                    style={{
+                      background: "var(--admin-accent)",
+                      color: "#111",
+                      fontWeight: 700,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      marginLeft: "auto",
+                    }}
+                    onClick={handlePushAllInQueue}
+                    title="Push all unbooked ready orders in queue to PostEx"
+                  >
+                    {isPushingAllQueue ? (
+                      <span>⏳ Pushing Queue...</span>
+                    ) : (
+                      <>
+                        <span>⚡ Push All in Queue</span>
+                        <span
+                          style={{
+                            background: "#111",
+                            color: "var(--admin-accent)",
+                            fontSize: 11,
+                            fontWeight: 800,
+                            padding: "1px 6px",
+                            borderRadius: 10,
+                          }}
+                        >
+                          {
+                            orders.filter(
+                              (o) =>
+                                (o.orderStatus === "READY_TO_SHIP" || o.status === "placed" || o.status === "confirmed") &&
+                                !o.trackingNumber &&
+                                !o.postexTrackingNumber &&
+                                o.orderStatus !== "ON_HOLD" &&
+                                o.orderStatus !== "CANCELLED" &&
+                                o.courierBookingStatus !== "booked"
+                            ).length
+                          }
+                        </span>
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
 

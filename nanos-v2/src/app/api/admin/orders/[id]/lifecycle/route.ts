@@ -70,6 +70,11 @@ export async function POST(
           { error: "City not serviceable by PostEx or needs address review." },
           { status: 400 }
         );
+      } else if (result.result === "skipped") {
+        return NextResponse.json(
+          { error: (result as any).reason || "Order cannot be booked (already in progress, booked, or on hold)." },
+          { status: 400 }
+        );
       } else {
         return NextResponse.json(
           { error: (result as any).error || "Failed to book order with PostEx." },

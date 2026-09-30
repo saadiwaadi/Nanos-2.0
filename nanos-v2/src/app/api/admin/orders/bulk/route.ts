@@ -70,8 +70,10 @@ export async function POST(request: Request) {
           const res = await bookOne(id, adminEmail);
           if (res.result === "booked") {
             results.push({ id, ok: true, message: `Booked: ${res.tracking}` });
+          } else if (res.result === "needs_review") {
+            results.push({ id, ok: false, error: "City not serviceable or needs address review" });
           } else {
-            results.push({ id, ok: false, error: (res as any).error || `Booking result: ${res.result}` });
+            results.push({ id, ok: false, error: (res as any).error || (res as any).reason || `Booking result: ${res.result}` });
           }
         }
         // 2. BULK PUT ON HOLD

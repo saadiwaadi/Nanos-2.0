@@ -86,8 +86,8 @@ async function runRealDbTests() {
   // --- Test G3: PostEx get-operational-city & status strings ---
   console.log("\n--- Test G3: PostEx status strings check ---");
   try {
-    const res: any = await postexFetch("/order/v1/get-operational-city?operationalCityType=Delivery");
-    const cities = res?.dist ?? [];
+    const res: any = await postexFetch("/order/v1/get-operational-city");
+    const cities = Array.isArray(res) ? res : (res?.dist ?? []);
     console.log(`Fetched ${cities.length} operational cities from PostEx API.`);
 
     const realStatuses = [

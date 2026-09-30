@@ -10,7 +10,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    const results = await runBatch();
+    const body = await request.json().catch(() => ({}));
+    const { includeAllUnbooked = true, limit = 200 } = body || {};
+    const results = await runBatch({ includeAllUnbooked, limit });
     return NextResponse.json(results);
   } catch (err: any) {
     return NextResponse.json(
