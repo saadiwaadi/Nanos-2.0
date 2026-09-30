@@ -2682,15 +2682,15 @@ export default function AdminPage() {
                           }}
                         />
                       </th>
-                      <th>Order ID</th>
-                      <th>Date</th>
-                      <th>Customer</th>
-                      <th>Items</th>
-                      <th>Total</th>
-                      <th>Lifecycle State</th>
-                      <th>PostEx / Tracking</th>
-                      <th>Quick Actions</th>
-                      <th>Details</th>
+                      <th style={{ width: 110, whiteSpace: "nowrap" }}>Order ID</th>
+                      <th style={{ width: 105, whiteSpace: "nowrap" }}>Date</th>
+                      <th style={{ minWidth: 170 }}>Customer</th>
+                      <th style={{ width: 60, textAlign: "center", whiteSpace: "nowrap" }}>Items</th>
+                      <th style={{ width: 110, whiteSpace: "nowrap" }}>Total</th>
+                      <th style={{ width: 135, whiteSpace: "nowrap" }}>Lifecycle State</th>
+                      <th style={{ width: 180, whiteSpace: "nowrap" }}>PostEx / Tracking</th>
+                      <th style={{ minWidth: 230, whiteSpace: "nowrap" }}>Quick Actions</th>
+                      <th style={{ width: 75, textAlign: "center", whiteSpace: "nowrap" }}>Details</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2755,25 +2755,30 @@ export default function AdminPage() {
                                   }}
                                 />
                               </td>
-                              <td>
+                              <td style={{ whiteSpace: "nowrap" }}>
                                 <strong>#{o.id.slice(-8)}</strong>
                               </td>
-                              <td style={{ fontSize: 13, color: "var(--admin-text-soft)" }}>
+                              <td style={{ fontSize: 13, color: "var(--admin-text-soft)", whiteSpace: "nowrap" }}>
                                 {formatDate(o.createdAt)}
                               </td>
-                              <td>
-                                <div>
-                                  <strong>{o.customerName}</strong>
+                              <td style={{ maxWidth: 200 }}>
+                                <div style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  {o.customerName}
                                 </div>
-                                <div style={{ fontSize: 12, color: "var(--admin-text-soft)" }}>
+                                <div
+                                  style={{ fontSize: 12, color: "var(--admin-text-soft)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                                  title={o.customerEmail}
+                                >
                                   {o.customerEmail}
                                 </div>
                               </td>
-                              <td>{o.orderItems.reduce((s, i) => s + i.quantity, 0)}</td>
-                              <td>
+                              <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>
+                                {o.orderItems.reduce((s, i) => s + i.quantity, 0)}
+                              </td>
+                              <td style={{ whiteSpace: "nowrap" }}>
                                 <strong>{fmtPrice(o.total)}</strong>
                               </td>
-                              <td>
+                              <td style={{ whiteSpace: "nowrap" }}>
                                 <span
                                   className="badge"
                                   style={{
@@ -2787,36 +2792,43 @@ export default function AdminPage() {
                                   {statusLabel}
                                 </span>
                               </td>
-                              <td>
+                              <td style={{ whiteSpace: "nowrap" }}>
                                 {trackingNum ? (
                                   <a
                                     href={`https://postex.pk/tracking?trackingNumber=${trackingNum}`}
                                     target="_blank"
                                     rel="noreferrer"
+                                    className="badge badge-info"
                                     style={{
-                                      color: "var(--admin-accent)",
-                                      textDecoration: "underline",
+                                      textDecoration: "none",
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: 5,
+                                      fontFamily: "monospace",
+                                      fontSize: 12,
                                       fontWeight: 700,
-                                      fontSize: 12.5,
+                                      cursor: "pointer",
                                     }}
+                                    title="Track on PostEx"
                                   >
-                                    {trackingNum}
+                                    <span>{trackingNum}</span>
+                                    <span style={{ fontSize: 10, opacity: 0.85 }}>↗</span>
                                   </a>
                                 ) : onHold ? (
-                                  <span style={{ fontSize: 12, color: "#f59e0b" }}>Paused (On Hold)</span>
+                                  <span className="badge badge-warn" style={{ fontSize: 11 }}>Paused (On Hold)</span>
                                 ) : (
                                   <span style={{ fontSize: 12, color: "var(--admin-text-soft)" }}>Not booked</span>
                                 )}
                               </td>
-                              <td>
-                                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                              <td style={{ whiteSpace: "nowrap" }}>
+                                <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "nowrap" }}>
                                   {readyToShip && (
                                     <>
                                       <button
                                         type="button"
                                         className="btn btn-primary btn-sm"
                                         disabled={isUpdating}
-                                        style={{ background: "var(--admin-accent)", color: "#111", fontSize: 11.5, padding: "4px 8px" }}
+                                        style={{ fontSize: 11.5, padding: "5px 10px" }}
                                         onClick={() => handleOrderLifecycle(o.id, "SEND_POSTEX")}
                                       >
                                         Send to PostEx
@@ -2825,7 +2837,7 @@ export default function AdminPage() {
                                         type="button"
                                         className="btn btn-outline btn-sm"
                                         disabled={isUpdating}
-                                        style={{ fontSize: 11.5, padding: "4px 8px" }}
+                                        style={{ fontSize: 11.5, padding: "5px 10px" }}
                                         onClick={() => promptHoldOrder(o)}
                                       >
                                         Put on Hold
@@ -2839,16 +2851,16 @@ export default function AdminPage() {
                                         type="button"
                                         className="btn btn-outline btn-sm"
                                         disabled={isUpdating}
-                                        style={{ fontSize: 11.5, padding: "4px 8px", borderColor: "var(--admin-accent)", color: "var(--admin-accent)" }}
+                                        style={{ fontSize: 11.5, padding: "5px 10px", borderColor: "var(--admin-accent)", color: "var(--admin-accent)" }}
                                         onClick={() => handleOrderLifecycle(o.id, "RELEASE")}
                                       >
                                         Release Hold
                                       </button>
                                       <button
                                         type="button"
-                                        className="btn btn-outline btn-sm"
+                                        className="btn btn-danger btn-sm"
                                         disabled={isUpdating}
-                                        style={{ fontSize: 11.5, padding: "4px 8px", color: "var(--admin-danger)", borderColor: "var(--admin-danger)" }}
+                                        style={{ fontSize: 11.5, padding: "5px 10px" }}
                                         onClick={() => promptCancelOrder(o)}
                                       >
                                         Cancel Order
@@ -2859,9 +2871,9 @@ export default function AdminPage() {
                                   {booked && (
                                     <button
                                       type="button"
-                                      className="btn btn-outline btn-sm"
+                                      className="btn btn-danger btn-sm"
                                       disabled={isUpdating}
-                                      style={{ fontSize: 11.5, padding: "4px 8px", color: "var(--admin-danger)", borderColor: "var(--admin-danger)" }}
+                                      style={{ fontSize: 11.5, padding: "5px 10px" }}
                                       onClick={() => promptCancelOrder(o)}
                                     >
                                       Cancel Order
@@ -2869,14 +2881,15 @@ export default function AdminPage() {
                                   )}
 
                                   {cancelled && (
-                                    <span style={{ fontSize: 12, color: "var(--admin-danger)" }}>Cancelled</span>
+                                    <span className="badge badge-danger" style={{ fontSize: 11 }}>Cancelled</span>
                                   )}
                                 </div>
                               </td>
-                              <td>
+                              <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>
                                 <button
                                   type="button"
                                   className="btn btn-outline btn-sm"
+                                  style={{ fontSize: 11.5, padding: "5px 10px" }}
                                   onClick={() => setExpandedOrderId(isExpanded ? null : o.id)}
                                 >
                                   {isExpanded ? "Hide" : "View"}
@@ -4353,17 +4366,7 @@ export default function AdminPage() {
                 <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
                   <button
                     type="button"
-                    className="admin-btn-outline"
-                    style={{
-                      padding: "8px 14px",
-                      fontSize: "13px",
-                      fontWeight: 600,
-                      borderRadius: "4px",
-                      border: "1px solid var(--admin-border)",
-                      background: "var(--admin-surface)",
-                      color: "var(--admin-text)",
-                      cursor: "pointer",
-                    }}
+                    className="btn btn-outline"
                     disabled={healthLoading}
                     onClick={handleTestPostexConnection}
                   >

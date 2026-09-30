@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { verifyToken } from "@/lib/auth-server";
 import { getProductById } from "@/lib/products";
 import { prisma } from "@/lib/prisma";
@@ -224,23 +224,33 @@ export async function POST(request: Request) {
         num_items: numItems,
       };
 
-      if (eventId) {
-        MetaCapiService.sendEvent(
-          "InitiateCheckout",
-          eventId,
-          eventSourceUrl,
-          userData,
-          customData
-        );
-      }
+      after(async () => {
+        const events: Promise<void>[] = [];
 
-      MetaCapiService.sendEvent(
-        "Purchase",
-        orderId,
-        eventSourceUrl,
-        userData,
-        customData
-      );
+        if (eventId) {
+          events.push(
+            MetaCapiService.sendEvent(
+              "InitiateCheckout",
+              eventId,
+              eventSourceUrl,
+              userData,
+              customData
+            )
+          );
+        }
+
+        events.push(
+          MetaCapiService.sendEvent(
+            "Purchase",
+            orderId,
+            eventSourceUrl,
+            userData,
+            customData
+          )
+        );
+
+        await Promise.allSettled(events);
+      });
     } catch (capiErr) {
       console.error("Failed to trigger CAPI events:", capiErr);
     }

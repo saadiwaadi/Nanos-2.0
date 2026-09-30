@@ -21,6 +21,12 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "nanos.pk — Keep it simple. Wear it your way.",
   description: "Everyday essentials engineered for utility and effortless style. Delivered across Pakistan.",
+  formatDetection: {
+    telephone: false,
+    date: false,
+    address: false,
+    email: false,
+  },
   icons: {
     icon: "/icon.png",
     shortcut: "/icon.png",

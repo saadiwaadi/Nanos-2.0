@@ -587,10 +587,10 @@ export function PdpActions({
           <div style={{ margin: bundleTier === 1 ? "14px 0 24px 0" : "18px 0 20px 0" }}>
             <div
               style={{
-                fontSize: 13.5,
+                fontSize: 13,
                 fontWeight: 700,
                 marginBottom: 10,
-                letterSpacing: "-0.01em",
+                letterSpacing: "0.02em",
                 textTransform: "uppercase",
                 color: "#222",
                 display: "flex",
@@ -601,63 +601,40 @@ export function PdpActions({
               <span>Bundle &amp; Save Offer</span>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div className="bundle-list">
               {/* TIER 1: BUY 1 */}
               <div
                 onClick={() => setBundleTier(1)}
+                className="bundle-card"
                 style={{
-                  position: "relative",
-                  padding: "12px 16px",
-                  borderRadius: 8,
-                  cursor: "pointer",
-                  transition: "all 0.18s ease",
                   border: bundleTier === 1 ? "2px solid var(--black, #111111)" : "1.5px solid var(--stone, #D9D6CF)",
                   background:
                     bundleTier === 1
                       ? "rgba(200, 255, 0, 0.14)"
                       : "var(--white, #FFFFFF)",
                   boxShadow: bundleTier === 1 ? "0 4px 14px rgba(0,0,0,0.06)" : "none",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 12,
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div className="bundle-card-left">
                   <div
+                    className="bundle-radio-circle"
                     style={{
-                      width: 18,
-                      height: 18,
-                      borderRadius: "50%",
                       border: bundleTier === 1 ? "2px solid var(--black, #111111)" : "2px solid #BBB",
-                      display: "grid",
-                      placeItems: "center",
-                      flexShrink: 0,
-                      background: "var(--white, #FFFFFF)",
                     }}
                   >
-                    {bundleTier === 1 && (
-                      <div
-                        style={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: "50%",
-                          background: "var(--black, #111111)",
-                        }}
-                      />
-                    )}
+                    {bundleTier === 1 && <div className="bundle-radio-dot" />}
                   </div>
 
-                  <div>
-                    <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--black, #111111)" }}>Buy 1</div>
-                    <div style={{ fontSize: 11.5, color: "#666666" }}>
+                  <div className="bundle-card-text">
+                    <div className="bundle-card-name">Buy 1</div>
+                    <div className="bundle-card-desc">
                       {fmtPrice(b1Price)} each · 1 Pair
                     </div>
                   </div>
                 </div>
 
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 14.5, fontWeight: 800, color: "var(--black, #111111)" }}>
+                <div className="bundle-card-right">
+                  <div className="bundle-card-price">
                     {fmtPrice(b1Price)}
                   </div>
                 </div>
@@ -676,97 +653,49 @@ export function PdpActions({
                     return next;
                   });
                 }}
+                className="bundle-card"
                 style={{
-                  position: "relative",
-                  padding: "12px 16px",
-                  borderRadius: 8,
-                  cursor: "pointer",
-                  transition: "all 0.18s ease",
                   border: bundleTier === 2 ? "2px solid var(--black, #111111)" : "1.5px solid var(--stone, #D9D6CF)",
                   background:
                     bundleTier === 2
                       ? "rgba(200, 255, 0, 0.14)"
                       : "var(--white, #FFFFFF)",
                   boxShadow: bundleTier === 2 ? "0 4px 14px rgba(0,0,0,0.06)" : "none",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 12,
                 }}
               >
-                <div
-                  style={{
-                    position: "absolute",
-                    top: -9,
-                    right: 14,
-                    background: "var(--lime, #C8FF00)",
-                    color: "var(--black, #111111)",
-                    fontSize: 9.5,
-                    fontWeight: 800,
-                    letterSpacing: "0.06em",
-                    padding: "2px 8px",
-                    borderRadius: 10,
-                    textTransform: "uppercase",
-                    border: "1px solid rgba(0,0,0,0.12)",
-                  }}
-                >
+                <div className="bundle-pill-badge">
                   MOST POPULAR
                 </div>
 
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div className="bundle-card-left">
                   <div
+                    className="bundle-radio-circle"
                     style={{
-                      width: 18,
-                      height: 18,
-                      borderRadius: "50%",
                       border: bundleTier === 2 ? "2px solid var(--black, #111111)" : "2px solid #BBB",
-                      display: "grid",
-                      placeItems: "center",
-                      flexShrink: 0,
-                      background: "var(--white, #FFFFFF)",
                     }}
                   >
-                    {bundleTier === 2 && (
-                      <div
-                        style={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: "50%",
-                          background: "var(--black, #111111)",
-                        }}
-                      />
-                    )}
+                    {bundleTier === 2 && <div className="bundle-radio-dot" />}
                   </div>
 
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <span style={{ fontSize: 13.5, fontWeight: 700, color: "var(--black, #111111)" }}>Buy 2 (Pair)</span>
-                      <span
-                        style={{
-                          background: "rgba(200, 255, 0, 0.35)",
-                          color: "var(--black, #111111)",
-                          border: "1px solid rgba(160, 204, 0, 0.6)",
-                          fontSize: 9.5,
-                          fontWeight: 800,
-                          padding: "1px 6px",
-                          borderRadius: 8,
-                        }}
-                      >
+                  <div className="bundle-card-text">
+                    <div className="bundle-card-header">
+                      <span className="bundle-card-name">Buy 2 (Pair)</span>
+                      <span className="bundle-card-badge-inline">
                         {b2DiscountText}
                       </span>
                     </div>
-                    <div style={{ fontSize: 11.5, color: "#666666" }}>
-                      {fmtPrice(b2UnitPrice)} each · Mix & match colors & sizes
+                    <div className="bundle-card-desc">
+                      {fmtPrice(b2UnitPrice)} each · Mix &amp; match colors &amp; sizes
                     </div>
                   </div>
                 </div>
 
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 14.5, fontWeight: 800, color: "var(--black, #111111)" }}>
+                <div className="bundle-card-right">
+                  <div className="bundle-card-price">
                     {fmtPrice(b2Price)}
                   </div>
                   {b2Price < b1Price * 2 && (
-                    <div style={{ fontSize: 11, color: "#888888", textDecoration: "line-through" }}>
+                    <div className="bundle-card-old-price">
                       {fmtPrice(b1Price * 2)}
                     </div>
                   )}
@@ -786,97 +715,49 @@ export function PdpActions({
                     return next;
                   });
                 }}
+                className="bundle-card"
                 style={{
-                  position: "relative",
-                  padding: "12px 16px",
-                  borderRadius: 8,
-                  cursor: "pointer",
-                  transition: "all 0.18s ease",
                   border: bundleTier === 3 ? "2px solid var(--black, #111111)" : "1.5px solid var(--stone, #D9D6CF)",
                   background:
                     bundleTier === 3
                       ? "rgba(200, 255, 0, 0.14)"
                       : "var(--white, #FFFFFF)",
                   boxShadow: bundleTier === 3 ? "0 4px 14px rgba(0,0,0,0.06)" : "none",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 12,
                 }}
               >
-                <div
-                  style={{
-                    position: "absolute",
-                    top: -9,
-                    right: 14,
-                    background: "var(--lime, #C8FF00)",
-                    color: "var(--black, #111111)",
-                    fontSize: 9.5,
-                    fontWeight: 800,
-                    letterSpacing: "0.06em",
-                    padding: "2px 8px",
-                    borderRadius: 10,
-                    textTransform: "uppercase",
-                    border: "1px solid rgba(0,0,0,0.12)",
-                  }}
-                >
+                <div className="bundle-pill-badge">
                   BEST VALUE
                 </div>
 
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div className="bundle-card-left">
                   <div
+                    className="bundle-radio-circle"
                     style={{
-                      width: 18,
-                      height: 18,
-                      borderRadius: "50%",
                       border: bundleTier === 3 ? "2px solid var(--black, #111111)" : "2px solid #BBB",
-                      display: "grid",
-                      placeItems: "center",
-                      flexShrink: 0,
-                      background: "var(--white, #FFFFFF)",
                     }}
                   >
-                    {bundleTier === 3 && (
-                      <div
-                        style={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: "50%",
-                          background: "var(--black, #111111)",
-                        }}
-                      />
-                    )}
+                    {bundleTier === 3 && <div className="bundle-radio-dot" />}
                   </div>
 
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <span style={{ fontSize: 13.5, fontWeight: 700, color: "var(--black, #111111)" }}>Buy 3</span>
-                      <span
-                        style={{
-                          background: "rgba(200, 255, 0, 0.35)",
-                          color: "var(--black, #111111)",
-                          border: "1px solid rgba(160, 204, 0, 0.6)",
-                          fontSize: 9.5,
-                          fontWeight: 800,
-                          padding: "1px 6px",
-                          borderRadius: 8,
-                        }}
-                      >
+                  <div className="bundle-card-text">
+                    <div className="bundle-card-header">
+                      <span className="bundle-card-name">Buy 3</span>
+                      <span className="bundle-card-badge-inline">
                         {b3DiscountText}
                       </span>
                     </div>
-                    <div style={{ fontSize: 11.5, color: "#666666" }}>
-                      {fmtPrice(b3UnitPrice)} each · Mix & match colors & sizes
+                    <div className="bundle-card-desc">
+                      {fmtPrice(b3UnitPrice)} each · Mix &amp; match colors &amp; sizes
                     </div>
                   </div>
                 </div>
 
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 14.5, fontWeight: 800, color: "var(--black, #111111)" }}>
+                <div className="bundle-card-right">
+                  <div className="bundle-card-price">
                     {fmtPrice(b3Price)}
                   </div>
                   {b3Price < b1Price * 3 && (
-                    <div style={{ fontSize: 11, color: "#888888", textDecoration: "line-through" }}>
+                    <div className="bundle-card-old-price">
                       {fmtPrice(b1Price * 3)}
                     </div>
                   )}
@@ -895,13 +776,15 @@ export function PdpActions({
                 alignItems: "center",
                 justifyContent: "space-between",
                 marginBottom: 12,
+                flexWrap: "wrap",
+                gap: 6,
               }}
             >
-              <span style={{ fontSize: 13.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.02em" }}>
+              <span style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.02em" }}>
                 Choose Your Pairs ({bundleTier} Pairs)
               </span>
-              <span style={{ fontSize: 12, color: "#666" }}>
-                Select independent color &amp; size per pair
+              <span style={{ fontSize: 11.5, color: "#666" }}>
+                Mix &amp; match colors &amp; sizes
               </span>
             </div>
 
@@ -916,7 +799,7 @@ export function PdpActions({
                     style={{
                       border: "1.5px solid var(--stone, #D9D6CF)",
                       borderRadius: 8,
-                      padding: "14px 16px",
+                      padding: "12px 14px",
                       background: "var(--white, #FFFFFF)",
                       boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
                     }}
@@ -930,6 +813,8 @@ export function PdpActions({
                         marginBottom: 10,
                         paddingBottom: 8,
                         borderBottom: "1px solid #ECEAE5",
+                        gap: 8,
+                        flexWrap: "wrap",
                       }}
                     >
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -972,10 +857,10 @@ export function PdpActions({
                               aria-label={`Select ${c.name} for pair ${idx + 1}`}
                               onClick={() => handlePairColorSelect(idx, c.name)}
                               style={{
-                                width: 32,
-                                height: 32,
-                                minWidth: 32,
-                                minHeight: 32,
+                                width: 34,
+                                height: 34,
+                                minWidth: 34,
+                                minHeight: 34,
                                 borderRadius: "50%",
                                 border: pair.color === c.name ? "2px solid var(--black, #111)" : "1.5px solid transparent",
                                 padding: 2,
@@ -1025,15 +910,17 @@ export function PdpActions({
                                 }
                               }}
                               style={{
-                                minWidth: 42,
-                                height: 38,
+                                minWidth: 44,
+                                minHeight: 40,
+                                height: 40,
                                 padding: "0 12px",
                                 borderRadius: 4,
                                 fontSize: 13,
                                 fontWeight: isSelected ? 700 : 500,
                                 border: isSelected ? "2px solid var(--black, #111)" : "1.5px solid var(--stone, #D9D6CF)",
                                 background: isSelected ? "var(--black, #111)" : "var(--white, #FFF)",
-                                color: isSelected ? "var(--white, #FFF)" : isOutOfStock ? "#AAA" : "var(--black, #111)",
+                                color: isSelected ? "#FFFFFF" : isOutOfStock ? "#AAA" : "#111111",
+                                WebkitTextFillColor: isSelected ? "#FFFFFF" : isOutOfStock ? "#AAA" : "#111111",
                                 textDecoration: isOutOfStock ? "line-through" : "none",
                                 opacity: isOutOfStock || p.category === "trousers" ? 0.35 : 1,
                                 cursor: isOutOfStock || p.category === "trousers" ? "not-allowed" : "pointer",
@@ -1054,71 +941,60 @@ export function PdpActions({
         )}
 
         {/* PDP Actions (Add to Cart & Buy Now) */}
-        <div className="pdp-actions" style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <div className="pdp-actions-container">
           {p.category === "trousers" ? (
             <button
               type="button"
-              className="btn btn-primary"
+              className="pdp-btn-main"
               disabled
-              style={{ opacity: 0.6, cursor: "not-allowed", background: "var(--surface-2, #2a2a2a)", flex: 1 }}
+              style={{ opacity: 0.6, cursor: "not-allowed", background: "var(--surface-2, #2a2a2a)", width: "100%" }}
             >
               Coming Soon
             </button>
           ) : (
             <>
+              <div className="pdp-actions-row">
+                <button
+                  type="button"
+                  className="pdp-btn-main"
+                  disabled={!isAllBundleSizesSelected}
+                  onClick={handleAdd}
+                >
+                  {buttonText}
+                </button>
+                <button
+                  type="button"
+                  className={`pdp-wish-btn ${isItemWished ? "active" : ""}`}
+                  onClick={() =>
+                    wishlist.toggleWishlist({
+                      productId: p.id,
+                      name: p.name,
+                      price: p.price,
+                      oldPrice: p.oldPrice,
+                      img: displayedImage,
+                      color,
+                      size: size || p.sizes[0] || "Standard",
+                      category: p.category,
+                    })
+                  }
+                  aria-label={isItemWished ? "Remove from wishlist" : "Add to wishlist"}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z" />
+                  </svg>
+                </button>
+              </div>
+
               <button
                 type="button"
-                className="btn btn-primary"
-                disabled={!isAllBundleSizesSelected}
-                onClick={handleAdd}
-                style={{ flex: 1, minHeight: 48 }}
-              >
-                {buttonText}
-              </button>
-              <button
-                type="button"
+                className="pdp-btn-buynow"
                 disabled={!isAllBundleSizesSelected}
                 onClick={handleBuyNow}
-                style={{
-                  background: "var(--lime, #C8FF00)",
-                  color: "#111",
-                  fontWeight: 800,
-                  fontSize: "14px",
-                  letterSpacing: "0.02em",
-                  border: "1.5px solid rgba(0,0,0,0.15)",
-                  cursor: !isAllBundleSizesSelected ? "not-allowed" : "pointer",
-                  opacity: !isAllBundleSizesSelected ? 0.4 : 1,
-                  transition: "all 0.15s ease",
-                  padding: "0 22px",
-                  minHeight: "48px",
-                  borderRadius: "2px",
-                }}
               >
                 Buy Now
               </button>
             </>
           )}
-          <button
-            type="button"
-            className={`wish-toggle ${isItemWished ? "active" : ""}`}
-            onClick={() =>
-              wishlist.toggleWishlist({
-                productId: p.id,
-                name: p.name,
-                price: p.price,
-                oldPrice: p.oldPrice,
-                img: displayedImage,
-                color,
-                size: size || p.sizes[0] || "Standard",
-                category: p.category,
-              })
-            }
-            aria-label={isItemWished ? "Remove from wishlist" : "Add to wishlist"}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z" />
-            </svg>
-          </button>
         </div>
 
         {added && (
