@@ -244,7 +244,7 @@ export function CartDrawer() {
                     productId: "clog-sand",
                     name: "Everyday Comfort Clogs",
                     price: 1650,
-                    img: "https://res.cloudinary.com/wj34wxob/image/upload/v1790489954/IMG_4223_3_c8n15a.jpg",
+                    img: "https://res.cloudinary.com/tp1vyxi3/image/upload/v1789413175/ChatGPT_Image_Sep_14_2026_12_12_47_PM.png",
                     color: "Sand",
                     size: "PK 8",
                   },
@@ -252,7 +252,7 @@ export function CartDrawer() {
                     productId: "clog-black",
                     name: "Double sole Crocs",
                     price: 1850,
-                    img: "https://res.cloudinary.com/wj34wxob/image/upload/v1790489958/IMG_4228_3_mkvqch.jpg",
+                    img: "https://res.cloudinary.com/tp1vyxi3/image/upload/v1789376228/ChatGPT_Image_Sep_14_2026_01_04_47_AM.png",
                     color: "Black",
                     size: "PK 8",
                   },
@@ -321,6 +321,10 @@ export function CartDrawer() {
                               <img
                                 src={sug.img}
                                 alt={sug.name}
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src =
+                                    "https://res.cloudinary.com/tp1vyxi3/image/upload/v1789376228/ChatGPT_Image_Sep_14_2026_01_04_47_AM.png";
+                                }}
                                 style={{ width: "100%", height: "100%", objectFit: "cover" }}
                               />
                             </div>

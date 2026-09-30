@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
@@ -36,47 +35,7 @@ export function ProductCard({
   const router = useRouter();
   const wishlist = useWishlist();
   const isItemWished = wishlist.isWished(id);
-  const [added, setAdded] = useState(false);
-  const [animating, setAnimating] = useState(false);
-  const [animCoords, setAnimCoords] = useState<{ startX: number; startY: number } | null>(null);
   const cart = useCart();
-
-  function handleQuickAdd(e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (animating) return;
-
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    setAnimCoords({
-      startX: rect.left + rect.width / 2,
-      startY: rect.top + rect.height / 2,
-    });
-    setAnimating(true);
-
-    const selectedColor = colors[0]?.name || "Standard";
-    const selectedSize = sizes[0] || "Standard";
-
-    // 600ms flight animation delay before cart badge count increments
-    setTimeout(() => {
-      cart.addItem(
-        {
-          productId: id,
-          name,
-          color: selectedColor,
-          size: selectedSize,
-          price,
-          img: hero,
-        },
-        1
-      );
-      setAdded(true);
-      setAnimating(false);
-      setAnimCoords(null);
-      setTimeout(() => setAdded(false), 1500);
-      router.push("/cart");
-    }, 600);
-  }
 
   function handleBuyNow(e: React.MouseEvent) {
     e.preventDefault();
@@ -102,18 +61,6 @@ export function ProductCard({
 
   return (
     <div className="product-card">
-      {animating && animCoords && (
-        <div
-          className="fly-to-cart-dot"
-          style={
-            {
-              "--start-x": `${animCoords.startX}px`,
-              "--start-y": `${animCoords.startY}px`,
-            } as React.CSSProperties
-          }
-        />
-      )}
-
       <div className="product-thumb" style={{ position: "relative" }}>
         <Link href={`/product/${id}`} className="w-full h-full block">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -192,40 +139,31 @@ export function ProductCard({
             Coming Soon
           </button>
         ) : (
-          <div className="card-actions" style={{ display: "flex", gap: 6, marginTop: 12 }}>
-            <button
-              type="button"
-              onClick={handleQuickAdd}
-              className={`quick-add ${added ? "added" : ""}`}
-              style={{ flex: 1, marginTop: 0, padding: "8px 6px", fontSize: 12 }}
-            >
-              {added ? "Added ✓" : "+ Quick Add"}
-            </button>
-            <button
-              type="button"
-              onClick={handleBuyNow}
-              className="card-buy-now"
-              style={{
-                flex: 1,
-                minHeight: 44,
-                padding: "8px 6px",
-                fontSize: 12,
-                fontWeight: 700,
-                background: "var(--black, #111)",
-                color: "var(--white, #fff)",
-                border: "1.5px solid var(--black, #111)",
-                borderRadius: 2,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-                transition: "all 0.15s ease",
-              }}
-            >
-              Buy Now
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handleBuyNow}
+            className="card-buy-now"
+            style={{
+              width: "100%",
+              minHeight: 44,
+              marginTop: 12,
+              padding: "10px 12px",
+              fontSize: 13,
+              fontWeight: 700,
+              background: "var(--black, #111)",
+              color: "var(--white, #fff)",
+              border: "1.5px solid var(--black, #111)",
+              borderRadius: 2,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+              transition: "all 0.15s ease",
+            }}
+          >
+            Buy Now
+          </button>
         )}
       </div>
     </div>
