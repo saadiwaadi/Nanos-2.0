@@ -8,6 +8,7 @@ export interface PostexCreateOrderPayload {
   deliveryAddress: string;
   invoiceDivision: number;
   invoicePayment: number;
+  items?: number;
   orderDetail: string;
   orderRefNumber: string;
   pickupAddressCode: string;

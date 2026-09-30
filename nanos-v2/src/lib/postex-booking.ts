@@ -9,10 +9,17 @@ function sleep(ms: number) {
 }
 
 // ─── 3.5 CITY RESOLUTION & PHONE CLEANING ────────────────
-let cityCache: { at: number; set: Map<string, string> } | null = null;
+let cityCache: {
+  at: number;
+  normMap: Map<string, string>;
+  compactMap: Map<string, string>;
+} | null = null;
 
 const norm = (s: string) =>
   s.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+
+const compact = (s: string) =>
+  s.toLowerCase().replace(/[^a-z0-9]/g, "");
 
 const ALIASES: Record<string, string> = {
   lhr: "lahore",
@@ -34,10 +41,18 @@ const ALIASES: Record<string, string> = {
   swl: "sahiwal",
   ryk: "rahim yar khan",
   dgk: "dera ghazi khan",
+  dgkhan: "dera ghazi khan",
   dik: "dera ismail khan",
+  dikhan: "dera ismail khan",
   abb: "abbottabad",
   atd: "abbottabad",
   mzd: "muzaffarabad",
+  mirpur: "mirpur ajk",
+  sheikhoopura: "sheikhupura",
+  nowshehra: "nowshera",
+  charsada: "charsadda",
+  mandibahauddin: "mandi bahauddin",
+  tobateksingh: "toba tek singh",
 };
 
 const STOP_WORDS = new Set([
@@ -66,18 +81,29 @@ export async function resolveCity(input: string): Promise<string | null> {
   if (!input) return null;
   if (!cityCache || Date.now() - cityCache.at > 6 * 3600_000) {
     try {
-      const r: any = await postexFetch(
-        "/order/v1/get-operational-city"
-      );
-      const cities = Array.isArray(r) ? r : (Array.isArray(r?.dist) ? r.dist : []);
+      let r: any;
+      try {
+        r = await postexFetch("/order/v2/get-operational-city");
+      } catch {
+        r = await postexFetch("/order/v1/get-operational-city");
+      }
+
+      const cities = r?.dist || (Array.isArray(r) ? r : []);
       if (Array.isArray(cities) && cities.length > 0) {
+        const normMap = new Map<string, string>();
+        const compactMap = new Map<string, string>();
+
+        for (const c of cities) {
+          if (!c?.operationalCityName) continue;
+          const official = c.operationalCityName;
+          normMap.set(norm(official), official);
+          compactMap.set(compact(official), official);
+        }
+
         cityCache = {
           at: Date.now(),
-          set: new Map(
-            cities
-              .filter((c: any) => c && c.operationalCityName)
-              .map((c: any) => [norm(c.operationalCityName), c.operationalCityName])
-          ),
+          normMap,
+          compactMap,
         };
       }
     } catch {
@@ -88,11 +114,18 @@ export async function resolveCity(input: string): Promise<string | null> {
       const defaultOperational = [
         "Lahore", "Karachi", "Islamabad", "Rawalpindi", "Faisalabad",
         "Multan", "Peshawar", "Quetta", "Sialkot", "Gujrat", "Gujranwala",
-        "Vehari", "Sahiwal", "Bahawalpur", "Sargodha", "Hyderabad", "Sukkur"
+        "Vehari", "HASIL PUR", "Sahiwal", "Bahawalpur", "Sargodha", "Hyderabad", "Sukkur"
       ];
+      const normMap = new Map<string, string>();
+      const compactMap = new Map<string, string>();
+      for (const c of defaultOperational) {
+        normMap.set(norm(c), c);
+        compactMap.set(compact(c), c);
+      }
       cityCache = {
         at: Date.now(),
-        set: new Map(defaultOperational.map((c) => [norm(c), c])),
+        normMap,
+        compactMap,
       };
     }
   }
@@ -100,35 +133,59 @@ export async function resolveCity(input: string): Promise<string | null> {
   const k = norm(input);
   if (!k) return null;
 
-  // 1. Direct match or direct alias match
-  const direct = cityCache.set.get(ALIASES[k] ?? k);
-  if (direct) return direct;
+  const normMap = cityCache.normMap;
+  const compactMap = cityCache.compactMap;
 
-  // 2. Token / stripped match
+  // 1. Direct match or alias match
+  const aliasK = ALIASES[k] ?? k;
+  if (normMap.has(aliasK)) return normMap.get(aliasK)!;
+
+  // 2. Compact match (e.g. "Hasilpur" -> "hasilpur" -> "HASIL PUR")
+  const compK = compact(aliasK);
+  if (compactMap.has(compK)) return compactMap.get(compK)!;
+  if (ALIASES[compK] && compactMap.has(compact(ALIASES[compK]))) {
+    return compactMap.get(compact(ALIASES[compK]))!;
+  }
+
+  // 3. Token / stripped match
   const words = k.split(" ").filter((w) => w.length > 0);
   const cleanWords = words.filter((w) => !STOP_WORDS.has(w));
   const cleanStr = cleanWords.join(" ");
-  if (cleanStr && cityCache.set.has(ALIASES[cleanStr] ?? cleanStr)) {
-    return cityCache.set.get(ALIASES[cleanStr] ?? cleanStr)!;
+  if (cleanStr) {
+    const aliasClean = ALIASES[cleanStr] ?? cleanStr;
+    if (normMap.has(aliasClean)) return normMap.get(aliasClean)!;
+    const compClean = compact(aliasClean);
+    if (compactMap.has(compClean)) return compactMap.get(compClean)!;
   }
 
-  // 3. Individual token search (e.g. "Vehari" or "Burewala" inside "Burewala district Vehari")
+  // 4. Individual word or compacted word matches
   for (const w of words) {
     if (w.length >= 3 && !STOP_WORDS.has(w)) {
       const aliasW = ALIASES[w] ?? w;
-      if (cityCache.set.has(aliasW)) {
-        return cityCache.set.get(aliasW)!;
-      }
+      if (normMap.has(aliasW)) return normMap.get(aliasW)!;
+      const compW = compact(aliasW);
+      if (compactMap.has(compW)) return compactMap.get(compW)!;
     }
   }
 
-  // 4. Longest dictionary match
+  // 5. Longest dictionary substring scan
   let longest: string | null = null;
   let maxLen = 0;
-  for (const [normCity, official] of cityCache.set.entries()) {
+  for (const [normCity, official] of normMap.entries()) {
     if (normCity.length >= 4 && k.includes(normCity)) {
       if (normCity.length > maxLen) {
         maxLen = normCity.length;
+        longest = official;
+      }
+    }
+  }
+  if (longest) return longest;
+
+  // 6. Compact substring scan
+  for (const [compCity, official] of compactMap.entries()) {
+    if (compCity.length >= 4 && compK.includes(compCity)) {
+      if (compCity.length > maxLen) {
+        maxLen = compCity.length;
         longest = official;
       }
     }
@@ -199,6 +256,8 @@ export function buildPostexPayload(order: any, city: string) {
   const deliveryAddress = baseAddress ? `${baseAddress}, ${city}`.trim() : city;
 
   const orderItems = order.items || order.orderItems || [];
+  const totalPieces =
+    orderItems.reduce((sum: number, i: any) => sum + (Number(i.quantity ?? i.qty) || 1), 0) || 1;
   const itemDetails =
     orderItems.length > 0
       ? orderItems
@@ -216,6 +275,7 @@ export function buildPostexPayload(order: any, city: string) {
     deliveryAddress,
     invoiceDivision: 1,
     invoicePayment: Math.max(0, Number(order.total) || 0),
+    items: totalPieces,
     orderDetail: itemDetails,
     orderRefNumber: order.id,
     pickupAddressCode,
