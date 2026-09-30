@@ -74,6 +74,7 @@ export function ProductCard({
       setAnimating(false);
       setAnimCoords(null);
       setTimeout(() => setAdded(false), 1500);
+      router.push("/cart");
     }, 600);
   }
 

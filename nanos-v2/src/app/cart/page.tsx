@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import { fmtPrice } from "@/lib/cart";
 
 export default function CartPage() {
+  const router = useRouter();
   const cart = useCart();
   const [promoInput, setPromoInput] = useState("");
   const [promoMsg, setPromoMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -32,9 +34,18 @@ export default function CartPage() {
             <p>
               Looks like you haven&apos;t added anything yet. Browse crocs and trousers built for your everyday rotation.
             </p>
-            <Link href="/" className="btn btn-primary">
-              Start Shopping
-            </Link>
+            <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => router.back()}
+              >
+                Continue Shopping
+              </button>
+              <Link href="/" className="btn btn-outline">
+                Browse Products
+              </Link>
+            </div>
           </div>
         </div>
       </div>
@@ -203,13 +214,14 @@ export default function CartPage() {
             >
               Proceed to Checkout
             </Link>
-            <Link
-              href="/"
+            <button
+              type="button"
+              onClick={() => router.back()}
               className="btn btn-outline btn-block"
               style={{ marginTop: 10 }}
             >
               Continue Shopping
-            </Link>
+            </button>
           </div>
         </div>
       </div>

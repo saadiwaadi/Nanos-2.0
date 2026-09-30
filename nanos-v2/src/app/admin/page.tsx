@@ -405,6 +405,19 @@ export default function AdminPage() {
   const [settingDrafts, setSettingDrafts] = useState<Record<string, string>>({});
   const [savingSettingCategory, setSavingSettingCategory] = useState<string | null>(null);
 
+  // Remarks & PostEx Shipper Advice State
+  const [remarksOrder, setRemarksOrder] = useState<AdminOrder | null>(null);
+  const [remarksLoading, setRemarksLoading] = useState(false);
+  const [remarksSubmitting, setRemarksSubmitting] = useState(false);
+  const [remarksInput, setRemarksInput] = useState("");
+  const [remarksStatusId, setRemarksStatusId] = useState<number>(0);
+  const [remarksSyncPostex, setRemarksSyncPostex] = useState<boolean>(true);
+  const [remarksHistory, setRemarksHistory] = useState<{
+    localRemarks: any[];
+    postexRemarks: any[];
+    trackingNumber: string | null;
+  }>({ localRemarks: [], postexRemarks: [], trackingNumber: null });
+
   // Toast Helper
   const showToast = useCallback((message: string, type: "success" | "error" = "success") => {
     setToast({ message, type });
@@ -544,6 +557,70 @@ export default function AdminPage() {
       setCourierLoading(false);
     }
   }, [authFetch, showToast]);
+
+  // Remarks / Shipper Advice Functions
+  const fetchRemarksHistory = useCallback(async (orderId: string) => {
+    setRemarksLoading(true);
+    try {
+      const res = await authFetch(`/api/admin/orders/${orderId}/remarks`);
+      if (res.ok) {
+        const data = await res.json();
+        setRemarksHistory({
+          localRemarks: data.localRemarks || [],
+          postexRemarks: data.postexRemarks || [],
+          trackingNumber: data.trackingNumber || null,
+        });
+      }
+    } catch {
+      // Ignore
+    } finally {
+      setRemarksLoading(false);
+    }
+  }, [authFetch]);
+
+  const openRemarksModal = useCallback((order: AdminOrder) => {
+    setRemarksOrder(order);
+    setRemarksInput("");
+    setRemarksStatusId(0);
+    const tracking = order.postexTrackingNumber || order.trackingNumber || null;
+    setRemarksSyncPostex(!!tracking);
+    setRemarksHistory({
+      localRemarks: (order.auditLogs || []).filter((l) => l.action === "SHIPPER_ADVICE" || l.action === "ADD_REMARK"),
+      postexRemarks: [],
+      trackingNumber: tracking,
+    });
+    fetchRemarksHistory(order.id);
+  }, [fetchRemarksHistory]);
+
+  const handleSaveRemark = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!remarksOrder || !remarksInput.trim()) return;
+
+    setRemarksSubmitting(true);
+    try {
+      const res = await authFetch(`/api/admin/orders/${remarksOrder.id}/remarks`, {
+        method: "POST",
+        body: JSON.stringify({
+          remarks: remarksInput.trim(),
+          statusId: remarksStatusId,
+          syncToPostex: remarksSyncPostex,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || "Failed to save remark", "error");
+      } else {
+        showToast(data.message || "Remark saved successfully", "success");
+        setRemarksInput("");
+        await fetchRemarksHistory(remarksOrder.id);
+        loadMainData();
+      }
+    } catch (err: any) {
+      showToast(err.message || "Failed to submit remark", "error");
+    } finally {
+      setRemarksSubmitting(false);
+    }
+  }, [remarksOrder, remarksInput, remarksStatusId, remarksSyncPostex, authFetch, showToast, fetchRemarksHistory, loadMainData]);
 
   // Load Size Chart Data
   const loadSizeChart = useCallback(
@@ -2767,7 +2844,7 @@ export default function AdminPage() {
                                 </div>
                                 <div
                                   style={{ fontSize: 12, color: "var(--admin-text-soft)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-                                  title={o.customerEmail}
+                                  title={o.customerEmail || undefined}
                                 >
                                   {o.customerEmail}
                                 </div>
@@ -2883,6 +2960,16 @@ export default function AdminPage() {
                                   {cancelled && (
                                     <span className="badge badge-danger" style={{ fontSize: 11 }}>Cancelled</span>
                                   )}
+
+                                  <button
+                                    type="button"
+                                    className="btn btn-outline btn-sm"
+                                    style={{ fontSize: 11.5, padding: "5px 8px", display: "inline-flex", alignItems: "center", gap: 3 }}
+                                    onClick={() => openRemarksModal(o)}
+                                    title="Add remarks or PostEx shipper advice"
+                                  >
+                                    <span>💬 Remark</span>
+                                  </button>
                                 </div>
                               </td>
                               <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>
@@ -2985,9 +3072,65 @@ export default function AdminPage() {
                                     ))}
                                   </div>
 
-                                  {/* Totals */}
-                                  <div style={{ textAlign: "right", marginTop: 12, marginBottom: 20, fontWeight: 700 }}>
-                                    Total: {fmtPrice(o.total)}
+                                  {/* REMARKS & POSTEX SHIPPER ADVICE PANEL */}
+                                  <div style={{ borderTop: "1px solid var(--admin-border)", paddingTop: 16, marginBottom: 16 }}>
+                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+                                      <div style={{ fontWeight: 700, fontSize: 14, display: "flex", alignItems: "center", gap: 8 }}>
+                                        <span>💬 Remarks &amp; PostEx Shipper Advice</span>
+                                        {trackingNum && (
+                                          <span style={{ fontSize: 11, background: "rgba(59, 130, 246, 0.15)", color: "#3b82f6", padding: "2px 8px", borderRadius: 4, fontWeight: 700 }}>
+                                            PostEx #{trackingNum}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <button
+                                        type="button"
+                                        className="btn btn-outline btn-sm"
+                                        style={{ fontSize: 11.5, padding: "4px 10px", minHeight: 30 }}
+                                        onClick={() => openRemarksModal(o)}
+                                      >
+                                        + Add Remark / Shipper Advice
+                                      </button>
+                                    </div>
+                                    {(!o.auditLogs || o.auditLogs.filter((l) => l.action === "SHIPPER_ADVICE" || l.action === "ADD_REMARK").length === 0) ? (
+                                      <div style={{ fontSize: 12.5, color: "var(--admin-text-soft)", padding: "4px 0" }}>
+                                        No remarks added yet for this order. Click &quot;+ Add Remark&quot; to add customer notes or submit shipper advice to PostEx.
+                                      </div>
+                                    ) : (
+                                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                                        {o.auditLogs
+                                          .filter((l) => l.action === "SHIPPER_ADVICE" || l.action === "ADD_REMARK")
+                                          .map((l) => (
+                                            <div
+                                              key={l.id}
+                                              style={{
+                                                background: "var(--admin-surface)",
+                                                border: "1px solid var(--admin-border)",
+                                                borderRadius: 4,
+                                                padding: "8px 12px",
+                                                fontSize: 12.5,
+                                                display: "flex",
+                                                justifyContent: "space-between",
+                                                alignItems: "center",
+                                                gap: 10,
+                                              }}
+                                            >
+                                              <div>
+                                                <span style={{ fontWeight: 700, color: "var(--admin-accent)" }}>{l.adminUser}: </span>
+                                                <span>{l.note}</span>
+                                              </div>
+                                              <span style={{ fontSize: 11, color: "var(--admin-text-soft)", whiteSpace: "nowrap" }}>
+                                                {new Date(l.createdAt).toLocaleString("en-PK", {
+                                                  day: "2-digit",
+                                                  month: "short",
+                                                  hour: "2-digit",
+                                                  minute: "2-digit",
+                                                })}
+                                              </span>
+                                            </div>
+                                          ))}
+                                      </div>
+                                    )}
                                   </div>
 
                                   {/* ORDER AUDIT LOG */}
@@ -5248,6 +5391,259 @@ export default function AdminPage() {
               >
                 {modalSubmitting ? "Processing…" : confirmModal.actionLabel}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Remarks & PostEx Shipper Advice Modal */}
+      {remarksOrder && (
+        <div
+          className="modal-overlay"
+          onClick={() => {
+            if (!remarksSubmitting) {
+              setRemarksOrder(null);
+            }
+          }}
+        >
+          <div
+            className="modal"
+            style={{ maxWidth: 580, maxHeight: "90vh", display: "flex", flexDirection: "column" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="modal-head" style={{ borderBottom: "1px solid var(--admin-border)" }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 17, display: "flex", alignItems: "center", gap: 8 }}>
+                  <span>💬 Remarks &amp; Shipper Advice</span>
+                </h3>
+                <div style={{ fontSize: 12.5, color: "var(--admin-text-soft)", marginTop: 3 }}>
+                  Order <strong>#{remarksOrder.id.slice(-8)}</strong> · {remarksOrder.customerName} ({remarksOrder.shippingInfo?.city || "Unknown City"})
+                </div>
+              </div>
+              <button
+                type="button"
+                className="modal-close"
+                disabled={remarksSubmitting}
+                onClick={() => setRemarksOrder(null)}
+                aria-label="Close modal"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="modal-body" style={{ overflowY: "auto", padding: "18px 20px", display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* Courier Tracking Status Bar */}
+              <div
+                style={{
+                  background: "var(--admin-surface-2)",
+                  border: "1px solid var(--admin-border)",
+                  borderRadius: 6,
+                  padding: "10px 14px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  gap: 8,
+                }}
+              >
+                <div>
+                  <span style={{ fontSize: 11.5, color: "var(--admin-text-soft)", textTransform: "uppercase", letterSpacing: "0.03em" }}>
+                    PostEx Tracking Number
+                  </span>
+                  <div style={{ fontSize: 13.5, fontWeight: 700, marginTop: 1 }}>
+                    {remarksHistory.trackingNumber ? (
+                      <a
+                        href={`https://postex.pk/tracking?trackingNumber=${remarksHistory.trackingNumber}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ color: "#3b82f6", textDecoration: "underline" }}
+                      >
+                        {remarksHistory.trackingNumber} ↗
+                      </a>
+                    ) : (
+                      <span style={{ color: "var(--admin-text-soft)", fontWeight: 500 }}>Not booked with PostEx yet</span>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ textAlign: "right" }}>
+                  <span style={{ fontSize: 11.5, color: "var(--admin-text-soft)", textTransform: "uppercase", letterSpacing: "0.03em" }}>
+                    Order Total
+                  </span>
+                  <div style={{ fontSize: 13.5, fontWeight: 700 }}>
+                    {fmtPrice(remarksOrder.total)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Remarks History List */}
+              <div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.02em" }}>
+                    Remarks &amp; Shipper Advice History
+                  </span>
+                  <button
+                    type="button"
+                    style={{ fontSize: 11.5, color: "#3b82f6", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}
+                    onClick={() => fetchRemarksHistory(remarksOrder.id)}
+                  >
+                    Refresh ↻
+                  </button>
+                </div>
+
+                {remarksLoading ? (
+                  <div style={{ padding: "14px", textAlign: "center", fontSize: 12.5, color: "var(--admin-text-soft)" }}>
+                    Loading remarks from PostEx API…
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 180, overflowY: "auto", paddingRight: 4 }}>
+                    {/* Live PostEx Shipper Advice Items */}
+                    {remarksHistory.postexRemarks && remarksHistory.postexRemarks.length > 0 && (
+                      remarksHistory.postexRemarks.map((item, idx) => (
+                        <div
+                          key={`postex-rem-${idx}`}
+                          style={{
+                            background: "rgba(59, 130, 246, 0.08)",
+                            border: "1px solid rgba(59, 130, 246, 0.25)",
+                            borderRadius: 6,
+                            padding: "8px 12px",
+                            fontSize: 12.5,
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
+                            <span style={{ fontWeight: 700, color: "#2563eb", fontSize: 11 }}>
+                              POSTEX SHIPPER ADVICE {item.username ? `· ${item.username}` : ""}
+                            </span>
+                            <span style={{ fontSize: 11, color: "var(--admin-text-soft)" }}>
+                              {item.remarksDate || "Recent"}
+                            </span>
+                          </div>
+                          <div style={{ color: "var(--admin-text)" }}>{item.remarks}</div>
+                        </div>
+                      ))
+                    )}
+
+                    {/* Local Remarks & Audit Items */}
+                    {remarksHistory.localRemarks && remarksHistory.localRemarks.length > 0 ? (
+                      remarksHistory.localRemarks.map((log) => (
+                        <div
+                          key={log.id}
+                          style={{
+                            background: "var(--admin-surface)",
+                            border: "1px solid var(--admin-border)",
+                            borderRadius: 6,
+                            padding: "8px 12px",
+                            fontSize: 12.5,
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
+                            <span style={{ fontWeight: 700, color: "var(--admin-accent)" }}>
+                              {log.adminUser || "Admin"}
+                            </span>
+                            <span style={{ fontSize: 11, color: "var(--admin-text-soft)" }}>
+                              {new Date(log.createdAt).toLocaleString("en-PK", {
+                                day: "2-digit",
+                                month: "short",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                          </div>
+                          <div style={{ color: "var(--admin-text)" }}>{log.note || "-"}</div>
+                        </div>
+                      ))
+                    ) : null}
+
+                    {(!remarksHistory.postexRemarks || remarksHistory.postexRemarks.length === 0) &&
+                      (!remarksHistory.localRemarks || remarksHistory.localRemarks.length === 0) && (
+                        <div style={{ padding: "12px", textAlign: "center", fontSize: 12.5, color: "var(--admin-text-soft)", background: "var(--admin-surface)", borderRadius: 6 }}>
+                          No remarks recorded yet. Use the form below to add remarks or submit advice to PostEx.
+                        </div>
+                      )}
+                  </div>
+                )}
+              </div>
+
+              {/* Add Remark Form */}
+              <form onSubmit={handleSaveRemark} style={{ borderTop: "1px solid var(--admin-border)", paddingTop: 14 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.02em" }}>
+                  Add New Remark / Shipper Advice
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {/* Status ID Selector */}
+                  <div className="field">
+                    <label style={{ fontSize: 12.5, fontWeight: 600 }}>Advice Type (PostEx Status ID)</label>
+                    <select
+                      value={remarksStatusId}
+                      onChange={(e) => setRemarksStatusId(Number(e.target.value))}
+                      style={{ padding: "8px 10px", fontSize: 13, borderRadius: 4, background: "var(--admin-surface)" }}
+                    >
+                      <option value={0}>0 — General Remarks / Instruction</option>
+                      <option value={2}>2 — Mark Retry Attempt (Reattempt Delivery)</option>
+                      <option value={1}>1 — Mark Return Requested (Return to Origin)</option>
+                    </select>
+                  </div>
+
+                  {/* Remarks Input */}
+                  <div className="field">
+                    <label style={{ fontSize: 12.5, fontWeight: 600 }}>
+                      Remarks / Instructions <span style={{ color: "var(--admin-danger)" }}>*</span>
+                    </label>
+                    <textarea
+                      rows={3}
+                      placeholder={
+                        remarksStatusId === 2
+                          ? "e.g., Customer confirmed available tomorrow at 4 PM. Please re-dispatch package."
+                          : remarksStatusId === 1
+                          ? "e.g., Customer refused delivery / returned item. Please return to warehouse."
+                          : "e.g., Customer requested delivery in afternoon after 2 PM."
+                      }
+                      value={remarksInput}
+                      onChange={(e) => setRemarksInput(e.target.value)}
+                      required
+                      style={{ width: "100%", padding: "8px 10px", fontSize: 13, borderRadius: 4, background: "var(--admin-surface)" }}
+                    />
+                  </div>
+
+                  {/* Sync to PostEx Checkbox */}
+                  {remarksHistory.trackingNumber && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
+                      <input
+                        type="checkbox"
+                        id="syncPostexCheck"
+                        checked={remarksSyncPostex}
+                        onChange={(e) => setRemarksSyncPostex(e.target.checked)}
+                      />
+                      <label htmlFor="syncPostexCheck" style={{ fontSize: 12.5, margin: 0, cursor: "pointer" }}>
+                        ⚡ Submit to PostEx via Save Shipper Advice API (Section 3.11)
+                      </label>
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 10 }}>
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      disabled={remarksSubmitting}
+                      onClick={() => setRemarksOrder(null)}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="btn btn-primary btn-sm"
+                      disabled={remarksSubmitting || !remarksInput.trim()}
+                      style={{ fontWeight: 700 }}
+                    >
+                      {remarksSubmitting ? "Submitting…" : "Save & Submit Remark"}
+                    </button>
+                  </div>
+                </div>
+              </form>
             </div>
           </div>
         </div>

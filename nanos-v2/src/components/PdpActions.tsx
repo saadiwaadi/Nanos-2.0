@@ -256,6 +256,7 @@ export function PdpActions({
 
     setAdded(true);
     setTimeout(() => setAdded(false), 1500);
+    router.push("/cart");
   }
 
   function handleBuyNow(e: React.MouseEvent) {

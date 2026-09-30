@@ -95,11 +95,59 @@ export async function callTrackOrderApi(
   );
 }
 
+export interface PostexShipperAdvicePayload {
+  trackingNumber: string;
+  statusId: number; // 1 - Mark Return Requested, 2 - Mark Retry Attempt, 0 - General Remarks
+  remarks: string;
+}
+
+export interface PostexShipperAdviceItem {
+  remarks: string;
+  remarksDate: string;
+  username?: string;
+}
+
+export interface PostexGetShipperAdviceResponse {
+  statusCode: string;
+  statusMessage: string;
+  dist?: {
+    trackingNumber: string;
+    message?: string;
+    trackingResponse?: PostexShipperAdviceItem[];
+  }[];
+}
+
 export async function callCancelOrderApi(trackingNumber: string) {
   return postexFetch("/order/v1/cancel-order", {
     method: "PUT",
     body: { trackingNumber },
   });
+}
+
+/**
+ * Section 3.11: Save Shipper Advice API
+ * PUT https://api.postex.pk/services/integration/api/order/v2/save-shipper-advice
+ */
+export async function callSaveShipperAdviceApi(
+  payload: PostexShipperAdvicePayload
+): Promise<any> {
+  return postexFetch("/order/v2/save-shipper-advice", {
+    method: "PUT",
+    body: payload,
+  });
+}
+
+/**
+ * Section 3.12: Get Shipper Advice API
+ * GET https://api.postex.pk/services/integration/api/order/v1/get-shipper-advice/{trackingNumber}
+ */
+export async function callGetShipperAdviceApi(
+  trackingNumber: string
+): Promise<PostexGetShipperAdviceResponse> {
+  return postexFetch<PostexGetShipperAdviceResponse>(
+    `/order/v1/get-shipper-advice/${encodeURIComponent(trackingNumber)}`,
+    { method: "GET" }
+  );
 }
 
 export async function isAutoBookCity(city: string): Promise<boolean> {
