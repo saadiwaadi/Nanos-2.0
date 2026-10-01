@@ -8,6 +8,7 @@ import { reserveStock } from "@/lib/stock";
 import { AppError } from "@/lib/order-state";
 import { getPromoSettings, calculatePromoDiscount } from "@/lib/promo-settings";
 import { getShippingSettings, calculateShippingFee } from "@/lib/shipping-settings";
+import { normalizeOperationalCity } from "@/lib/operational-cities";
 
 // In-memory fallback order store for dev when DB is offline
 export const memoryOrders = new Map<string, any>();
@@ -54,6 +55,16 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+
+    // Server-side validation against PostEx operational delivery cities
+    const canonicalCity = await normalizeOperationalCity(shippingInfo.city);
+    if (!canonicalCity) {
+      return NextResponse.json(
+        { error: { code: "BAD_REQUEST", message: `The city "${shippingInfo.city}" is not an operational delivery city.` } },
+        { status: 400 }
+      );
+    }
+    shippingInfo.city = canonicalCity;
 
     const userEmail = (shippingInfo.email || guestEmail || "").trim();
     if (userEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userEmail)) {

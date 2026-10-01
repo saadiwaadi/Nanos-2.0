@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { OrderSummary, OrderStatus } from "@/lib/types";
 import { OverviewTab } from "@/components/account/OverviewTab";
 import { useSWR } from "@/lib/swr";
+import { CityCombobox } from "@/components/CityCombobox";
 
 function getInitials(name?: string): string {
   if (!name) return "N";
@@ -57,6 +58,11 @@ export default function AccountPage() {
   const [activeTab, setActiveTab] = useState<"overview" | "orders" | "wishlist" | "details">("overview");
   const [nameInput, setNameInput] = useState("");
   const [emailInput, setEmailInput] = useState("");
+  const [phoneInput, setPhoneInput] = useState("");
+  const [addressInput, setAddressInput] = useState("");
+  const [cityInput, setCityInput] = useState("");
+  const [postalInput, setPostalInput] = useState("");
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
 
   const fetchOrders = useCallback(async () => {
     let token: string | null = null;
@@ -110,6 +116,17 @@ export default function AccountPage() {
       setNameInput(auth.user.name || "");
       setEmailInput(auth.user.email || "");
     }
+
+    try {
+      const rawSaved = localStorage.getItem("nanos_saved_address") || localStorage.getItem("nanos_checkout_draft");
+      if (rawSaved) {
+        const d = JSON.parse(rawSaved);
+        if (d.phone) setPhoneInput(d.phone);
+        if (d.address) setAddressInput(d.address);
+        if (d.city) setCityInput(d.city);
+        if (d.postal) setPostalInput(d.postal);
+      }
+    } catch {}
   }, [auth.isLoggedIn, auth.user, router]);
 
   if (!auth.isLoggedIn || !auth.user) {
@@ -120,7 +137,20 @@ export default function AccountPage() {
 
   function handleSaveDetails(e: React.FormEvent) {
     e.preventDefault();
-    console.log("Save account details:", { name: nameInput, email: emailInput });
+    try {
+      const addressData = {
+        name: nameInput,
+        phone: phoneInput,
+        email: emailInput,
+        address: addressInput,
+        city: cityInput,
+        postal: postalInput,
+      };
+      localStorage.setItem("nanos_saved_address", JSON.stringify(addressData));
+      localStorage.setItem("nanos_checkout_draft", JSON.stringify(addressData));
+      setSaveSuccessMsg("Account details & address saved successfully!");
+      setTimeout(() => setSaveSuccessMsg(null), 3000);
+    } catch {}
   }
 
   function handleLogout() {
@@ -428,8 +458,25 @@ export default function AccountPage() {
               <div className="form-section">
                 <h3>Account Details</h3>
                 <form onSubmit={handleSaveDetails} className="auth-form">
+                  {saveSuccessMsg && (
+                    <div
+                      style={{
+                        padding: "12px 16px",
+                        backgroundColor: "#f0fdf4",
+                        border: "1px solid #bbf7d0",
+                        borderRadius: "6px",
+                        color: "#15803d",
+                        fontSize: "13.5px",
+                        fontWeight: 500,
+                        marginBottom: "16px",
+                      }}
+                    >
+                      {saveSuccessMsg}
+                    </div>
+                  )}
+
                   <div className="form-row">
-                    <div className="form-group full">
+                    <div className="form-group">
                       <label htmlFor="acc-name">Full Name</label>
                       <input
                         type="text"
@@ -439,9 +486,7 @@ export default function AccountPage() {
                         required
                       />
                     </div>
-                  </div>
-                  <div className="form-row">
-                    <div className="form-group full">
+                    <div className="form-group">
                       <label htmlFor="acc-email">Email Address</label>
                       <input
                         type="email"
@@ -452,8 +497,65 @@ export default function AccountPage() {
                       />
                     </div>
                   </div>
-                  <div style={{ marginTop: 12 }}>
-                    <button type="submit" className="btn btn-secondary">
+
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label htmlFor="acc-phone">Phone Number (Optional)</label>
+                      <input
+                        type="tel"
+                        id="acc-phone"
+                        placeholder="03XX-XXXXXXX"
+                        value={phoneInput}
+                        onChange={(e) => setPhoneInput(e.target.value)}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="acc-postal">Postal Code (Optional)</label>
+                      <input
+                        type="text"
+                        id="acc-postal"
+                        placeholder="54000"
+                        value={postalInput}
+                        onChange={(e) => setPostalInput(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-row">
+                    <div className="form-group full">
+                      <label htmlFor="acc-address">Delivery Address (Optional)</label>
+                      <input
+                        type="text"
+                        id="acc-address"
+                        placeholder="House #, Street, Area"
+                        value={addressInput}
+                        onChange={(e) => setAddressInput(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-row">
+                    <div className="form-group full">
+                      <label htmlFor="acc-city">City {addressInput.trim().length > 0 ? "(Required with address)" : "(Optional)"}</label>
+                      <CityCombobox
+                        id="acc-city"
+                        value={cityInput}
+                        onChange={(val) => setCityInput(val)}
+                        placeholder="Type or search city (e.g. Lahore, Karachi)"
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: 16 }}>
+                    <button
+                      type="submit"
+                      className="btn btn-secondary"
+                      disabled={
+                        !nameInput.trim() ||
+                        !emailInput.trim() ||
+                        (addressInput.trim().length > 0 && !cityInput.trim())
+                      }
+                    >
                       Save Changes
                     </button>
                   </div>
