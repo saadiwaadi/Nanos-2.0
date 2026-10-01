@@ -120,7 +120,9 @@ export default function CheckoutPage() {
   const phoneDigits = (phone.match(/\d/g) || []).length;
   const isPhoneValid = phoneDigits >= 10;
   const isAddressValid = address.trim().length >= 5;
-  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const isEmailValid = createAccount
+    ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+    : email.trim() === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const isNameValid = name.trim().length >= 2;
   const isCityValid = city === "Other" ? customCity.trim().length >= 2 : city.trim().length > 0;
   const isPostalValid = true; // Postal code is optional
@@ -158,9 +160,17 @@ export default function CheckoutPage() {
 
     try {
       let currentToken = auth.token;
+      const trimmedEmail = email.trim();
 
       // 1. Optional registration for guest
       if (!auth.isLoggedIn && createAccount) {
+        if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+          setErrorMsg("Please provide a valid email address to create an account.");
+          setIsSubmitting(false);
+          submittingRef.current = false;
+          return;
+        }
+
         if (!password || password.length < 8) {
           setErrorMsg("Password must be at least 8 characters long.");
           setIsSubmitting(false);
@@ -171,7 +181,7 @@ export default function CheckoutPage() {
         const regRes = await fetch("/api/auth/register", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, email, password }),
+          body: JSON.stringify({ name, email: trimmedEmail, password }),
         });
 
         const regData = await regRes.json();
@@ -201,10 +211,17 @@ export default function CheckoutPage() {
           size: i.size,
           qty: i.qty,
         })),
-        shippingInfo: { name, phone, email, address, city: effectiveCity, postal },
+        shippingInfo: {
+          name: name.trim(),
+          phone: phone.trim(),
+          email: trimmedEmail || undefined,
+          address: address.trim(),
+          city: effectiveCity,
+          postal: postal.trim() || undefined,
+        },
         promoCode: cart.promo || undefined,
-        guestEmail: currentToken ? undefined : email,
-        guestName: currentToken ? undefined : name,
+        guestEmail: currentToken ? undefined : (trimmedEmail || undefined),
+        guestName: currentToken ? undefined : name.trim(),
         fbp: getCookie("_fbp"),
         fbc: getCookie("_fbc"),
         eventId: initiateCheckoutEventId,
@@ -233,7 +250,9 @@ export default function CheckoutPage() {
 
       const redirectUrl = currentToken
         ? `/confirmation/${orderData.id}`
-        : `/confirmation/${orderData.id}?email=${encodeURIComponent(email)}`;
+        : trimmedEmail
+        ? `/confirmation/${orderData.id}?email=${encodeURIComponent(trimmedEmail)}`
+        : `/confirmation/${orderData.id}`;
 
       router.push(redirectUrl);
     } catch (err: any) {
@@ -324,19 +343,26 @@ export default function CheckoutPage() {
 
                 <div className="form-row">
                   <div className="form-group full">
-                    <label htmlFor="ship-email">Email Address</label>
+                    <label htmlFor="ship-email">
+                      Email Address {createAccount ? "(Required for account)" : "(Optional)"}
+                    </label>
                     <input
                       type="email"
                       id="ship-email"
-                      required
-                      placeholder="you@example.com"
+                      required={createAccount}
+                      placeholder="you@example.com (optional)"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       onBlur={() => markTouched("email")}
                     />
-                    {touched.email && !isEmailValid && (
+                    {touched.email && email.trim() !== "" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) && (
                       <span style={{ color: "#c0392b", fontSize: 12, marginTop: 4 }}>
                         Please enter a valid email address
+                      </span>
+                    )}
+                    {touched.email && createAccount && !email.trim() && (
+                      <span style={{ color: "#c0392b", fontSize: 12, marginTop: 4 }}>
+                        Email is required when creating an account
                       </span>
                     )}
                   </div>

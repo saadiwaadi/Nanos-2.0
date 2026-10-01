@@ -46,12 +46,19 @@ export async function POST(request: Request) {
       !shippingInfo ||
       !shippingInfo.name ||
       !shippingInfo.phone ||
-      !shippingInfo.email ||
       !shippingInfo.address ||
       !shippingInfo.city
     ) {
       return NextResponse.json(
-        { error: { code: "BAD_REQUEST", message: "Name, phone, email, address, and city are required." } },
+        { error: { code: "BAD_REQUEST", message: "Name, phone, address, and city are required." } },
+        { status: 400 }
+      );
+    }
+
+    const userEmail = (shippingInfo.email || guestEmail || "").trim();
+    if (userEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userEmail)) {
+      return NextResponse.json(
+        { error: { code: "BAD_REQUEST", message: "Please enter a valid email address." } },
         { status: 400 }
       );
     }
@@ -133,8 +140,10 @@ export async function POST(request: Request) {
           data: {
             id: orderId,
             userId: validUserId,
-            guestEmail: validUserId ? null : guestEmail || shippingInfo.email,
-            guestName: validUserId ? null : guestName || shippingInfo.name,
+            guestEmail: validUserId ? null : (userEmail || null),
+            guestName: validUserId ? null : (guestName || shippingInfo.name || null),
+            customerName: shippingInfo.name || guestName || null,
+            customerEmail: userEmail || null,
             subtotal,
             discount,
             shipping,
@@ -196,7 +205,7 @@ export async function POST(request: Request) {
         request.headers.get("referer") || "https://nanos.pk/checkout";
 
       const userData = {
-        email: shippingInfo.email || guestEmail,
+        email: userEmail || null,
         phone: shippingInfo.phone,
         name: shippingInfo.name || guestName,
         city: shippingInfo.city,
