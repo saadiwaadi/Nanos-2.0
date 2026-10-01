@@ -7,7 +7,6 @@ import { useAuth } from "@/context/AuthContext";
 import { OrderSummary, OrderStatus } from "@/lib/types";
 import { OverviewTab } from "@/components/account/OverviewTab";
 import { useSWR } from "@/lib/swr";
-import { CityCombobox } from "@/components/CityCombobox";
 
 function getInitials(name?: string): string {
   if (!name) return "N";
@@ -537,11 +536,12 @@ export default function AccountPage() {
                   <div className="form-row">
                     <div className="form-group full">
                       <label htmlFor="acc-city">City {addressInput.trim().length > 0 ? "(Required with address)" : "(Optional)"}</label>
-                      <CityCombobox
+                      <input
+                        type="text"
                         id="acc-city"
+                        placeholder="e.g. Lahore, Karachi, Islamabad"
                         value={cityInput}
-                        onChange={(val) => setCityInput(val)}
-                        placeholder="Type or search city (e.g. Lahore, Karachi)"
+                        onChange={(e) => setCityInput(e.target.value)}
                       />
                     </div>
                   </div>

@@ -7,7 +7,6 @@ import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { fmtPrice } from "@/lib/cart";
 import { trackMeta } from "@/lib/fpixel";
-import { CityCombobox } from "@/components/CityCombobox";
 
 function getCookie(name: string): string | undefined {
   if (typeof document === "undefined") return undefined;
@@ -113,7 +112,7 @@ export default function CheckoutPage() {
     ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
     : email.trim() === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const isNameValid = name.trim().length >= 2;
-  const isCityValid = city.trim().length > 0;
+  const isCityValid = city.trim().length >= 2;
   const isPostalValid = true; // Postal code is optional
   const isPasswordValid = !createAccount || password.length >= 8;
 
@@ -123,8 +122,6 @@ export default function CheckoutPage() {
     isEmailValid &&
     isAddressValid &&
     isCityValid &&
-    isPasswordValid &&
-    cart.items.length > 0;
     isPasswordValid &&
     cart.items.length > 0;
 
@@ -382,17 +379,18 @@ export default function CheckoutPage() {
                 <div className="form-row">
                   <div className="form-group">
                     <label htmlFor="ship-city">City</label>
-                    <CityCombobox
+                    <input
+                      type="text"
                       id="ship-city"
+                      required
+                      placeholder="e.g. Lahore, Karachi, Rawalpindi"
                       value={city}
-                      onChange={(val) => setCity(val)}
+                      onChange={(e) => setCity(e.target.value)}
                       onBlur={() => markTouched("city")}
-                      hasError={touched.city && !isCityValid}
-                      placeholder="Type or search city (e.g. Lahore, Karachi)"
                     />
                     {touched.city && !isCityValid && (
                       <span style={{ color: "#c0392b", fontSize: 12, marginTop: 4 }}>
-                        Please select a valid delivery city from the list
+                        Please enter your city name
                       </span>
                     )}
                   </div>

@@ -56,15 +56,9 @@ export async function POST(request: Request) {
       );
     }
 
-    // Server-side validation against PostEx operational delivery cities
+    // Normalize city casing if it matches a known operational city, otherwise keep entered text
     const canonicalCity = await normalizeOperationalCity(shippingInfo.city);
-    if (!canonicalCity) {
-      return NextResponse.json(
-        { error: { code: "BAD_REQUEST", message: `The city "${shippingInfo.city}" is not an operational delivery city.` } },
-        { status: 400 }
-      );
-    }
-    shippingInfo.city = canonicalCity;
+    shippingInfo.city = canonicalCity || shippingInfo.city.trim();
 
     const userEmail = (shippingInfo.email || guestEmail || "").trim();
     if (userEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userEmail)) {
