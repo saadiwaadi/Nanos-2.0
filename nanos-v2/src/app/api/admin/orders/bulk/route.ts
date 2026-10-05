@@ -83,72 +83,78 @@ export async function POST(request: Request) {
             continue;
           }
 
-          await prisma.$transaction(async (tx) => {
-            await tx.order.update({
-              where: { id },
-              data: {
-                orderStatus: "ON_HOLD",
-                status: "on_hold",
-                version: { increment: 1 },
-              },
-            });
+          await prisma.$transaction(
+            async (tx) => {
+              await tx.order.update({
+                where: { id },
+                data: {
+                  orderStatus: "ON_HOLD",
+                  status: "on_hold",
+                  version: { increment: 1 },
+                },
+              });
 
-            await tx.orderAuditLog.create({
-              data: {
-                orderId: id,
-                action: "HOLD",
-                adminUser: adminEmail,
-                note: logNote || "Bulk put on hold by admin",
-              },
-            });
+              await tx.orderAuditLog.create({
+                data: {
+                  orderId: id,
+                  action: "HOLD",
+                  adminUser: adminEmail,
+                  note: logNote || "Bulk put on hold by admin",
+                },
+              });
 
-            await tx.orderEvent.create({
-              data: {
-                orderId: id,
-                type: "status_change",
-                fromValue: order.orderStatus,
-                toValue: "ON_HOLD",
-                actor: adminEmail,
-                reason: logNote || "Bulk action: hold",
-              },
-            });
-          });
+              await tx.orderEvent.create({
+                data: {
+                  orderId: id,
+                  type: "status_change",
+                  fromValue: order.orderStatus,
+                  toValue: "ON_HOLD",
+                  actor: adminEmail,
+                  reason: logNote || "Bulk action: hold",
+                },
+              });
+            },
+            { maxWait: 10000, timeout: 25000 }
+          );
 
           results.push({ id, ok: true });
         }
         // 3. BULK RELEASE HOLD
         else if (normAction === "release" || normAction === "release_hold") {
-          await prisma.$transaction(async (tx) => {
-            const nextStatus = (order.trackingNumber || order.postexTrackingNumber) ? "BOOKED" : "READY_TO_SHIP";
-            await tx.order.update({
-              where: { id },
-              data: {
-                orderStatus: nextStatus,
-                status: "confirmed",
-                version: { increment: 1 },
-              },
-            });
+          await prisma.$transaction(
+            async (tx) => {
+              const nextStatus = (order.trackingNumber || order.postexTrackingNumber) ? "BOOKED" : "READY_TO_SHIP";
+              await tx.order.update({
+                where: { id },
+                data: {
+                  orderStatus: nextStatus,
+                  status: "confirmed",
+                  version: { increment: 1 },
+                },
+              });
 
-            await tx.orderAuditLog.create({
-              data: {
-                orderId: id,
-                action: "RELEASE",
-                adminUser: adminEmail,
-                note: logNote || "Bulk release hold by admin",
-              },
-            });
+              await tx.orderAuditLog.create({
+                data: {
+                  orderId: id,
+                  action: "RELEASE",
+                  adminUser: adminEmail,
+                  note: logNote || "Bulk release hold by admin",
+                },
+              });
 
-            await tx.orderEvent.create({
-              data: {
-                orderId: id,
-                type: "status_change",
-                fromValue: "ON_HOLD",
-                toValue: nextStatus,
-                actor: adminEmail,
-                reason: logNote || "Bulk action: release",
-              },
-            });
-          });
+              await tx.orderEvent.create({
+                data: {
+                  orderId: id,
+                  type: "status_change",
+                  fromValue: "ON_HOLD",
+                  toValue: nextStatus,
+                  actor: adminEmail,
+                  reason: logNote || "Bulk action: release",
+                },
+              });
+            },
+            { maxWait: 10000, timeout: 25000 }
+          );
 
           results.push({ id, ok: true });
         }
@@ -171,43 +177,46 @@ export async function POST(request: Request) {
             }
           }
 
-          await prisma.$transaction(async (tx) => {
-            if (order.stockReserved) {
-              await releaseStock(tx, order.items);
-            }
+          await prisma.$transaction(
+            async (tx) => {
+              if (order.stockReserved) {
+                await releaseStock(tx, order.items);
+              }
 
-            await tx.order.update({
-              where: { id },
-              data: {
-                orderStatus: "CANCELLED",
-                status: "cancelled",
-                courierBookingStatus: activeTracking ? "cancelled" : "not_booked",
-                courierStatusRaw: activeTracking ? "Cancelled" : order.courierStatusRaw,
-                stockReserved: false,
-                version: { increment: 1 },
-              },
-            });
+              await tx.order.update({
+                where: { id },
+                data: {
+                  orderStatus: "CANCELLED",
+                  status: "cancelled",
+                  courierBookingStatus: activeTracking ? "cancelled" : "not_booked",
+                  courierStatusRaw: activeTracking ? "Cancelled" : order.courierStatusRaw,
+                  stockReserved: false,
+                  version: { increment: 1 },
+                },
+              });
 
-            await tx.orderAuditLog.create({
-              data: {
-                orderId: id,
-                action: "CANCEL",
-                adminUser: adminEmail,
-                note: logNote || (activeTracking ? `Bulk cancelled with PostEx (${activeTracking})` : "Bulk cancelled by admin"),
-              },
-            });
+              await tx.orderAuditLog.create({
+                data: {
+                  orderId: id,
+                  action: "CANCEL",
+                  adminUser: adminEmail,
+                  note: logNote || (activeTracking ? `Bulk cancelled with PostEx (${activeTracking})` : "Bulk cancelled by admin"),
+                },
+              });
 
-            await tx.orderEvent.create({
-              data: {
-                orderId: id,
-                type: "status_change",
-                fromValue: order.orderStatus,
-                toValue: "CANCELLED",
-                actor: adminEmail,
-                reason: logNote || "Bulk action: cancel",
-              },
-            });
-          });
+              await tx.orderEvent.create({
+                data: {
+                  orderId: id,
+                  type: "status_change",
+                  fromValue: order.orderStatus,
+                  toValue: "CANCELLED",
+                  actor: adminEmail,
+                  reason: logNote || "Bulk action: cancel",
+                },
+              });
+            },
+            { maxWait: 10000, timeout: 25000 }
+          );
 
           results.push({ id, ok: true });
         }

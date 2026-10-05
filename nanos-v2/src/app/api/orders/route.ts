@@ -184,7 +184,7 @@ export async function POST(request: Request) {
             actor: validUserId ? `user:${validUserId}` : "customer:guest",
           },
         });
-      });
+      }, { maxWait: 10000, timeout: 25000 });
     } catch (txErr: any) {
       if (txErr instanceof AppError && txErr.code === "OUT_OF_STOCK") {
         return NextResponse.json(

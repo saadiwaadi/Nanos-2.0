@@ -290,7 +290,7 @@ export async function PATCH(
       });
 
       return NextResponse.json({ ok: true, order: updated });
-    });
+    }, { maxWait: 10000, timeout: 25000 });
   } catch (err: any) {
     if (err instanceof AppError) {
       return NextResponse.json(
@@ -362,7 +362,7 @@ export async function DELETE(
       });
 
       return NextResponse.json({ ok: true });
-    });
+    }, { maxWait: 10000, timeout: 25000 });
   } catch (err: any) {
     if (err instanceof AppError) {
       return NextResponse.json(

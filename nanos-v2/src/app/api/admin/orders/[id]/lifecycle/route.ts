@@ -89,77 +89,83 @@ export async function POST(
         return NextResponse.json({ error: "Cannot put a cancelled order on hold." }, { status: 400 });
       }
 
-      const updated = await prisma.$transaction(async (tx) => {
-        const o = await tx.order.update({
-          where: { id },
-          data: {
-            orderStatus: "ON_HOLD",
-            status: "on_hold",
-            version: { increment: 1 },
-          },
-        });
+      const updated = await prisma.$transaction(
+        async (tx) => {
+          const o = await tx.order.update({
+            where: { id },
+            data: {
+              orderStatus: "ON_HOLD",
+              status: "on_hold",
+              version: { increment: 1 },
+            },
+          });
 
-        await tx.orderAuditLog.create({
-          data: {
-            orderId: id,
-            action: "HOLD",
-            adminUser: adminEmail,
-            note: logNote || "Order put on hold by admin",
-          },
-        });
+          await tx.orderAuditLog.create({
+            data: {
+              orderId: id,
+              action: "HOLD",
+              adminUser: adminEmail,
+              note: logNote || "Order put on hold by admin",
+            },
+          });
 
-        await tx.orderEvent.create({
-          data: {
-            orderId: id,
-            type: "status_change",
-            fromValue: order.orderStatus,
-            toValue: "ON_HOLD",
-            actor: adminEmail,
-            reason: logNote || undefined,
-          },
-        });
+          await tx.orderEvent.create({
+            data: {
+              orderId: id,
+              type: "status_change",
+              fromValue: order.orderStatus,
+              toValue: "ON_HOLD",
+              actor: adminEmail,
+              reason: logNote || undefined,
+            },
+          });
 
-        return o;
-      });
+          return o;
+        },
+        { maxWait: 10000, timeout: 25000 }
+      );
 
       return NextResponse.json({ ok: true, message: "Order placed on hold.", order: updated });
     }
 
     // ─── 3. RELEASE HOLD ────────────────────────────────────
     if (normAction === "RELEASE" || normAction === "RELEASE_HOLD") {
-      const updated = await prisma.$transaction(async (tx) => {
-        const nextStatus = (order.trackingNumber || order.postexTrackingNumber) ? "BOOKED" : "READY_TO_SHIP";
-        const o = await tx.order.update({
-          where: { id },
-          data: {
-            orderStatus: nextStatus,
-            status: "confirmed",
-            version: { increment: 1 },
-          },
-        });
+      const updated = await prisma.$transaction(
+        async (tx) => {
+          const nextStatus = (order.trackingNumber || order.postexTrackingNumber) ? "BOOKED" : "READY_TO_SHIP";
+          const o = await tx.order.update({
+            where: { id },
+            data: {
+              orderStatus: nextStatus,
+              status: "confirmed",
+              version: { increment: 1 },
+            },
+          });
 
-        await tx.orderAuditLog.create({
-          data: {
-            orderId: id,
-            action: "RELEASE",
-            adminUser: adminEmail,
-            note: logNote || "Hold released by admin",
-          },
-        });
+          await tx.orderAuditLog.create({
+            data: {
+              orderId: id,
+              action: "RELEASE",
+              adminUser: adminEmail,
+              note: logNote || "Hold released by admin",
+            },
+          });
 
-        await tx.orderEvent.create({
-          data: {
-            orderId: id,
-            type: "status_change",
-            fromValue: "ON_HOLD",
-            toValue: nextStatus,
-            actor: adminEmail,
-            reason: logNote || undefined,
-          },
-        });
+          await tx.orderEvent.create({
+            data: {
+              orderId: id,
+              type: "status_change",
+              fromValue: "ON_HOLD",
+              toValue: nextStatus,
+              actor: adminEmail,
+              reason: logNote || undefined,
+            },
+          });
 
-        return o;
-      });
+          return o;
+        },
+        { maxWait: 10000, timeout: 25000 }
+      );
 
       return NextResponse.json({ ok: true, message: "Hold released. Order is now ready.", order: updated });
     }
@@ -189,103 +195,109 @@ export async function POST(
         }
       }
 
-      const updated = await prisma.$transaction(async (tx) => {
-        if (order.stockReserved) {
-          await releaseStock(tx, order.items);
-        }
+      const updated = await prisma.$transaction(
+        async (tx) => {
+          if (order.stockReserved) {
+            await releaseStock(tx, order.items);
+          }
 
-        const o = await tx.order.update({
-          where: { id },
-          data: {
-            orderStatus: "CANCELLED",
-            status: "cancelled",
-            courierBookingStatus: activeTracking ? "cancelled" : "not_booked",
-            courierStatusRaw: activeTracking ? "Cancelled" : order.courierStatusRaw,
-            stockReserved: false,
-            version: { increment: 1 },
-          },
-        });
+          const o = await tx.order.update({
+            where: { id },
+            data: {
+              orderStatus: "CANCELLED",
+              status: "cancelled",
+              courierBookingStatus: activeTracking ? "cancelled" : "not_booked",
+              courierStatusRaw: activeTracking ? "Cancelled" : order.courierStatusRaw,
+              stockReserved: false,
+              version: { increment: 1 },
+            },
+          });
 
-        await tx.orderAuditLog.create({
-          data: {
-            orderId: id,
-            action: "CANCEL",
-            adminUser: adminEmail,
-            note: logNote || (activeTracking ? `Cancelled with PostEx (${activeTracking})` : "Cancelled by admin"),
-          },
-        });
+          await tx.orderAuditLog.create({
+            data: {
+              orderId: id,
+              action: "CANCEL",
+              adminUser: adminEmail,
+              note: logNote || (activeTracking ? `Cancelled with PostEx (${activeTracking})` : "Cancelled by admin"),
+            },
+          });
 
-        await tx.orderEvent.create({
-          data: {
-            orderId: id,
-            type: "status_change",
-            fromValue: order.orderStatus,
-            toValue: "CANCELLED",
-            actor: adminEmail,
-            reason: logNote || undefined,
-          },
-        });
+          await tx.orderEvent.create({
+            data: {
+              orderId: id,
+              type: "status_change",
+              fromValue: order.orderStatus,
+              toValue: "CANCELLED",
+              actor: adminEmail,
+              reason: logNote || undefined,
+            },
+          });
 
-        return o;
-      });
+          return o;
+        },
+        { maxWait: 10000, timeout: 25000 }
+      );
 
       return NextResponse.json({ ok: true, message: "Order cancelled successfully.", order: updated });
     }
 
     // ─── 5. RESEND / RESTORE CANCELLED ORDER ────────────────
     if (normAction === "RESEND" || normAction === "RESTORE" || normAction === "REOPEN") {
-      const updated = await prisma.$transaction(async (tx) => {
-        // Re-reserve stock if items are present
-        if (order.items && order.items.length > 0) {
-          const linesToReserve = order.items.map((i) => ({
-            productId: i.productId,
-            color: i.color,
-            size: i.size,
-            qty: i.quantity,
-          }));
-          await reserveStock(tx, linesToReserve);
-        }
+      const updated = await prisma.$transaction(
+        async (tx) => {
+          // Re-reserve stock if items are present
+          if (order.items && order.items.length > 0) {
+            const linesToReserve = order.items.map((i) => ({
+              productId: i.productId,
+              color: i.color,
+              size: i.size,
+              qty: i.quantity,
+            }));
+            await reserveStock(tx, linesToReserve);
+          }
 
-        const o = await tx.order.update({
-          where: { id },
-          data: {
-            orderStatus: "READY_TO_SHIP",
-            status: "placed",
-            courierBookingStatus: "not_booked",
-            trackingNumber: null,
-            postexTrackingNumber: null,
-            courierStatusRaw: null,
-            bookingError: null,
-            bookingAttempts: 0,
-            bookingLockedAt: null,
-            bookingAmbiguous: false,
-            stockReserved: true,
-            version: { increment: 1 },
-          },
-        });
+          const o = await tx.order.update({
+            where: { id },
+            data: {
+              orderStatus: "READY_TO_SHIP",
+              status: "placed",
+              courierBookingStatus: "not_booked",
+              trackingNumber: null,
+              postexTrackingNumber: null,
+              courierStatusRaw: null,
+              bookingError: null,
+              bookingAttempts: 0,
+              bookingLockedAt: null,
+              bookingAmbiguous: false,
+              stockReserved: true,
+              version: { increment: 1 },
+            },
+          });
 
-        await tx.orderAuditLog.create({
-          data: {
-            orderId: id,
-            action: "RESEND",
-            adminUser: adminEmail,
-            note: logNote || "Cancelled order restored & queued for re-dispatch by admin",
-          },
-        });
+          await tx.orderAuditLog.create({
+            data: {
+              orderId: id,
+              action: "RESEND",
+              adminUser: adminEmail,
+              note: logNote || "Cancelled order restored & queued for re-dispatch by admin",
+            },
+          });
 
-        await tx.orderEvent.create({
-          data: {
-            orderId: id,
-            type: "status_change",
-            fromValue: order.orderStatus || "CANCELLED",
-            toValue: "READY_TO_SHIP",
-            actor: adminEmail,
-            reason: logNote || "Order restored for re-dispatch",
-          },
-        });
+          await tx.orderEvent.create({
+            data: {
+              orderId: id,
+              type: "status_change",
+              fromValue: order.orderStatus || "CANCELLED",
+              toValue: "READY_TO_SHIP",
+              actor: adminEmail,
+              reason: logNote || "Order restored for re-dispatch",
+            },
+          });
 
-        return o;
-      });
+          return o;
+        },
+        { maxWait: 10000, timeout: 25000 }
+      );
 
       return NextResponse.json({ ok: true, message: "Order restored to Ready to Ship queue.", order: updated });
     }

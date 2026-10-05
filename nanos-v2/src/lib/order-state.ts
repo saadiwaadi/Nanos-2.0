@@ -147,5 +147,5 @@ export async function transitionOrder(
       where: { id: o.id },
       include: { items: true },
     });
-  });
+  }, { maxWait: 10000, timeout: 25000 });
 }

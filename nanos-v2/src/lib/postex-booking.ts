@@ -371,7 +371,7 @@ export async function bookOne(id: string, actor = "system:batch") {
             note: `Booked with PostEx (Tracking #${tracking})`,
           },
         });
-      });
+      }, { maxWait: 10000, timeout: 25000 });
 
       if (order.status === "placed") {
         await transitionOrder(prisma, {
