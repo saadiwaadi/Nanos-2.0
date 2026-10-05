@@ -5,7 +5,10 @@ import { memoryOrders } from "../route";
 
 function parseShippingInfo(val: string) {
   try {
-    return typeof val === "string" ? JSON.parse(val) : val;
+    const parsed = typeof val === "string" ? JSON.parse(val) : val || {};
+    // Ensure internal admin-only fields are never exposed publicly
+    const { adminNote, adminNotes, internalNote, internalNotes, ...publicInfo } = parsed;
+    return publicInfo;
   } catch {
     return {};
   }

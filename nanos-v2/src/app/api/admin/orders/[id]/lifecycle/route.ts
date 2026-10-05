@@ -3,7 +3,7 @@ import { requireAdmin } from "@/lib/auth-server";
 import { prisma } from "@/lib/prisma";
 import { bookOne } from "@/lib/postex-booking";
 import { callCancelOrderApi } from "@/lib/postex";
-import { releaseStock } from "@/lib/stock";
+import { releaseStock, reserveStock } from "@/lib/stock";
 
 export async function POST(
   request: Request,
@@ -230,6 +230,64 @@ export async function POST(
       });
 
       return NextResponse.json({ ok: true, message: "Order cancelled successfully.", order: updated });
+    }
+
+    // ─── 5. RESEND / RESTORE CANCELLED ORDER ────────────────
+    if (normAction === "RESEND" || normAction === "RESTORE" || normAction === "REOPEN") {
+      const updated = await prisma.$transaction(async (tx) => {
+        // Re-reserve stock if items are present
+        if (order.items && order.items.length > 0) {
+          const linesToReserve = order.items.map((i) => ({
+            productId: i.productId,
+            color: i.color,
+            size: i.size,
+            qty: i.quantity,
+          }));
+          await reserveStock(tx, linesToReserve);
+        }
+
+        const o = await tx.order.update({
+          where: { id },
+          data: {
+            orderStatus: "READY_TO_SHIP",
+            status: "placed",
+            courierBookingStatus: "not_booked",
+            trackingNumber: null,
+            postexTrackingNumber: null,
+            courierStatusRaw: null,
+            bookingError: null,
+            bookingAttempts: 0,
+            bookingLockedAt: null,
+            bookingAmbiguous: false,
+            stockReserved: true,
+            version: { increment: 1 },
+          },
+        });
+
+        await tx.orderAuditLog.create({
+          data: {
+            orderId: id,
+            action: "RESEND",
+            adminUser: adminEmail,
+            note: logNote || "Cancelled order restored & queued for re-dispatch by admin",
+          },
+        });
+
+        await tx.orderEvent.create({
+          data: {
+            orderId: id,
+            type: "status_change",
+            fromValue: order.orderStatus || "CANCELLED",
+            toValue: "READY_TO_SHIP",
+            actor: adminEmail,
+            reason: logNote || "Order restored for re-dispatch",
+          },
+        });
+
+        return o;
+      });
+
+      return NextResponse.json({ ok: true, message: "Order restored to Ready to Ship queue.", order: updated });
     }
 
     return NextResponse.json({ error: `Unknown lifecycle action: ${action}` }, { status: 400 });

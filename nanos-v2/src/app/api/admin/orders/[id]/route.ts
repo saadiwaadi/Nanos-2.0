@@ -28,8 +28,10 @@ export async function PATCH(
       address,
       city,
       notes,
+      adminNote,
       shippingFee,
       isTest,
+      payment,
       items,
     } = body || {};
 
@@ -53,9 +55,13 @@ export async function PATCH(
         );
       }
 
-      const isBooked =
-        order.courierBookingStatus === "booked" ||
-        ["shipped", "delivered", "returned", "cancelled"].includes(order.status);
+      const isCancelled =
+        order.status === "cancelled" || order.orderStatus === "CANCELLED";
+
+      const isActivelyBooked =
+        !isCancelled &&
+        (order.courierBookingStatus === "booked" ||
+          ["shipped", "delivered"].includes(order.status));
 
       const editingNonNotes =
         customerName !== undefined ||
@@ -66,10 +72,10 @@ export async function PATCH(
         shippingFee !== undefined ||
         items !== undefined;
 
-      if (isBooked && editingNonNotes) {
+      if (isActivelyBooked && editingNonNotes) {
         throw new AppError(
           "LOCKED",
-          "This order is booked with PostEx. Cancel the booking to edit it.",
+          "This order is actively booked with PostEx. Cancel the booking to edit it.",
           409
         );
       }
@@ -86,6 +92,10 @@ export async function PATCH(
         email: email ?? sInfo.email,
         address: address ?? sInfo.address,
         city: city ?? sInfo.city,
+        adminNote:
+          adminNote !== undefined
+            ? (typeof adminNote === "string" ? adminNote.trim() : "")
+            : sInfo.adminNote,
       };
 
       let newSubtotal = order.subtotal;
@@ -96,6 +106,20 @@ export async function PATCH(
 
       if (notes !== undefined && notes !== order.notes) {
         diff.notes = { before: order.notes, after: notes };
+      }
+      if (adminNote !== undefined && adminNote !== (sInfo.adminNote || "")) {
+        diff.adminNote = { before: sInfo.adminNote || "", after: adminNote };
+        await tx.orderAuditLog.create({
+          data: {
+            orderId: id,
+            action: "ADMIN_NOTE",
+            adminUser: adminEmail,
+            note: adminNote ? `Admin note: ${adminNote}` : "Admin note cleared",
+          },
+        });
+      }
+      if (payment !== undefined && payment !== order.payment) {
+        diff.payment = { before: order.payment, after: payment };
       }
       if (isTest !== undefined && isTest !== order.isTest) {
         diff.isTest = { before: order.isTest, after: isTest };
@@ -194,23 +218,51 @@ export async function PATCH(
         }
       }
 
+      if (isCancelled && !order.stockReserved && (!items || items.length === 0)) {
+        const linesToReserve = order.items.map((i) => ({
+          productId: i.productId,
+          color: i.color,
+          size: i.size,
+          qty: i.quantity,
+        }));
+        await reserveStock(tx, linesToReserve);
+      }
+
       const r = await tx.order.updateMany({
         where: { id, version: order.version },
         data: {
+          orderStatus: isCancelled ? "READY_TO_SHIP" : order.orderStatus,
+          status: isCancelled ? "placed" : order.status,
+          courierBookingStatus: isCancelled ? "not_booked" : newCourierBookingStatus,
+          trackingNumber: isCancelled ? null : order.trackingNumber,
+          postexTrackingNumber: isCancelled ? null : order.postexTrackingNumber,
+          courierStatusRaw: isCancelled ? null : order.courierStatusRaw,
+          stockReserved: isCancelled ? true : order.stockReserved,
           customerName: customerName ?? order.customerName,
           customerEmail: email ?? order.customerEmail,
           shippingInfo: JSON.stringify(newSInfo),
           notes: notes !== undefined ? notes : order.notes,
+          payment: payment !== undefined ? payment : order.payment,
           isTest: isTest !== undefined ? isTest : order.isTest,
           subtotal: newSubtotal,
           discount: newDiscount,
           shipping: newShipping,
           total: newTotal,
-          courierBookingStatus: newCourierBookingStatus,
-          bookingError,
+          bookingError: isCancelled ? null : bookingError,
           version: { increment: 1 },
         },
       });
+
+      if (isCancelled) {
+        await tx.orderAuditLog.create({
+          data: {
+            orderId: id,
+            action: "EDIT_RESEND",
+            adminUser: adminEmail,
+            note: "Cancelled order updated and restored to Ready to Ship queue",
+          },
+        });
+      }
 
       if (r.count === 0) {
         throw new AppError(
@@ -222,7 +274,10 @@ export async function PATCH(
 
       const updated = await tx.order.findUnique({
         where: { id },
-        include: { items: { include: { product: true } } },
+        include: {
+          items: { include: { product: true } },
+          auditLogs: { orderBy: { createdAt: "desc" } },
+        },
       });
 
       await tx.orderEvent.create({

@@ -5,10 +5,105 @@ import { callSaveShipperAdviceApi, callGetShipperAdviceApi } from "@/lib/postex"
 
 export const dynamic = "force-dynamic";
 
+// ─── ERROR INDEX DICTIONARY ───────────────────────────────────────────
+export interface ErrorIndexDetail {
+  code: string;
+  category: "AUTH" | "VALIDATION" | "DATABASE" | "POSTEX_LIFECYCLE" | "POSTEX_API" | "SYSTEM";
+  severity: "info" | "warning" | "error";
+  title: string;
+  message: string;
+  resolution: string;
+}
+
+export const REMARKS_ERROR_INDEX: Record<string, ErrorIndexDetail> = {
+  ERR_AUTH_REQUIRED: {
+    code: "ERR_AUTH_REQUIRED",
+    category: "AUTH",
+    severity: "error",
+    title: "Authentication Required",
+    message: "Admin session is missing or unauthorized.",
+    resolution: "Please sign in again to your admin account.",
+  },
+  ERR_ORDER_NOT_FOUND: {
+    code: "ERR_ORDER_NOT_FOUND",
+    category: "DATABASE",
+    severity: "error",
+    title: "Order Not Found",
+    message: "The requested order does not exist in the database.",
+    resolution: "Refresh the orders table to ensure this order still exists.",
+  },
+  ERR_EMPTY_REMARK: {
+    code: "ERR_EMPTY_REMARK",
+    category: "VALIDATION",
+    severity: "warning",
+    title: "Empty Remark Text",
+    message: "Remarks and customer notes cannot be empty.",
+    resolution: "Please type a remark or instruction before submitting.",
+  },
+  ERR_POSTEX_NOT_ATTEMPTED: {
+    code: "ERR_POSTEX_NOT_ATTEMPTED",
+    category: "POSTEX_LIFECYCLE",
+    severity: "info",
+    title: "Courier Advice Not Active Yet",
+    message: "PostEx requires parcels to have a recorded delivery attempt before accepting rider shipper advice.",
+    resolution: "The remark has been saved to your internal order notes. Once the courier attempts delivery, shipper advice can be submitted.",
+  },
+  ERR_POSTEX_NOT_BOOKED: {
+    code: "ERR_POSTEX_NOT_BOOKED",
+    category: "POSTEX_LIFECYCLE",
+    severity: "info",
+    title: "Order Not Booked with PostEx",
+    message: "This order does not have an active PostEx tracking number.",
+    resolution: "Remark saved to internal order notes. Book the order with PostEx first if you want to sync courier remarks.",
+  },
+  ERR_POSTEX_AUTH_FAILED: {
+    code: "ERR_POSTEX_AUTH_FAILED",
+    category: "POSTEX_API",
+    severity: "error",
+    title: "PostEx Authentication Error",
+    message: "PostEx API token is missing, expired, or invalid.",
+    resolution: "Check the POSTEX_API_TOKEN configuration in server settings.",
+  },
+  ERR_POSTEX_API_ERROR: {
+    code: "ERR_POSTEX_API_ERROR",
+    category: "POSTEX_API",
+    severity: "warning",
+    title: "PostEx Courier API Notice",
+    message: "PostEx could not process shipper advice at this moment.",
+    resolution: "The remark is safely saved to the order. Retry submitting to PostEx when courier status updates.",
+  },
+  ERR_SERVER_EXCEPTION: {
+    code: "ERR_SERVER_EXCEPTION",
+    category: "SYSTEM",
+    severity: "error",
+    title: "Internal Server Error",
+    message: "An unexpected error occurred while processing the remark.",
+    resolution: "Check server logs or try again.",
+  },
+};
+
+function classifyPostexError(errMsg: string | null | undefined): ErrorIndexDetail {
+  const lower = (errMsg || "").toLowerCase();
+  if (
+    lower.includes("cannot add transaction remark") ||
+    lower.includes("check the status of your order") ||
+    lower.includes("unbooked")
+  ) {
+    return REMARKS_ERROR_INDEX.ERR_POSTEX_NOT_ATTEMPTED;
+  }
+  if (lower.includes("token") || lower.includes("unauthorized") || lower.includes("forbidden")) {
+    return REMARKS_ERROR_INDEX.ERR_POSTEX_AUTH_FAILED;
+  }
+  return {
+    ...REMARKS_ERROR_INDEX.ERR_POSTEX_API_ERROR,
+    message: errMsg || REMARKS_ERROR_INDEX.ERR_POSTEX_API_ERROR.message,
+  };
+}
+
 const STATUS_LABELS: Record<number, string> = {
-  0: "General Remarks",
-  1: "Mark Return Requested",
-  2: "Mark Retry Attempt",
+  0: "General Note",
+  1: "Return Requested",
+  2: "Delivery Reattempt",
 };
 
 export async function GET(
@@ -18,7 +113,10 @@ export async function GET(
   const auth = await requireAdmin(request);
   if ("error" in auth) {
     const status = auth.error === "403" ? 403 : 401;
-    return NextResponse.json({ error: "Unauthorized" }, { status });
+    return NextResponse.json(
+      { ok: false, error: "Unauthorized", errorIndex: REMARKS_ERROR_INDEX.ERR_AUTH_REQUIRED },
+      { status }
+    );
   }
 
   const { id } = await ctx.params;
@@ -29,7 +127,7 @@ export async function GET(
       include: {
         auditLogs: {
           where: {
-            action: { in: ["SHIPPER_ADVICE", "ADD_REMARK", "NOTES_UPDATED"] },
+            action: { in: ["SHIPPER_ADVICE", "ADD_REMARK", "NOTES_UPDATED", "INTERNAL_NOTE"] },
           },
           orderBy: { createdAt: "desc" },
         },
@@ -37,7 +135,10 @@ export async function GET(
     });
 
     if (!order) {
-      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+      return NextResponse.json(
+        { ok: false, error: "Order not found", errorIndex: REMARKS_ERROR_INDEX.ERR_ORDER_NOT_FOUND },
+        { status: 404 }
+      );
     }
 
     const trackingNumber = order.postexTrackingNumber || order.trackingNumber || null;
@@ -46,14 +147,19 @@ export async function GET(
     if (trackingNumber) {
       try {
         const postexRes = await callGetShipperAdviceApi(trackingNumber);
-        if (postexRes && postexRes.dist && postexRes.dist.length > 0) {
-          const firstDist = postexRes.dist[0];
-          if (Array.isArray(firstDist.trackingResponse)) {
-            postexRemarks = firstDist.trackingResponse;
+        if (postexRes && postexRes.dist) {
+          if (Array.isArray(postexRes.dist)) {
+            for (const item of postexRes.dist) {
+              if (Array.isArray(item.trackingResponse)) {
+                postexRemarks.push(...item.trackingResponse);
+              } else if ((item as any).remarks) {
+                postexRemarks.push(item);
+              }
+            }
           }
         }
       } catch (err: any) {
-        console.warn(`[PostEx Shipper Advice GET] Failed for ${trackingNumber}:`, err.message);
+        console.warn(`[PostEx Shipper Advice GET] Notice for ${trackingNumber}:`, err.message);
       }
     }
 
@@ -61,13 +167,17 @@ export async function GET(
       ok: true,
       orderId: order.id,
       trackingNumber,
-      orderNotes: order.notes,
+      orderNotes: order.notes || "",
       localRemarks: order.auditLogs || [],
       postexRemarks,
     });
   } catch (err: any) {
     return NextResponse.json(
-      { error: err.message || "Failed to fetch remarks" },
+      {
+        ok: false,
+        error: err.message || "Failed to fetch remarks",
+        errorIndex: REMARKS_ERROR_INDEX.ERR_SERVER_EXCEPTION,
+      },
       { status: 500 }
     );
   }
@@ -80,7 +190,10 @@ export async function POST(
   const auth = await requireAdmin(request);
   if ("error" in auth) {
     const status = auth.error === "403" ? 403 : 401;
-    return NextResponse.json({ error: "Unauthorized" }, { status });
+    return NextResponse.json(
+      { ok: false, error: "Unauthorized", errorIndex: REMARKS_ERROR_INDEX.ERR_AUTH_REQUIRED },
+      { status }
+    );
   }
 
   const { id } = await ctx.params;
@@ -88,11 +201,15 @@ export async function POST(
 
   try {
     const body = await request.json();
-    const { remarks, statusId = 0, syncToPostex = true } = body || {};
+    const { remarks, statusId = 0, syncToPostex = false } = body || {};
 
     if (!remarks || typeof remarks !== "string" || !remarks.trim()) {
       return NextResponse.json(
-        { error: "Remarks text is required." },
+        {
+          ok: false,
+          error: "Remarks text is required.",
+          errorIndex: REMARKS_ERROR_INDEX.ERR_EMPTY_REMARK,
+        },
         { status: 400 }
       );
     }
@@ -106,39 +223,57 @@ export async function POST(
     });
 
     if (!order) {
-      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+      return NextResponse.json(
+        { ok: false, error: "Order not found", errorIndex: REMARKS_ERROR_INDEX.ERR_ORDER_NOT_FOUND },
+        { status: 404 }
+      );
     }
 
     const trackingNumber = order.postexTrackingNumber || order.trackingNumber || null;
     let postexSynced = false;
-    let postexError: string | null = null;
+    let postexErrorIndex: ErrorIndexDetail | null = null;
+    let rawPostexError: string | null = null;
 
-    if (syncToPostex && trackingNumber) {
-      try {
-        await callSaveShipperAdviceApi({
-          trackingNumber,
-          statusId: parsedStatusId,
-          remarks: trimmedRemarks,
-        });
-        postexSynced = true;
-      } catch (err: any) {
-        postexError = err.message || "PostEx Shipper Advice API error";
-        console.error(`[PostEx Save Shipper Advice] Failed:`, postexError);
+    // Only attempt PostEx sync if admin explicitly requested AND order has a tracking number
+    if (syncToPostex) {
+      if (!trackingNumber) {
+        postexErrorIndex = REMARKS_ERROR_INDEX.ERR_POSTEX_NOT_BOOKED;
+      } else {
+        try {
+          await callSaveShipperAdviceApi({
+            trackingNumber,
+            statusId: parsedStatusId,
+            remarks: trimmedRemarks,
+          });
+          postexSynced = true;
+        } catch (err: any) {
+          rawPostexError = err.message || "PostEx Shipper Advice API error";
+          postexErrorIndex = classifyPostexError(rawPostexError);
+          console.warn(`[PostEx Save Shipper Advice] Notice:`, rawPostexError);
+        }
       }
     }
 
-    // Save remark to Audit Log & Event in database
-    const logNote = `[${statusLabel}] ${trimmedRemarks}${
-      postexSynced ? " (Synced to PostEx)" : postexError ? ` (PostEx sync failed: ${postexError})` : ""
-    }`;
+    // Prepare note content for audit log
+    const auditAction = postexSynced ? "SHIPPER_ADVICE" : "ADD_REMARK";
+    const logNote = postexSynced
+      ? `[${statusLabel}] ${trimmedRemarks} (Synced to PostEx)`
+      : `[${statusLabel}] ${trimmedRemarks}`;
 
-    await prisma.$transaction([
+    // Execute atomic update: update order.notes and create audit logs
+    const [newAuditLog, updatedOrder] = await prisma.$transaction([
       prisma.orderAuditLog.create({
         data: {
           orderId: order.id,
-          action: "SHIPPER_ADVICE",
+          action: auditAction,
           adminUser: adminEmail,
           note: logNote,
+        },
+      }),
+      prisma.order.update({
+        where: { id: order.id },
+        data: {
+          notes: trimmedRemarks,
         },
       }),
       prisma.orderEvent.create({
@@ -150,9 +285,10 @@ export async function POST(
           metadata: {
             statusId: parsedStatusId,
             statusLabel,
-            trackingNumber,
+            trackingNumber: trackingNumber || "",
             postexSynced,
-            postexError,
+            postexError: rawPostexError || "",
+            errorIndexCode: postexErrorIndex?.code || "",
           },
         },
       }),
@@ -162,15 +298,21 @@ export async function POST(
       ok: true,
       message: postexSynced
         ? `Remark saved and synced to PostEx successfully.`
-        : postexError
-        ? `Remark saved locally (PostEx note: ${postexError}).`
-        : `Remark saved locally.`,
+        : postexErrorIndex
+        ? `Remark saved internally. (${postexErrorIndex.title}: ${postexErrorIndex.resolution})`
+        : `Remark saved successfully as order note.`,
       postexSynced,
-      postexError,
+      errorIndex: postexErrorIndex,
+      auditLog: newAuditLog,
+      orderNotes: updatedOrder.notes,
     });
   } catch (err: any) {
     return NextResponse.json(
-      { error: err.message || "Failed to save remark" },
+      {
+        ok: false,
+        error: err.message || "Failed to save remark",
+        errorIndex: REMARKS_ERROR_INDEX.ERR_SERVER_EXCEPTION,
+      },
       { status: 500 }
     );
   }

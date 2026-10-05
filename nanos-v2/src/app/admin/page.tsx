@@ -84,6 +84,7 @@ interface AdminOrder {
   discount: number;
   shipping: number;
   total: number;
+  notes?: string | null;
   shippingInfo: any;
   payment: string;
   guestEmail?: string | null;
@@ -146,6 +147,35 @@ function formatDate(iso: string): string {
   }
 }
 
+function formatTime(iso: string): string {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleTimeString("en-PK", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+  } catch {
+    return "";
+  }
+}
+
+function formatDateTime(iso: string): string {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleString("en-PK", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+  } catch {
+    return iso;
+  }
+}
+
 function parseShippingInfo(val: any): any {
   if (!val) return {};
   if (typeof val === "object") return val;
@@ -157,6 +187,97 @@ function parseShippingInfo(val: any): any {
     }
   }
   return {};
+}
+
+// ─── MINIMAL SVG ICONS ─────────────────────────────────
+
+interface IconProps {
+  size?: number;
+  className?: string;
+  style?: React.CSSProperties;
+}
+
+function IconEdit({ size = 13, className = "", style }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} style={{ display: "inline-block", verticalAlign: "middle", ...style }}>
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+    </svg>
+  );
+}
+
+function IconMessage({ size = 13, className = "", style }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} style={{ display: "inline-block", verticalAlign: "middle", ...style }}>
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
+function IconClock({ size = 13, className = "", style }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} style={{ display: "inline-block", verticalAlign: "middle", ...style }}>
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
+    </svg>
+  );
+}
+
+function IconSave({ size = 13, className = "", style }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} style={{ display: "inline-block", verticalAlign: "middle", ...style }}>
+      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+      <polyline points="17 21 17 13 7 13 7 21" />
+      <polyline points="7 3 7 8 15 8" />
+    </svg>
+  );
+}
+
+function IconAlert({ size = 13, className = "", style }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} style={{ display: "inline-block", verticalAlign: "middle", ...style }}>
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  );
+}
+
+function IconZap({ size = 13, className = "", style }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} style={{ display: "inline-block", verticalAlign: "middle", ...style }}>
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+    </svg>
+  );
+}
+
+function IconExternalLink({ size = 11, className = "", style }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} style={{ display: "inline-block", verticalAlign: "middle", ...style }}>
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+      <polyline points="15 3 21 3 21 9" />
+      <line x1="10" y1="14" x2="21" y2="3" />
+    </svg>
+  );
+}
+
+function IconRefresh({ size = 11, className = "", style }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} style={{ display: "inline-block", verticalAlign: "middle", ...style }}>
+      <polyline points="23 4 23 10 17 10" />
+      <polyline points="1 20 1 14 7 14" />
+      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+    </svg>
+  );
+}
+
+function IconLock({ size = 13, className = "", style }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} style={{ display: "inline-block", verticalAlign: "middle", ...style }}>
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  );
 }
 
 function getAuthToken(): string {
@@ -417,12 +538,178 @@ export default function AdminPage() {
     postexRemarks: any[];
     trackingNumber: string | null;
   }>({ localRemarks: [], postexRemarks: [], trackingNumber: null });
+  const [remarksErrorDetail, setRemarksErrorDetail] = useState<{
+    code: string;
+    category?: string;
+    severity?: string;
+    title: string;
+    message: string;
+    resolution: string;
+  } | null>(null);
+
+  // Edit Order Modal State
+  const [editingOrder, setEditingOrder] = useState<AdminOrder | null>(null);
+  const [editOrderForm, setEditOrderForm] = useState<{
+    customerName: string;
+    phone: string;
+    email: string;
+    address: string;
+    city: string;
+    notes: string;
+    adminNote: string;
+    shippingFee: number;
+    payment: string;
+    items: Array<{
+      id: string;
+      productId: string;
+      name: string;
+      color: string;
+      size: string;
+      quantity: number;
+      price: number;
+      hero?: string;
+    }>;
+  }>({
+    customerName: "",
+    phone: "",
+    email: "",
+    address: "",
+    city: "",
+    notes: "",
+    adminNote: "",
+    shippingFee: 0,
+    payment: "cod",
+    items: [],
+  });
+  const [savingEditOrder, setSavingEditOrder] = useState(false);
+  const [editOrderError, setEditOrderError] = useState<string | null>(null);
+
+  // Inline Admin Note State
+  const [editingAdminNoteOrderId, setEditingAdminNoteOrderId] = useState<string | null>(null);
+  const [adminNoteInput, setAdminNoteInput] = useState<string>("");
+  const [savingAdminNote, setSavingAdminNote] = useState<boolean>(false);
 
   // Toast Helper
   const showToast = useCallback((message: string, type: "success" | "error" = "success") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3200);
   }, []);
+
+  const handleSaveInlineAdminNote = async (orderId: string, currentOrder: AdminOrder) => {
+    setSavingAdminNote(true);
+    try {
+      const res = await authFetch(`/api/admin/orders/${orderId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          adminNote: adminNoteInput.trim(),
+          expectedVersion: currentOrder.version,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || data.error || "Failed to save admin note");
+      }
+      showToast("Admin customer note saved!");
+      setEditingAdminNoteOrderId(null);
+      setAdminNoteInput("");
+      await loadMainData();
+    } catch (err: any) {
+      showToast(err.message || "Failed to save admin note", "error");
+    } finally {
+      setSavingAdminNote(false);
+    }
+  };
+
+  const openEditOrderModal = (o: AdminOrder) => {
+    const sInfo = parseShippingInfo(o.shippingInfo);
+    setEditingOrder(o);
+    setEditOrderError(null);
+    setEditOrderForm({
+      customerName: o.customerName || sInfo.name || "",
+      phone: sInfo.phone || "",
+      email: o.customerEmail || sInfo.email || "",
+      address: sInfo.address || "",
+      city: sInfo.city || "",
+      notes: o.notes || sInfo.notes || "",
+      adminNote: sInfo.adminNote || "",
+      shippingFee: o.shipping ?? 0,
+      payment: o.payment || "cod",
+      items: (o.orderItems || []).map((item) => ({
+        id: item.id,
+        productId: item.productId,
+        name: item.product?.name || item.productId,
+        color: item.color || "",
+        size: item.size || "",
+        quantity: item.quantity || 1,
+        price: item.price || 0,
+        hero: item.product?.hero || "",
+      })),
+    });
+  };
+
+  const handleSaveEditOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingOrder) return;
+
+    if (!editOrderForm.customerName.trim()) {
+      setEditOrderError("Customer name is required.");
+      return;
+    }
+    if (!editOrderForm.phone.trim()) {
+      setEditOrderError("Phone number is required.");
+      return;
+    }
+    if (!editOrderForm.address.trim()) {
+      setEditOrderError("Delivery address is required.");
+      return;
+    }
+    if (!editOrderForm.city.trim()) {
+      setEditOrderError("City is required.");
+      return;
+    }
+
+    setSavingEditOrder(true);
+    setEditOrderError(null);
+
+    try {
+      const payload: any = {
+        expectedVersion: editingOrder.version,
+        customerName: editOrderForm.customerName.trim(),
+        phone: editOrderForm.phone.trim(),
+        email: editOrderForm.email.trim(),
+        address: editOrderForm.address.trim(),
+        city: editOrderForm.city.trim(),
+        notes: editOrderForm.notes,
+        adminNote: editOrderForm.adminNote,
+        shippingFee: Number(editOrderForm.shippingFee) || 0,
+        payment: editOrderForm.payment,
+        items: editOrderForm.items.map((it) => ({
+          productId: it.productId,
+          color: it.color,
+          size: it.size,
+          qty: it.quantity,
+        })),
+      };
+
+      const res = await authFetch(`/api/admin/orders/${editingOrder.id}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || data.error || "Failed to update order");
+      }
+
+      showToast("Order updated successfully!");
+      setEditingOrder(null);
+      await loadMainData();
+    } catch (err: any) {
+      setEditOrderError(err.message || "Failed to update order");
+    } finally {
+      setSavingEditOrder(false);
+    }
+  };
 
   // Fetch wrapper with auth
   const authFetch = useCallback(
@@ -505,6 +792,7 @@ export default function AdminPage() {
             customerName: cName,
             customerEmail: cEmail,
             shippingInfo: sInfo,
+            notes: o.notes || sInfo.notes || "",
             orderItems: items,
             auditLogs: o.auditLogs || [],
           };
@@ -582,6 +870,7 @@ export default function AdminPage() {
     setRemarksOrder(order);
     setRemarksInput("");
     setRemarksStatusId(0);
+    setRemarksErrorDetail(null);
     const tracking = order.postexTrackingNumber || order.trackingNumber || null;
     setRemarksSyncPostex(!!tracking);
     setRemarksHistory({
@@ -597,6 +886,7 @@ export default function AdminPage() {
     if (!remarksOrder || !remarksInput.trim()) return;
 
     setRemarksSubmitting(true);
+    setRemarksErrorDetail(null);
     try {
       const res = await authFetch(`/api/admin/orders/${remarksOrder.id}/remarks`, {
         method: "POST",
@@ -608,10 +898,41 @@ export default function AdminPage() {
       });
       const data = await res.json();
       if (!res.ok) {
+        if (data.errorIndex) {
+          setRemarksErrorDetail(data.errorIndex);
+        }
         showToast(data.error || "Failed to save remark", "error");
       } else {
+        if (data.errorIndex) {
+          setRemarksErrorDetail(data.errorIndex);
+        } else {
+          setRemarksErrorDetail(null);
+        }
+
+        const noteText = remarksInput.trim();
         showToast(data.message || "Remark saved successfully", "success");
         setRemarksInput("");
+
+        // Immediate state update for instant UI feedback
+        if (data.auditLog) {
+          setRemarksHistory((prev) => ({
+            ...prev,
+            localRemarks: [data.auditLog, ...prev.localRemarks],
+          }));
+
+          setOrders((prev) =>
+            prev.map((o) =>
+              o.id === remarksOrder.id
+                ? {
+                    ...o,
+                    notes: data.orderNotes || noteText,
+                    auditLogs: [data.auditLog, ...(o.auditLogs || [])],
+                  }
+                : o
+            )
+          );
+        }
+
         await fetchRemarksHistory(remarksOrder.id);
         loadMainData();
       }
@@ -1368,7 +1689,7 @@ export default function AdminPage() {
   // Order Lifecycle Handlers (POST /api/admin/orders/[id]/lifecycle)
   async function handleOrderLifecycle(
     orderId: string,
-    action: "SEND_POSTEX" | "HOLD" | "RELEASE" | "CANCEL",
+    action: "SEND_POSTEX" | "HOLD" | "RELEASE" | "CANCEL" | "RESEND",
     reason?: string
   ) {
     setUpdatingStatusId(orderId);
@@ -1389,6 +1710,22 @@ export default function AdminPage() {
     } finally {
       setUpdatingStatusId(null);
     }
+  }
+
+  function promptResendOrder(order: AdminOrder) {
+    setModalReasonInput("");
+    setConfirmModal({
+      isOpen: true,
+      title: `Resend / Restore Order #${order.id.slice(-8)}`,
+      message: `Restore cancelled order for ${order.customerName || "customer"} and return it to the Ready to Ship queue? Stock will be re-reserved and booking can be submitted again to PostEx.`,
+      actionLabel: "Restore & Resend",
+      danger: false,
+      requiresReason: false,
+      reasonPlaceholder: "Note (optional)",
+      onConfirm: async (reason) => {
+        await handleOrderLifecycle(order.id, "RESEND", reason);
+      },
+    });
   }
 
   function promptCancelOrder(order: AdminOrder) {
@@ -2836,7 +3173,10 @@ export default function AdminPage() {
                                 <strong>#{o.id.slice(-8)}</strong>
                               </td>
                               <td style={{ fontSize: 13, color: "var(--admin-text-soft)", whiteSpace: "nowrap" }}>
-                                {formatDate(o.createdAt)}
+                                <div>{formatDate(o.createdAt)}</div>
+                                <div style={{ fontSize: 11, color: "var(--admin-text-soft)", opacity: 0.8, marginTop: 2 }}>
+                                  {formatTime(o.createdAt)}
+                                </div>
                               </td>
                               <td style={{ maxWidth: 200 }}>
                                 <div style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -2958,17 +3298,42 @@ export default function AdminPage() {
                                   )}
 
                                   {cancelled && (
-                                    <span className="badge badge-danger" style={{ fontSize: 11 }}>Cancelled</span>
+                                    <>
+                                      <span className="badge badge-danger" style={{ fontSize: 11 }}>Cancelled</span>
+                                      <button
+                                        type="button"
+                                        className="btn btn-primary btn-sm"
+                                        disabled={isUpdating}
+                                        style={{ fontSize: 11.5, padding: "5px 10px", display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(200, 255, 0, 0.15)", color: "var(--admin-accent)", borderColor: "var(--admin-accent)" }}
+                                        onClick={() => promptResendOrder(o)}
+                                        title="Restore cancelled order to Ready to Ship"
+                                      >
+                                        <IconRefresh size={11} />
+                                        <span>Resend</span>
+                                      </button>
+                                    </>
                                   )}
 
                                   <button
                                     type="button"
                                     className="btn btn-outline btn-sm"
-                                    style={{ fontSize: 11.5, padding: "5px 8px", display: "inline-flex", alignItems: "center", gap: 3 }}
+                                    style={{ fontSize: 11.5, padding: "5px 8px", display: "inline-flex", alignItems: "center", gap: 5 }}
+                                    onClick={() => openEditOrderModal(o)}
+                                    title={cancelled ? "Edit address, items, and resend order" : "Edit customer details, address, phone or notes"}
+                                  >
+                                    <IconEdit size={12} />
+                                    <span>{cancelled ? "Edit & Resend" : "Edit"}</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    className="btn btn-outline btn-sm"
+                                    style={{ fontSize: 11.5, padding: "5px 8px", display: "inline-flex", alignItems: "center", gap: 5 }}
                                     onClick={() => openRemarksModal(o)}
                                     title="Add remarks or PostEx shipper advice"
                                   >
-                                    <span>💬 Remark</span>
+                                    <IconMessage size={12} />
+                                    <span>Remark</span>
                                   </button>
                                 </div>
                               </td>
@@ -2988,19 +3353,93 @@ export default function AdminPage() {
                             {isExpanded && (
                               <tr>
                                 <td colSpan={10} style={{ background: "var(--admin-surface-2)", padding: 20 }}>
+                                  {/* Expanded Top Header */}
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      justifyContent: "space-between",
+                                      alignItems: "center",
+                                      marginBottom: 16,
+                                      paddingBottom: 12,
+                                      borderBottom: "1px solid var(--admin-border)",
+                                      flexWrap: "wrap",
+                                      gap: 10,
+                                    }}
+                                  >
+                                    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                                      <span style={{ fontSize: 13, color: "var(--admin-text-soft)" }}>Order Placed:</span>
+                                      <span
+                                        style={{
+                                          fontSize: 13,
+                                          fontWeight: 700,
+                                          background: "rgba(200, 255, 0, 0.1)",
+                                          color: "var(--admin-accent)",
+                                          padding: "3px 9px",
+                                          borderRadius: 4,
+                                          border: "1px solid rgba(200, 255, 0, 0.25)",
+                                          display: "inline-flex",
+                                          alignItems: "center",
+                                          gap: 6,
+                                        }}
+                                      >
+                                        <IconClock size={12} />
+                                        <span>{formatDateTime(o.createdAt)}</span>
+                                      </span>
+                                      {o.isTest && (
+                                        <span className="badge badge-warn" style={{ fontSize: 11 }}>
+                                          TEST ORDER
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                                      {cancelled && (
+                                        <button
+                                          type="button"
+                                          className="btn btn-outline btn-sm"
+                                          disabled={isUpdating}
+                                          style={{ fontSize: 12, padding: "6px 14px", display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 700, borderColor: "var(--admin-accent)", color: "var(--admin-accent)" }}
+                                          onClick={() => promptResendOrder(o)}
+                                        >
+                                          <IconRefresh size={13} />
+                                          <span>Resend Order</span>
+                                        </button>
+                                      )}
+                                      <button
+                                        type="button"
+                                        className="btn btn-primary btn-sm"
+                                        style={{ fontSize: 12, padding: "6px 14px", display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 700 }}
+                                        onClick={() => openEditOrderModal(o)}
+                                      >
+                                        <IconEdit size={13} />
+                                        <span>{cancelled ? "Edit & Resend Order" : "Edit Order & Address"}</span>
+                                      </button>
+                                    </div>
+                                  </div>
+
                                   <div className="order-details-grid">
                                     <div>
                                       <div style={{ fontWeight: 700, marginBottom: 6 }}>Customer Info</div>
-                                      <div>Name: {o.customerName}</div>
+                                      <div>Name: <strong>{o.customerName}</strong></div>
                                       <div>Email: {o.customerEmail}</div>
                                       <div>Type: {o.user?.id ? "Registered Account" : "Guest Checkout"}</div>
+                                      <div style={{ marginTop: 4, display: "flex", alignItems: "center", gap: 5 }}>
+                                        <IconClock size={12} style={{ color: "var(--admin-accent)" }} />
+                                        <span>Placed Time:</span>
+                                        <strong style={{ color: "var(--admin-accent)" }}>{formatDateTime(o.createdAt)}</strong>
+                                      </div>
                                     </div>
                                     <div>
                                       <div style={{ fontWeight: 700, marginBottom: 6 }}>Shipping &amp; Payment</div>
-                                      <div>Address: {o.shippingInfo?.address || "N/A"}</div>
-                                      <div>City: {o.shippingInfo?.city || "N/A"}</div>
-                                      <div>Phone: {o.shippingInfo?.phone || "N/A"}</div>
+                                      <div>Address: <strong>{o.shippingInfo?.address || "N/A"}</strong></div>
+                                      <div>City: <strong>{o.shippingInfo?.city || "N/A"}</strong></div>
+                                      <div>Phone: <strong>{o.shippingInfo?.phone || "N/A"}</strong></div>
                                       <div>Payment: {o.payment?.toUpperCase()}</div>
+                                      {o.notes && (
+                                        <div style={{ marginTop: 4, color: "var(--admin-accent)", fontSize: 12.5 }}>
+                                          <strong>Note:</strong> {o.notes}
+                                        </div>
+                                      )}
                                     </div>
                                     <div>
                                       <div style={{ fontWeight: 700, marginBottom: 6 }}>Lifecycle &amp; Courier</div>
@@ -3017,9 +3456,10 @@ export default function AdminPage() {
                                             href={`https://postex.pk/tracking?trackingNumber=${trackingNum}`}
                                             target="_blank"
                                             rel="noreferrer"
-                                            style={{ color: "var(--admin-accent)", textDecoration: "underline", fontWeight: 700 }}
+                                            style={{ color: "var(--admin-accent)", textDecoration: "underline", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 4 }}
                                           >
-                                            {trackingNum}
+                                            <span>{trackingNum}</span>
+                                            <IconExternalLink size={10} />
                                           </a>
                                         ) : (
                                           "Not booked"
@@ -3028,6 +3468,95 @@ export default function AdminPage() {
                                       <div>Courier Status Raw: {o.courierStatusRaw || "N/A"}</div>
                                     </div>
                                   </div>
+
+                                  {/* ADMIN CUSTOMER NOTE (INTERNAL / STAFF ONLY) */}
+                                  {(() => {
+                                    const sInfo = parseShippingInfo(o.shippingInfo);
+                                    const currentAdminNote = sInfo.adminNote || "";
+                                    const isEditingThis = editingAdminNoteOrderId === o.id;
+
+                                    return (
+                                      <div
+                                        style={{
+                                          marginTop: 14,
+                                          background: "var(--admin-surface)",
+                                          border: "1px solid var(--admin-border)",
+                                          borderLeft: "3px solid var(--admin-accent)",
+                                          borderRadius: 6,
+                                          padding: "12px 16px",
+                                        }}
+                                      >
+                                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6, flexWrap: "wrap", gap: 8 }}>
+                                          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 700, color: "var(--admin-accent)", textTransform: "uppercase", letterSpacing: "0.03em" }}>
+                                            <IconLock size={13} />
+                                            <span>Admin Customer Note (Private · Staff Only)</span>
+                                          </div>
+                                          {!isEditingThis && (
+                                            <button
+                                              type="button"
+                                              className="btn btn-outline btn-sm"
+                                              style={{ fontSize: 11, padding: "2px 8px", minHeight: 26, display: "inline-flex", alignItems: "center", gap: 4 }}
+                                              onClick={() => {
+                                                setEditingAdminNoteOrderId(o.id);
+                                                setAdminNoteInput(currentAdminNote);
+                                              }}
+                                            >
+                                              <IconEdit size={11} />
+                                              <span>{currentAdminNote ? "Edit Note" : "+ Add Note"}</span>
+                                            </button>
+                                          )}
+                                        </div>
+
+                                        {isEditingThis ? (
+                                          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
+                                            <textarea
+                                              rows={2}
+                                              value={adminNoteInput}
+                                              onChange={(e) => setAdminNoteInput(e.target.value)}
+                                              placeholder="e.g. VIP client, call customer before shipping, verified alternate phone, special packaging..."
+                                              style={{
+                                                width: "100%",
+                                                padding: "8px 10px",
+                                                fontSize: 12.5,
+                                                borderRadius: 4,
+                                                background: "var(--admin-surface-2)",
+                                                color: "var(--admin-text)",
+                                                border: "1px solid var(--admin-border)",
+                                              }}
+                                            />
+                                            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                                              <button
+                                                type="button"
+                                                className="btn btn-outline btn-sm"
+                                                disabled={savingAdminNote}
+                                                onClick={() => {
+                                                  setEditingAdminNoteOrderId(null);
+                                                  setAdminNoteInput("");
+                                                }}
+                                                style={{ fontSize: 11.5, padding: "3px 10px" }}
+                                              >
+                                                Cancel
+                                              </button>
+                                              <button
+                                                type="button"
+                                                className="btn btn-primary btn-sm"
+                                                disabled={savingAdminNote}
+                                                onClick={() => handleSaveInlineAdminNote(o.id, o)}
+                                                style={{ fontSize: 11.5, padding: "3px 12px", display: "inline-flex", alignItems: "center", gap: 5, fontWeight: 700 }}
+                                              >
+                                                <IconSave size={12} />
+                                                <span>{savingAdminNote ? "Saving…" : "Save Note"}</span>
+                                              </button>
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <div style={{ fontSize: 13, color: currentAdminNote ? "var(--admin-text)" : "var(--admin-text-soft)", fontStyle: currentAdminNote ? "normal" : "italic" }}>
+                                            {currentAdminNote || "No internal admin note attached to this customer yet. Only visible in this admin detail view."}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
 
                                   {/* Order Items */}
                                   <div style={{ fontWeight: 700, marginTop: 18, marginBottom: 8 }}>Order Items</div>
@@ -3076,7 +3605,8 @@ export default function AdminPage() {
                                   <div style={{ borderTop: "1px solid var(--admin-border)", paddingTop: 16, marginBottom: 16 }}>
                                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
                                       <div style={{ fontWeight: 700, fontSize: 14, display: "flex", alignItems: "center", gap: 8 }}>
-                                        <span>💬 Remarks &amp; PostEx Shipper Advice</span>
+                                        <IconMessage size={15} style={{ color: "var(--admin-accent)" }} />
+                                        <span>Remarks &amp; Shipper Advice</span>
                                         {trackingNum && (
                                           <span style={{ fontSize: 11, background: "rgba(59, 130, 246, 0.15)", color: "#3b82f6", padding: "2px 8px", borderRadius: 4, fontWeight: 700 }}>
                                             PostEx #{trackingNum}
@@ -3086,10 +3616,11 @@ export default function AdminPage() {
                                       <button
                                         type="button"
                                         className="btn btn-outline btn-sm"
-                                        style={{ fontSize: 11.5, padding: "4px 10px", minHeight: 30 }}
+                                        style={{ fontSize: 11.5, padding: "4px 10px", minHeight: 30, display: "inline-flex", alignItems: "center", gap: 5 }}
                                         onClick={() => openRemarksModal(o)}
                                       >
-                                        + Add Remark / Shipper Advice
+                                        <IconMessage size={12} />
+                                        <span>Add Remark / Shipper Advice</span>
                                       </button>
                                     </div>
                                     {(!o.auditLogs || o.auditLogs.filter((l) => l.action === "SHIPPER_ADVICE" || l.action === "ADD_REMARK").length === 0) ? (
@@ -5415,7 +5946,8 @@ export default function AdminPage() {
             <div className="modal-head" style={{ borderBottom: "1px solid var(--admin-border)" }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: 17, display: "flex", alignItems: "center", gap: 8 }}>
-                  <span>💬 Remarks &amp; Shipper Advice</span>
+                  <IconMessage size={18} />
+                  <span>Remarks &amp; Shipper Advice</span>
                 </h3>
                 <div style={{ fontSize: 12.5, color: "var(--admin-text-soft)", marginTop: 3 }}>
                   Order <strong>#{remarksOrder.id.slice(-8)}</strong> · {remarksOrder.customerName} ({remarksOrder.shippingInfo?.city || "Unknown City"})
@@ -5458,9 +5990,10 @@ export default function AdminPage() {
                         href={`https://postex.pk/tracking?trackingNumber=${remarksHistory.trackingNumber}`}
                         target="_blank"
                         rel="noreferrer"
-                        style={{ color: "#3b82f6", textDecoration: "underline" }}
+                        style={{ color: "#3b82f6", textDecoration: "underline", display: "inline-flex", alignItems: "center", gap: 4 }}
                       >
-                        {remarksHistory.trackingNumber} ↗
+                        {remarksHistory.trackingNumber}
+                        <IconExternalLink size={12} />
                       </a>
                     ) : (
                       <span style={{ color: "var(--admin-text-soft)", fontWeight: 500 }}>Not booked with PostEx yet</span>
@@ -5478,6 +6011,56 @@ export default function AdminPage() {
                 </div>
               </div>
 
+              {/* Error Index Card (if error / notice was returned) */}
+              {remarksErrorDetail && (
+                <div
+                  style={{
+                    background:
+                      remarksErrorDetail.severity === "error"
+                        ? "rgba(239, 68, 68, 0.12)"
+                        : remarksErrorDetail.severity === "warning"
+                        ? "rgba(245, 158, 11, 0.12)"
+                        : "rgba(59, 130, 246, 0.12)",
+                    border: `1px solid ${
+                      remarksErrorDetail.severity === "error"
+                        ? "rgba(239, 68, 68, 0.35)"
+                        : remarksErrorDetail.severity === "warning"
+                        ? "rgba(245, 158, 11, 0.35)"
+                        : "rgba(59, 130, 246, 0.35)"
+                    }`,
+                    borderRadius: 6,
+                    padding: "10px 14px",
+                    fontSize: 12.5,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                    <strong style={{ fontSize: 13, color: "var(--admin-text)" }}>
+                      {remarksErrorDetail.title}
+                    </strong>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        fontFamily: "monospace",
+                        padding: "2px 6px",
+                        borderRadius: 4,
+                        background: "var(--admin-surface)",
+                        color: "var(--admin-text-soft)",
+                        border: "1px solid var(--admin-border)",
+                      }}
+                    >
+                      {remarksErrorDetail.code}
+                    </span>
+                  </div>
+                  <div style={{ color: "var(--admin-text-soft)", marginBottom: 4 }}>
+                    {remarksErrorDetail.message}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: "var(--admin-accent)" }}>
+                    <strong>Resolution:</strong> {remarksErrorDetail.resolution}
+                  </div>
+                </div>
+              )}
+
               {/* Remarks History List */}
               <div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
@@ -5486,10 +6069,11 @@ export default function AdminPage() {
                   </span>
                   <button
                     type="button"
-                    style={{ fontSize: 11.5, color: "#3b82f6", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}
+                    style={{ fontSize: 11.5, color: "#3b82f6", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", display: "inline-flex", alignItems: "center", gap: 4 }}
                     onClick={() => fetchRemarksHistory(remarksOrder.id)}
                   >
-                    Refresh ↻
+                    <IconRefresh size={12} />
+                    Refresh
                   </button>
                 </div>
 
@@ -5539,9 +6123,20 @@ export default function AdminPage() {
                           }}
                         >
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
-                            <span style={{ fontWeight: 700, color: "var(--admin-accent)" }}>
-                              {log.adminUser || "Admin"}
-                            </span>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <span style={{ fontWeight: 700, color: "var(--admin-accent)" }}>
+                                {log.adminUser || "Admin"}
+                              </span>
+                              {log.action === "SHIPPER_ADVICE" ? (
+                                <span style={{ fontSize: 10, background: "rgba(59, 130, 246, 0.15)", color: "#3b82f6", padding: "1px 6px", borderRadius: 3, fontWeight: 700 }}>
+                                  POSTEX SYNCED
+                                </span>
+                              ) : (
+                                <span style={{ fontSize: 10, background: "rgba(200, 255, 0, 0.1)", color: "var(--admin-accent)", padding: "1px 6px", borderRadius: 3, fontWeight: 700 }}>
+                                  ORDER NOTE
+                                </span>
+                              )}
+                            </div>
                             <span style={{ fontSize: 11, color: "var(--admin-text-soft)" }}>
                               {new Date(log.createdAt).toLocaleString("en-PK", {
                                 day: "2-digit",
@@ -5617,8 +6212,9 @@ export default function AdminPage() {
                         checked={remarksSyncPostex}
                         onChange={(e) => setRemarksSyncPostex(e.target.checked)}
                       />
-                      <label htmlFor="syncPostexCheck" style={{ fontSize: 12.5, margin: 0, cursor: "pointer" }}>
-                        ⚡ Submit to PostEx via Save Shipper Advice API (Section 3.11)
+                      <label htmlFor="syncPostexCheck" style={{ fontSize: 12.5, margin: 0, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }}>
+                        <IconZap size={13} style={{ color: "var(--admin-accent)" }} />
+                        Submit to PostEx via Save Shipper Advice API (Section 3.11)
                       </label>
                     </div>
                   )}
@@ -5637,8 +6233,9 @@ export default function AdminPage() {
                       type="submit"
                       className="btn btn-primary btn-sm"
                       disabled={remarksSubmitting || !remarksInput.trim()}
-                      style={{ fontWeight: 700 }}
+                      style={{ fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 6 }}
                     >
+                      <IconMessage size={13} />
                       {remarksSubmitting ? "Submitting…" : "Save & Submit Remark"}
                     </button>
                   </div>
@@ -5648,6 +6245,486 @@ export default function AdminPage() {
           </div>
         </div>
       )}
+
+      {/* Edit Order Details Modal */}
+      {editingOrder && (() => {
+        const isCancelled =
+          editingOrder.orderStatus === "CANCELLED" || editingOrder.status === "cancelled";
+        const isBooked =
+          !isCancelled &&
+          (editingOrder.courierBookingStatus === "booked" ||
+            ["shipped", "delivered"].includes(editingOrder.status));
+        const trackingNum = editingOrder.trackingNumber || editingOrder.postexTrackingNumber;
+        const liveSubtotal = editOrderForm.items.reduce((sum, it) => sum + (it.price * (it.quantity || 1)), 0);
+        const liveDiscount = Math.min(editingOrder.discount || 0, liveSubtotal);
+        const liveShipping = Number(editOrderForm.shippingFee) || 0;
+        const liveTotal = liveSubtotal - liveDiscount + liveShipping;
+
+        return (
+          <div
+            className="modal-overlay"
+            onClick={() => {
+              if (!savingEditOrder) {
+                setEditingOrder(null);
+              }
+            }}
+          >
+            <div
+              className="modal"
+              style={{ maxWidth: 720, maxHeight: "92vh", display: "flex", flexDirection: "column" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="modal-head" style={{ borderBottom: "1px solid var(--admin-border)" }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 17, display: "flex", alignItems: "center", gap: 8 }}>
+                    {isCancelled ? <IconRefresh size={17} /> : <IconEdit size={17} />}
+                    <span>{isCancelled ? "Edit & Resend Order" : "Edit Order"} #{editingOrder.id.slice(-8)}</span>
+                    {isCancelled && (
+                      <span className="badge badge-danger" style={{ fontSize: 11 }}>CANCELLED</span>
+                    )}
+                    {editingOrder.isTest && (
+                      <span className="badge badge-warn" style={{ fontSize: 11 }}>TEST</span>
+                    )}
+                  </h3>
+                  <div style={{ fontSize: 12.5, color: "var(--admin-text-soft)", marginTop: 4, display: "flex", alignItems: "center", gap: 12 }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      <IconClock size={12} /> Placed: <strong style={{ color: "var(--admin-accent)" }}>{formatDateTime(editingOrder.createdAt)}</strong>
+                    </span>
+                    <span>·</span>
+                    <span>Status: <strong style={{ textTransform: "uppercase" }}>{editingOrder.orderStatus || editingOrder.status}</strong></span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="modal-close"
+                  disabled={savingEditOrder}
+                  onClick={() => setEditingOrder(null)}
+                  aria-label="Close edit order modal"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Modal Body / Form */}
+              <form onSubmit={handleSaveEditOrder} style={{ display: "flex", flexDirection: "column", overflow: "hidden", flex: 1 }}>
+                <div className="modal-body" style={{ overflowY: "auto", padding: "18px 20px", display: "flex", flexDirection: "column", gap: 16 }}>
+                  {/* City Datalist for autocomplete */}
+                  <datalist id="admin-order-cities-list">
+                    {Array.from(
+                      new Set([
+                        ...courierCities.defaultCities,
+                        ...courierCities.dbCities.map((c) => c.cityName),
+                        "KARACHI",
+                        "LAHORE",
+                        "ISLAMABAD",
+                        "RAWALPINDI",
+                        "FAISALABAD",
+                        "MULTAN",
+                        "PESHAWAR",
+                        "QUETTA",
+                        "SIALKOT",
+                        "GUJRANWALA",
+                        "HYDERABAD",
+                        "ABBOTTABAD",
+                        "ATTOCK",
+                        "HAZRO",
+                        "SARGODHA",
+                        "BAHAWALPUR",
+                        "SUKKUR",
+                        "LARKANA",
+                        "SHEIKHUPURA",
+                        "JHANG",
+                        "RAHIM YAR KHAN",
+                        "GUJRAT",
+                        "KASUR",
+                        "MARDAN",
+                      ])
+                    )
+                      .sort()
+                      .map((cityName) => (
+                        <option key={cityName} value={cityName} />
+                      ))}
+                  </datalist>
+
+                  {/* Cancelled re-dispatch banner */}
+                  {isCancelled && (
+                    <div
+                      style={{
+                        background: "rgba(200, 255, 0, 0.1)",
+                        border: "1px solid rgba(200, 255, 0, 0.35)",
+                        borderRadius: 6,
+                        padding: "10px 14px",
+                        fontSize: 12.5,
+                        color: "var(--admin-accent)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <IconRefresh size={16} />
+                      <div>
+                        <strong>Cancelled Order Re-dispatch Mode:</strong> You can edit any customer details, fix the delivery address, or modify items below. Saving will restore this order to <strong>READY TO SHIP</strong> status and queue it for PostEx dispatch.
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Warning banner if booked */}
+                  {isBooked && (
+                    <div
+                      style={{
+                        background: "rgba(245, 158, 11, 0.12)",
+                        border: "1px solid rgba(245, 158, 11, 0.35)",
+                        borderRadius: 6,
+                        padding: "10px 14px",
+                        fontSize: 12.5,
+                        color: "#fbbf24",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <IconAlert size={16} />
+                      <div>
+                        This order is booked with PostEx {trackingNum ? `(#${trackingNum})` : ""}. To modify address or items, please cancel the PostEx booking first. Notes can still be edited.
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Error banner */}
+                  {editOrderError && (
+                    <div
+                      style={{
+                        background: "rgba(239, 68, 68, 0.12)",
+                        border: "1px solid rgba(239, 68, 68, 0.35)",
+                        borderRadius: 6,
+                        padding: "10px 14px",
+                        fontSize: 12.5,
+                        color: "#f87171",
+                      }}
+                    >
+                      {editOrderError}
+                    </div>
+                  )}
+
+                  {/* Section 1: Customer Information */}
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", marginBottom: 8, color: "var(--admin-accent)" }}>
+                      1. Customer &amp; Contact Details
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      <div className="field">
+                        <label style={{ fontSize: 12, fontWeight: 600 }}>
+                          Customer Full Name <span style={{ color: "var(--admin-danger)" }}>*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={editOrderForm.customerName}
+                          onChange={(e) => setEditOrderForm({ ...editOrderForm, customerName: e.target.value })}
+                          disabled={savingEditOrder || isBooked}
+                          required
+                          placeholder="e.g. Majid Khan"
+                          style={{ width: "100%", padding: "8px 10px", fontSize: 13, borderRadius: 4, background: "var(--admin-surface)" }}
+                        />
+                      </div>
+                      <div className="field">
+                        <label style={{ fontSize: 12, fontWeight: 600 }}>
+                          Phone Number <span style={{ color: "var(--admin-danger)" }}>*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={editOrderForm.phone}
+                          onChange={(e) => setEditOrderForm({ ...editOrderForm, phone: e.target.value })}
+                          disabled={savingEditOrder || isBooked}
+                          required
+                          placeholder="e.g. 03065465159 or +923065465159"
+                          style={{ width: "100%", padding: "8px 10px", fontSize: 13, borderRadius: 4, background: "var(--admin-surface)" }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 10 }}>
+                      <div className="field">
+                        <label style={{ fontSize: 12, fontWeight: 600 }}>Email Address</label>
+                        <input
+                          type="email"
+                          value={editOrderForm.email}
+                          onChange={(e) => setEditOrderForm({ ...editOrderForm, email: e.target.value })}
+                          disabled={savingEditOrder || isBooked}
+                          placeholder="e.g. customer@example.com"
+                          style={{ width: "100%", padding: "8px 10px", fontSize: 13, borderRadius: 4, background: "var(--admin-surface)" }}
+                        />
+                      </div>
+                      <div className="field">
+                        <label style={{ fontSize: 12, fontWeight: 600 }}>
+                          City <span style={{ color: "var(--admin-danger)" }}>*</span>
+                        </label>
+                        <input
+                          type="text"
+                          list="admin-order-cities-list"
+                          value={editOrderForm.city}
+                          onChange={(e) => setEditOrderForm({ ...editOrderForm, city: e.target.value.toUpperCase() })}
+                          disabled={savingEditOrder || isBooked}
+                          required
+                          placeholder="e.g. HAZRO, KARACHI, LAHORE"
+                          style={{ width: "100%", padding: "8px 10px", fontSize: 13, borderRadius: 4, background: "var(--admin-surface)", textTransform: "uppercase" }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Section 2: Shipping Address */}
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", marginBottom: 8, color: "var(--admin-accent)" }}>
+                      2. Shipping Address &amp; Delivery Instructions
+                    </div>
+                    <div className="field">
+                      <label style={{ fontSize: 12, fontWeight: 600 }}>
+                        Complete Delivery Address <span style={{ color: "var(--admin-danger)" }}>*</span>
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={editOrderForm.address}
+                        onChange={(e) => setEditOrderForm({ ...editOrderForm, address: e.target.value })}
+                        disabled={savingEditOrder || isBooked}
+                        required
+                        placeholder="House / Flat / Shop #, Street, Area, Landmark"
+                        style={{ width: "100%", padding: "8px 10px", fontSize: 13, borderRadius: 4, background: "var(--admin-surface)" }}
+                      />
+                    </div>
+
+                    <div className="field" style={{ marginTop: 10 }}>
+                      <label style={{ fontSize: 12, fontWeight: 600 }}>Order Notes (Customer Instructions from Checkout)</label>
+                      <textarea
+                        rows={2}
+                        value={editOrderForm.notes}
+                        onChange={(e) => setEditOrderForm({ ...editOrderForm, notes: e.target.value })}
+                        disabled={savingEditOrder}
+                        placeholder="Customer instructions entered during checkout"
+                        style={{ width: "100%", padding: "8px 10px", fontSize: 13, borderRadius: 4, background: "var(--admin-surface)" }}
+                      />
+                    </div>
+
+                    <div className="field" style={{ marginTop: 10 }}>
+                      <label style={{ fontSize: 12, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 5, color: "var(--admin-accent)" }}>
+                        <IconLock size={12} />
+                        <span>Admin Customer Note (Private · Staff Only · Appears Only in Detail)</span>
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={editOrderForm.adminNote}
+                        onChange={(e) => setEditOrderForm({ ...editOrderForm, adminNote: e.target.value })}
+                        disabled={savingEditOrder}
+                        placeholder="Internal staff notes attached to this customer/order (never visible to customer, appears only in admin detail)"
+                        style={{ width: "100%", padding: "8px 10px", fontSize: 13, borderRadius: 4, background: "var(--admin-surface)", border: "1px solid rgba(200, 255, 0, 0.3)" }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Section 3: Payment & Shipping Fee */}
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", marginBottom: 8, color: "var(--admin-accent)" }}>
+                      3. Payment &amp; Shipping Charges
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      <div className="field">
+                        <label style={{ fontSize: 12, fontWeight: 600 }}>Payment Method</label>
+                        <select
+                          value={editOrderForm.payment}
+                          onChange={(e) => setEditOrderForm({ ...editOrderForm, payment: e.target.value })}
+                          disabled={savingEditOrder || isBooked}
+                          style={{ width: "100%", padding: "8px 10px", fontSize: 13, borderRadius: 4, background: "var(--admin-surface)" }}
+                        >
+                          <option value="cod">Cash on Delivery (COD)</option>
+                          <option value="card">Credit / Debit Card</option>
+                          <option value="easypaisa">EasyPaisa</option>
+                          <option value="jazzcash">JazzCash</option>
+                          <option value="bank">Bank Transfer</option>
+                        </select>
+                      </div>
+                      <div className="field">
+                        <label style={{ fontSize: 12, fontWeight: 600 }}>Shipping Fee (PKR)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="10"
+                          value={editOrderForm.shippingFee}
+                          onChange={(e) => setEditOrderForm({ ...editOrderForm, shippingFee: Math.max(0, Number(e.target.value) || 0) })}
+                          disabled={savingEditOrder || isBooked}
+                          style={{ width: "100%", padding: "8px 10px", fontSize: 13, borderRadius: 4, background: "var(--admin-surface)" }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Section 4: Order Items & Quantities */}
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", marginBottom: 8, color: "var(--admin-accent)" }}>
+                      4. Order Items
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {editOrderForm.items.map((item, index) => (
+                        <div
+                          key={item.id || index}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            background: "var(--admin-surface)",
+                            border: "1px solid var(--admin-border)",
+                            borderRadius: 6,
+                            padding: "8px 12px",
+                            gap: 10,
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
+                            {item.hero && (
+                              /* eslint-disable-next-line @next/next/no-img-element */
+                              <img
+                                src={item.hero}
+                                alt=""
+                                width={36}
+                                height={36}
+                                style={{ objectFit: "cover", borderRadius: 4 }}
+                              />
+                            )}
+                            <div style={{ minWidth: 0 }}>
+                              <strong style={{ fontSize: 13, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {item.name}
+                              </strong>
+                              <span style={{ fontSize: 12, color: "var(--admin-text-soft)" }}>
+                                {item.color} / {item.size} · {fmtPrice(item.price)} each
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Quantity control */}
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            {!isBooked && (
+                              <button
+                                type="button"
+                                className="btn btn-outline btn-sm"
+                                style={{ width: 28, height: 28, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}
+                                disabled={savingEditOrder || item.quantity <= 1}
+                                onClick={() => {
+                                   const updated = [...editOrderForm.items];
+                                   updated[index] = { ...updated[index], quantity: Math.max(1, item.quantity - 1) };
+                                   setEditOrderForm({ ...editOrderForm, items: updated });
+                                }}
+                              >
+                                -
+                              </button>
+                            )}
+
+                            <span style={{ fontWeight: 700, minWidth: 24, textAlign: "center", fontSize: 13 }}>
+                              {item.quantity}
+                            </span>
+
+                            {!isBooked && (
+                              <button
+                                type="button"
+                                className="btn btn-outline btn-sm"
+                                style={{ width: 28, height: 28, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}
+                                disabled={savingEditOrder}
+                                onClick={() => {
+                                   const updated = [...editOrderForm.items];
+                                   updated[index] = { ...updated[index], quantity: item.quantity + 1 };
+                                   setEditOrderForm({ ...editOrderForm, items: updated });
+                                }}
+                              >
+                                +
+                              </button>
+                            )}
+
+                            <div style={{ minWidth: 90, textAlign: "right", fontWeight: 700, fontSize: 13.5 }}>
+                              {fmtPrice(item.quantity * item.price)}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Section 5: Order Total Summary */}
+                  <div
+                    style={{
+                      background: "var(--admin-surface)",
+                      border: "1px solid var(--admin-border)",
+                      borderRadius: 6,
+                      padding: "12px 16px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 4,
+                      fontSize: 13,
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ color: "var(--admin-text-soft)" }}>Items Subtotal:</span>
+                      <span>{fmtPrice(liveSubtotal)}</span>
+                    </div>
+                    {liveDiscount > 0 && (
+                      <div style={{ display: "flex", justifyContent: "space-between", color: "#10b981" }}>
+                        <span>Discount:</span>
+                        <span>- {fmtPrice(liveDiscount)}</span>
+                      </div>
+                    )}
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ color: "var(--admin-text-soft)" }}>Shipping Fee:</span>
+                      <span>{fmtPrice(liveShipping)}</span>
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        borderTop: "1px solid var(--admin-border)",
+                        paddingTop: 8,
+                        marginTop: 4,
+                        fontSize: 15,
+                        fontWeight: 700,
+                        color: "var(--admin-accent)",
+                      }}
+                    >
+                      <span>New Order Total:</span>
+                      <span>{fmtPrice(liveTotal)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Modal Footer Actions */}
+                <div
+                  className="modal-actions"
+                  style={{
+                    borderTop: "1px solid var(--admin-border)",
+                    padding: "14px 20px",
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    gap: 10,
+                    background: "var(--admin-surface-2)",
+                  }}
+                >
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    disabled={savingEditOrder}
+                    onClick={() => setEditingOrder(null)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary btn-sm"
+                    disabled={savingEditOrder}
+                    style={{ fontWeight: 700, padding: "6px 18px", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 6 }}
+                  >
+                    {isCancelled ? <IconRefresh size={14} /> : <IconSave size={14} />}
+                    {savingEditOrder ? (isCancelled ? "Saving & Resending…" : "Saving Changes…") : (isCancelled ? "Save & Resend Order" : "Save Changes")}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

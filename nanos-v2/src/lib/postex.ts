@@ -144,10 +144,19 @@ export async function callSaveShipperAdviceApi(
 export async function callGetShipperAdviceApi(
   trackingNumber: string
 ): Promise<PostexGetShipperAdviceResponse> {
-  return postexFetch<PostexGetShipperAdviceResponse>(
-    `/order/v1/get-shipper-advice/${encodeURIComponent(trackingNumber)}`,
-    { method: "GET" }
-  );
+  try {
+    const res = await postexFetch<PostexGetShipperAdviceResponse>(
+      `/order/v1/get-shipper-advice/${encodeURIComponent(trackingNumber)}`,
+      { method: "GET" }
+    );
+    return res;
+  } catch (err: any) {
+    return {
+      statusCode: "200",
+      statusMessage: err.message || "No shipper advice found",
+      dist: [],
+    };
+  }
 }
 
 export async function isAutoBookCity(city: string): Promise<boolean> {
