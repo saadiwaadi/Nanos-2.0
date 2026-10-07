@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { fmtPrice } from "@/lib/cart";
 import { trackMeta } from "@/lib/fpixel";
+import { trackTikTok, identifyTikTok } from "@/lib/tiktok-pixel";
 
 interface OrderItemData {
   productId?: string;
@@ -74,7 +75,7 @@ export default function ConfirmationPage({
         const data = await res.json();
         setOrder(data);
 
-        // Fire Purchase Meta Pixel Event
+        // Fire Purchase Meta & TikTok Pixel Events
         try {
           const storageKey = `meta_purchase_fired_${data.id}`;
           if (typeof window !== "undefined" && !sessionStorage.getItem(storageKey)) {
@@ -100,6 +101,41 @@ export default function ConfirmationPage({
               },
               data.id
             );
+
+            // TikTok Pixel: Identify customer with hashed PII & Track PlaceAnOrder and Purchase
+            const tikTokContents = items.map((i: any) => ({
+              content_id: i.productId || i.sku || data.id,
+              content_type: "product",
+              content_name: i.name,
+              quantity: i.quantity || 1,
+              price: i.unitPrice || 0,
+            }));
+
+            identifyTikTok({
+              email: data.shippingInfo?.email || undefined,
+              phone_number: data.shippingInfo?.phone || undefined,
+              external_id: data.id,
+            }).finally(() => {
+              trackTikTok(
+                "PlaceAnOrder",
+                {
+                  contents: tikTokContents,
+                  value: data.total,
+                  currency: "PKR",
+                },
+                data.id
+              );
+
+              trackTikTok(
+                "Purchase",
+                {
+                  contents: tikTokContents,
+                  value: data.total,
+                  currency: "PKR",
+                },
+                data.id
+              );
+            });
           }
         } catch {
           // Ignore tracking error

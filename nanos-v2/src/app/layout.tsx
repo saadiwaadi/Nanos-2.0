@@ -10,6 +10,7 @@ import { ScrollRestoration } from "@/components/ScrollRestoration";
 import { WhatsAppButton } from "@/components/WhatsAppButton";
 
 import { MetaPixel } from "@/components/MetaPixel";
+import { TikTokPixel } from "@/components/TikTokPixel";
 
 import SiteChrome from "@/components/SiteChrome";
 
@@ -43,6 +44,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body suppressHydrationWarning>
         <MetaPixel />
+        <TikTokPixel />
         <AuthProvider>
           <WishlistProvider>
             <CartProvider>

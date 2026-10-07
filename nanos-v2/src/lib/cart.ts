@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { trackMeta } from "@/lib/fpixel";
+import { trackTikTok } from "@/lib/tiktok-pixel";
 
 export const PROMO_CODE = "NANOS10";
 export const PROMO_DISCOUNT = 0.1; // −10%
@@ -197,6 +198,24 @@ export function useCart() {
             value: item.price * qty,
             currency: "PKR",
             quantity: qty,
+          },
+          eventId
+        );
+
+        trackTikTok(
+          "AddToCart",
+          {
+            contents: [
+              {
+                content_id: item.productId,
+                content_type: "product",
+                content_name: item.name,
+                quantity: qty,
+                price: item.price,
+              },
+            ],
+            value: item.price * qty,
+            currency: "PKR",
           },
           eventId
         );

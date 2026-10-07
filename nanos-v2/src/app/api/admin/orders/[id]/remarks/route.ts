@@ -40,6 +40,22 @@ export const REMARKS_ERROR_INDEX: Record<string, ErrorIndexDetail> = {
     message: "Remarks and customer notes cannot be empty.",
     resolution: "Please type a remark or instruction before submitting.",
   },
+  ERR_INVALID_STATUS_ID: {
+    code: "ERR_INVALID_STATUS_ID",
+    category: "VALIDATION",
+    severity: "info",
+    title: "General Note Stored Internally",
+    message: "PostEx courier API only accepts courier advice for Mark Return (1) or Retry Attempt (2).",
+    resolution: "This general note has been safely saved in your internal order history and will not be dispatched to the courier.",
+  },
+  ERR_ORDER_NOT_ELIGIBLE: {
+    code: "ERR_ORDER_NOT_ELIGIBLE",
+    category: "POSTEX_LIFECYCLE",
+    severity: "warning",
+    title: "Order Not Eligible For Courier Advice",
+    message: "Cancelled orders cannot receive PostEx courier shipper advice.",
+    resolution: "Remark saved to internal order notes.",
+  },
   ERR_POSTEX_NOT_ATTEMPTED: {
     code: "ERR_POSTEX_NOT_ATTEMPTED",
     category: "POSTEX_LIFECYCLE",
@@ -87,12 +103,16 @@ function classifyPostexError(errMsg: string | null | undefined): ErrorIndexDetai
   if (
     lower.includes("cannot add transaction remark") ||
     lower.includes("check the status of your order") ||
-    lower.includes("unbooked")
+    lower.includes("unbooked") ||
+    lower.includes("attempt")
   ) {
     return REMARKS_ERROR_INDEX.ERR_POSTEX_NOT_ATTEMPTED;
   }
   if (lower.includes("token") || lower.includes("unauthorized") || lower.includes("forbidden")) {
     return REMARKS_ERROR_INDEX.ERR_POSTEX_AUTH_FAILED;
+  }
+  if (lower.includes("not found") || lower.includes("invalid tracking")) {
+    return REMARKS_ERROR_INDEX.ERR_POSTEX_NOT_BOOKED;
   }
   return {
     ...REMARKS_ERROR_INDEX.ERR_POSTEX_API_ERROR,
@@ -101,7 +121,7 @@ function classifyPostexError(errMsg: string | null | undefined): ErrorIndexDetai
 }
 
 const STATUS_LABELS: Record<number, string> = {
-  0: "General Note",
+  0: "Internal Note",
   1: "Return Requested",
   2: "Delivery Reattempt",
 };
@@ -216,7 +236,8 @@ export async function POST(
 
     const trimmedRemarks = remarks.trim();
     const parsedStatusId = Number(statusId) || 0;
-    const statusLabel = STATUS_LABELS[parsedStatusId] || "Remark";
+    const isPostexAdviceType = parsedStatusId === 1 || parsedStatusId === 2;
+    const statusLabel = STATUS_LABELS[parsedStatusId] || "Internal Note";
 
     const order = await prisma.order.findUnique({
       where: { id },
@@ -234,22 +255,33 @@ export async function POST(
     let postexErrorIndex: ErrorIndexDetail | null = null;
     let rawPostexError: string | null = null;
 
-    // Only attempt PostEx sync if admin explicitly requested AND order has a tracking number
+    // Upfront Guards for PostEx Shipper Advice:
+    // 1. PostEx ONLY supports statusId 1 (Return Requested) or 2 (Retry Attempt)
+    // 2. General/Internal notes (statusId 0) must stay local only
+    // 3. Order must be active and have a tracking number
     if (syncToPostex) {
-      if (!trackingNumber) {
+      if (!isPostexAdviceType) {
+        postexErrorIndex = REMARKS_ERROR_INDEX.ERR_INVALID_STATUS_ID;
+      } else if (!trackingNumber) {
         postexErrorIndex = REMARKS_ERROR_INDEX.ERR_POSTEX_NOT_BOOKED;
+      } else if (order.status === "cancelled" || order.orderStatus === "CANCELLED") {
+        postexErrorIndex = REMARKS_ERROR_INDEX.ERR_ORDER_NOT_ELIGIBLE;
       } else {
         try {
           await callSaveShipperAdviceApi({
             trackingNumber,
-            statusId: parsedStatusId,
+            statusId: parsedStatusId as 1 | 2,
             remarks: trimmedRemarks,
           });
           postexSynced = true;
         } catch (err: any) {
+          console.error(`[POSTEX_DIAG] Full caught error:`, JSON.stringify(err, Object.getOwnPropertyNames(err)));
           rawPostexError = err.message || "PostEx Shipper Advice API error";
           postexErrorIndex = classifyPostexError(rawPostexError);
-          console.warn(`[PostEx Save Shipper Advice] Notice:`, rawPostexError);
+          console.warn(`[PostEx Save Shipper Advice] Failed for ${trackingNumber}:`, {
+            error: rawPostexError,
+            responseBody: err.responseBody || null,
+          });
         }
       }
     }
@@ -257,7 +289,7 @@ export async function POST(
     // Prepare note content for audit log
     const auditAction = postexSynced ? "SHIPPER_ADVICE" : "ADD_REMARK";
     const logNote = postexSynced
-      ? `[${statusLabel}] ${trimmedRemarks} (Synced to PostEx)`
+      ? `[PostEx Shipper Advice: ${statusLabel}] ${trimmedRemarks}`
       : `[${statusLabel}] ${trimmedRemarks}`;
 
     // Execute atomic update: update order.notes and create audit logs

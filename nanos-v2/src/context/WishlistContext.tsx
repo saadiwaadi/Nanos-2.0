@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { trackTikTok } from "@/lib/tiktok-pixel";
 
 export interface WishlistItem {
   productId: string;
@@ -59,6 +60,21 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
         return prev.filter((i) => i.productId !== item.productId);
       } else {
         nowWished = true;
+        try {
+          trackTikTok("AddToWishlist", {
+            contents: [
+              {
+                content_id: item.productId,
+                content_type: "product",
+                content_name: item.name,
+              },
+            ],
+            value: item.price,
+            currency: "PKR",
+          });
+        } catch {
+          // Ignore tracking error
+        }
         return [item, ...prev];
       }
     });

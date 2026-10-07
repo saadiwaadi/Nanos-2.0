@@ -7,6 +7,7 @@ import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
 import { fmtPrice } from "@/lib/cart";
 import { trackMeta } from "@/lib/fpixel";
+import { trackTikTok } from "@/lib/tiktok-pixel";
 import type { ProductColor } from "@/lib/types";
 
 interface ProductData {
@@ -94,6 +95,22 @@ export function PdpActions({
         content_name: p.name,
         content_category: p.category,
         content_type: "product",
+        value: p.price,
+        currency: "PKR",
+      },
+      eventId
+    );
+
+    trackTikTok(
+      "ViewContent",
+      {
+        contents: [
+          {
+            content_id: p.id,
+            content_type: "product",
+            content_name: p.name,
+          },
+        ],
         value: p.price,
         currency: "PKR",
       },

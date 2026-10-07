@@ -97,7 +97,7 @@ export async function callTrackOrderApi(
 
 export interface PostexShipperAdvicePayload {
   trackingNumber: string;
-  statusId: number; // 1 - Mark Return Requested, 2 - Mark Retry Attempt, 0 - General Remarks
+  statusId: 1 | 2; // Strict per PostEx Spec v4.1.9: 1 = Mark Return Requested, 2 = Mark Retry Attempt
   remarks: string;
 }
 
@@ -127,14 +127,51 @@ export async function callCancelOrderApi(trackingNumber: string) {
 /**
  * Section 3.11: Save Shipper Advice API
  * PUT https://api.postex.pk/services/integration/api/order/v2/save-shipper-advice
+ * Allowed statusId: 1 (Return Requested) or 2 (Retry Attempt)
  */
 export async function callSaveShipperAdviceApi(
   payload: PostexShipperAdvicePayload
 ): Promise<any> {
-  return postexFetch("/order/v2/save-shipper-advice", {
-    method: "PUT",
-    body: payload,
-  });
+  const trackingNumber = (payload.trackingNumber || "").trim();
+  const parsedStatusId = Number(payload.statusId);
+  const remarks = (payload.remarks || "").trim();
+
+  if (!trackingNumber) {
+    throw new Error("trackingNumber is mandatory for PostEx shipper advice");
+  }
+  if (parsedStatusId !== 1 && parsedStatusId !== 2) {
+    throw new Error(
+      `Invalid statusId "${payload.statusId}". PostEx only supports 1 (Return Requested) or 2 (Retry Attempt).`
+    );
+  }
+  if (!remarks) {
+    throw new Error("remarks is mandatory for PostEx shipper advice");
+  }
+
+  const outgoingBody = {
+    trackingNumber,
+    statusId: parsedStatusId,
+    remarks,
+  };
+
+  console.log("[PostEx Shipper Advice Request]", JSON.stringify(outgoingBody));
+
+  try {
+    const res = await postexFetch("/order/v2/save-shipper-advice", {
+      method: "PUT",
+      body: outgoingBody,
+    });
+    console.log("[PostEx Shipper Advice Success Response]", JSON.stringify(res));
+    return res;
+  } catch (err: any) {
+    console.error("[PostEx Shipper Advice Failure Response]", {
+      message: err.message,
+      status: err.status,
+      code: err.code,
+      responseBody: err.responseBody || null,
+    });
+    throw err;
+  }
 }
 
 /**

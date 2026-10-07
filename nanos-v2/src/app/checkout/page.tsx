@@ -7,6 +7,7 @@ import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { fmtPrice } from "@/lib/cart";
 import { trackMeta } from "@/lib/fpixel";
+import { trackTikTok, identifyTikTok } from "@/lib/tiktok-pixel";
 
 function getCookie(name: string): string | undefined {
   if (typeof document === "undefined") return undefined;
@@ -62,6 +63,22 @@ export default function CheckoutPage() {
           currency: "PKR",
           value: cart.total,
           num_items: cart.count,
+        },
+        initiateCheckoutEventId
+      );
+
+      trackTikTok(
+        "InitiateCheckout",
+        {
+          contents: cart.items.map((i) => ({
+            content_id: i.productId,
+            content_type: "product",
+            content_name: i.name,
+            quantity: i.qty,
+            price: i.price,
+          })),
+          value: cart.total,
+          currency: "PKR",
         },
         initiateCheckoutEventId
       );
@@ -182,7 +199,40 @@ export default function CheckoutPage() {
 
         currentToken = regData.token;
         auth.login(regData.user, regData.token);
+
+        try {
+          trackTikTok("CompleteRegistration", {
+            contents: cart.items.map((i) => ({
+              content_id: i.productId,
+              content_type: "product",
+              content_name: i.name,
+            })),
+            value: cart.total,
+            currency: "PKR",
+          });
+        } catch {}
       }
+
+      // Identify customer with hashed PII before placing order
+      try {
+        await identifyTikTok({
+          email: trimmedEmail || undefined,
+          phone_number: phone.trim() || undefined,
+          external_id: auth.user?.id || undefined,
+        });
+
+        trackTikTok("AddPaymentInfo", {
+          contents: cart.items.map((i) => ({
+            content_id: i.productId,
+            content_type: "product",
+            content_name: i.name,
+            quantity: i.qty,
+            price: i.price,
+          })),
+          value: cart.total,
+          currency: "PKR",
+        });
+      } catch {}
 
       // 2. Submit Order
       const headers: Record<string, string> = {

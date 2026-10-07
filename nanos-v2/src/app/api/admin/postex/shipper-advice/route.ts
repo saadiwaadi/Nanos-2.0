@@ -41,19 +41,34 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { trackingNumber, statusId = 0, remarks } = body || {};
+    const { trackingNumber, statusId, remarks } = body || {};
 
-    if (!trackingNumber || !remarks) {
+    if (!trackingNumber || typeof trackingNumber !== "string" || !trackingNumber.trim()) {
       return NextResponse.json(
-        { error: "trackingNumber and remarks are required" },
+        { error: "trackingNumber is required" },
+        { status: 400 }
+      );
+    }
+
+    const parsedStatusId = Number(statusId);
+    if (parsedStatusId !== 1 && parsedStatusId !== 2) {
+      return NextResponse.json(
+        { error: "statusId must be 1 (Mark Return Requested) or 2 (Mark Retry Attempt)" },
+        { status: 400 }
+      );
+    }
+
+    if (!remarks || typeof remarks !== "string" || !remarks.trim()) {
+      return NextResponse.json(
+        { error: "remarks is required and cannot be empty" },
         { status: 400 }
       );
     }
 
     const res = await callSaveShipperAdviceApi({
-      trackingNumber,
-      statusId: Number(statusId) || 0,
-      remarks: String(remarks).trim(),
+      trackingNumber: trackingNumber.trim(),
+      statusId: parsedStatusId as 1 | 2,
+      remarks: remarks.trim(),
     });
 
     return NextResponse.json({ ok: true, message: "Shipper advice submitted to PostEx", data: res });

@@ -280,6 +280,25 @@ function IconLock({ size = 13, className = "", style }: IconProps) {
   );
 }
 
+function IconPlus({ size = 13, className = "", style }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className} style={{ display: "inline-block", verticalAlign: "middle", ...style }}>
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  );
+}
+
+function IconTrash({ size = 13, className = "", style }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} style={{ display: "inline-block", verticalAlign: "middle", ...style }}>
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    </svg>
+  );
+}
+
+
 function getAuthToken(): string {
   if (typeof window === "undefined") return "";
   const raw = localStorage.getItem("nanos_auth_v1");
@@ -584,6 +603,258 @@ export default function AdminPage() {
   const [savingEditOrder, setSavingEditOrder] = useState(false);
   const [editOrderError, setEditOrderError] = useState<string | null>(null);
 
+  // Quick New Order Modal State
+  const [showNewOrderModal, setShowNewOrderModal] = useState(false);
+  const [creatingNewOrder, setCreatingNewOrder] = useState(false);
+  const [newOrderError, setNewOrderError] = useState<string | null>(null);
+  const [newOrderForm, setNewOrderForm] = useState<{
+    customerName: string;
+    phone: string;
+    email: string;
+    address: string;
+    city: string;
+    notes: string;
+    adminNote: string;
+    payment: string;
+    orderStatus: string;
+    shippingFee: number;
+    discount: number;
+    reserveInventory: boolean;
+    isTest: boolean;
+    items: Array<{
+      productId: string;
+      sku: string;
+      name: string;
+      color: string;
+      size: string;
+      quantity: number;
+      price: number;
+      hero?: string;
+    }>;
+  }>({
+    customerName: "",
+    phone: "",
+    email: "",
+    address: "",
+    city: "KARACHI",
+    notes: "",
+    adminNote: "",
+    payment: "cod",
+    orderStatus: "READY_TO_SHIP",
+    shippingFee: 0,
+    discount: 0,
+    reserveInventory: true,
+    isTest: false,
+    items: [],
+  });
+
+  // New Order line item selector draft state
+  const [newOrderSelectedProdId, setNewOrderSelectedProdId] = useState<string>("");
+  const [newOrderSelectedColor, setNewOrderSelectedColor] = useState<string>("");
+  const [newOrderSelectedSize, setNewOrderSelectedSize] = useState<string>("");
+  const [newOrderSelectedQty, setNewOrderSelectedQty] = useState<number>(1);
+  const [newOrderCustomPrice, setNewOrderCustomPrice] = useState<string>("");
+
+  const getProductColors = (p?: AdminProduct | null): string[] => {
+    if (!p) return [];
+    if (Array.isArray(p.productColors) && p.productColors.length > 0) {
+      return p.productColors.map((c) => c.name).filter(Boolean);
+    }
+    if (Array.isArray(p.colors) && p.colors.length > 0) {
+      return p.colors.map((c) => (typeof c === "string" ? c : c?.name)).filter(Boolean);
+    }
+    return ["Standard"];
+  };
+
+  const getProductSizes = (p?: AdminProduct | null): string[] => {
+    if (!p) return [];
+    if (Array.isArray(p.sizes) && p.sizes.length > 0) {
+      return p.sizes.filter(Boolean);
+    }
+    return ["Standard"];
+  };
+
+  const openNewOrderModal = () => {
+    setNewOrderError(null);
+    const firstProd = products[0];
+    const initialProdId = firstProd ? firstProd.id : "";
+    setNewOrderSelectedProdId(initialProdId);
+    if (firstProd) {
+      const colors = getProductColors(firstProd);
+      const sizes = getProductSizes(firstProd);
+      setNewOrderSelectedColor(colors[0] || "Standard");
+      setNewOrderSelectedSize(sizes[0] || "Standard");
+      setNewOrderSelectedQty(1);
+      setNewOrderCustomPrice(String(firstProd.price || ""));
+    } else {
+      setNewOrderSelectedColor("Standard");
+      setNewOrderSelectedSize("Standard");
+      setNewOrderSelectedQty(1);
+      setNewOrderCustomPrice("");
+    }
+    setNewOrderForm({
+      customerName: "",
+      phone: "",
+      email: "",
+      address: "",
+      city: "KARACHI",
+      notes: "",
+      adminNote: "",
+      payment: "cod",
+      orderStatus: "READY_TO_SHIP",
+      shippingFee: 0,
+      discount: 0,
+      reserveInventory: true,
+      isTest: false,
+      items: [],
+    });
+    setShowNewOrderModal(true);
+  };
+
+  const handleSelectNewOrderProduct = (prodId: string) => {
+    setNewOrderSelectedProdId(prodId);
+    const prod = products.find((p) => p.id === prodId);
+    if (prod) {
+      const colors = getProductColors(prod);
+      const sizes = getProductSizes(prod);
+      setNewOrderSelectedColor(colors[0] || "Standard");
+      setNewOrderSelectedSize(sizes[0] || "Standard");
+      setNewOrderCustomPrice(String(prod.price || ""));
+    }
+  };
+
+  const handleAddItemToNewOrder = () => {
+    const prod = products.find((p) => p.id === newOrderSelectedProdId);
+    if (!prod) {
+      setNewOrderError("Please select a product.");
+      return;
+    }
+    setNewOrderError(null);
+    const price = newOrderCustomPrice !== "" && !isNaN(Number(newOrderCustomPrice))
+      ? Math.max(0, Number(newOrderCustomPrice))
+      : prod.price || 0;
+    const qty = Math.max(1, newOrderSelectedQty || 1);
+    const color = newOrderSelectedColor || "Standard";
+    const size = newOrderSelectedSize || "Standard";
+
+    // Check if matching item is already in list
+    const existingIndex = newOrderForm.items.findIndex(
+      (it) => it.productId === prod.id && it.color === color && it.size === size
+    );
+
+    if (existingIndex >= 0) {
+      const updated = [...newOrderForm.items];
+      updated[existingIndex].quantity += qty;
+      updated[existingIndex].price = price;
+      setNewOrderForm({ ...newOrderForm, items: updated });
+    } else {
+      setNewOrderForm({
+        ...newOrderForm,
+        items: [
+          ...newOrderForm.items,
+          {
+            productId: prod.id,
+            sku: prod.sku,
+            name: prod.name,
+            color,
+            size,
+            quantity: qty,
+            price,
+            hero: prod.hero,
+          },
+        ],
+      });
+    }
+  };
+
+  const handleRemoveItemFromNewOrder = (index: number) => {
+    setNewOrderForm({
+      ...newOrderForm,
+      items: newOrderForm.items.filter((_, idx) => idx !== index),
+    });
+  };
+
+  const handleUpdateItemQtyInNewOrder = (index: number, newQty: number) => {
+    if (newQty <= 0) {
+      handleRemoveItemFromNewOrder(index);
+      return;
+    }
+    const updated = [...newOrderForm.items];
+    updated[index] = { ...updated[index], quantity: newQty };
+    setNewOrderForm({ ...newOrderForm, items: updated });
+  };
+
+  const handleCreateNewOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newOrderForm.customerName.trim()) {
+      setNewOrderError("Customer name is required.");
+      return;
+    }
+    if (!newOrderForm.phone.trim()) {
+      setNewOrderError("Customer phone number is required.");
+      return;
+    }
+    if (!newOrderForm.address.trim()) {
+      setNewOrderError("Delivery address is required.");
+      return;
+    }
+    if (!newOrderForm.city.trim()) {
+      setNewOrderError("City is required.");
+      return;
+    }
+    if (newOrderForm.items.length === 0) {
+      setNewOrderError("Please add at least one product item to the order.");
+      return;
+    }
+
+    setCreatingNewOrder(true);
+    setNewOrderError(null);
+
+    try {
+      const payload = {
+        customerName: newOrderForm.customerName.trim(),
+        phone: newOrderForm.phone.trim(),
+        email: newOrderForm.email.trim() || undefined,
+        address: newOrderForm.address.trim(),
+        city: newOrderForm.city.trim(),
+        notes: newOrderForm.notes.trim() || undefined,
+        adminNote: newOrderForm.adminNote.trim() || undefined,
+        payment: newOrderForm.payment,
+        orderStatus: newOrderForm.orderStatus,
+        shippingFee: Number(newOrderForm.shippingFee) || 0,
+        discount: Number(newOrderForm.discount) || 0,
+        reserveInventory: newOrderForm.reserveInventory,
+        isTest: newOrderForm.isTest,
+        items: newOrderForm.items.map((it) => ({
+          productId: it.productId,
+          name: it.name,
+          color: it.color,
+          size: it.size,
+          quantity: it.quantity,
+          unitPrice: it.price,
+        })),
+      };
+
+      const res = await authFetch("/api/admin/orders", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || data.error || "Failed to create order");
+      }
+
+      showToast(`✨ Order #${data.order?.id?.slice(-8) || "created"} added successfully!`);
+      setShowNewOrderModal(false);
+      await loadMainData();
+    } catch (err: any) {
+      setNewOrderError(err.message || "Failed to create order");
+    } finally {
+      setCreatingNewOrder(false);
+    }
+  };
+
   // Inline Admin Note State
   const [editingAdminNoteOrderId, setEditingAdminNoteOrderId] = useState<string | null>(null);
   const [adminNoteInput, setAdminNoteInput] = useState<string>("");
@@ -871,8 +1142,8 @@ export default function AdminPage() {
     setRemarksInput("");
     setRemarksStatusId(0);
     setRemarksErrorDetail(null);
+    setRemarksSyncPostex(false);
     const tracking = order.postexTrackingNumber || order.trackingNumber || null;
-    setRemarksSyncPostex(!!tracking);
     setRemarksHistory({
       localRemarks: (order.auditLogs || []).filter((l) => l.action === "SHIPPER_ADVICE" || l.action === "ADD_REMARK"),
       postexRemarks: [],
@@ -2801,9 +3072,27 @@ export default function AdminPage() {
               <div className="panel">
                 <div className="panel-head">
                   <h3>Recent Orders</h3>
-                  <button type="button" className="btn btn-outline btn-sm" onClick={() => switchTab("orders")}>
-                    View all orders →
-                  </button>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={openNewOrderModal}
+                      style={{
+                        background: "var(--admin-accent)",
+                        color: "#111",
+                        fontWeight: 700,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 5,
+                      }}
+                    >
+                      <IconPlus size={13} />
+                      <span>+ New Order</span>
+                    </button>
+                    <button type="button" className="btn btn-outline btn-sm" onClick={() => switchTab("orders")}>
+                      View all orders →
+                    </button>
+                  </div>
                 </div>
                 <div className="table-scroll">
                   <table className="admin-table">
@@ -2954,53 +3243,72 @@ export default function AdminPage() {
                     </button>
                   )}
 
-                  {/* PUSH ALL IN QUEUE BUTTON */}
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm"
-                    disabled={isPushingAllQueue || loading}
-                    style={{
-                      background: "var(--admin-accent)",
-                      color: "#111",
-                      fontWeight: 700,
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 6,
-                      marginLeft: "auto",
-                    }}
-                    onClick={handlePushAllInQueue}
-                    title="Push all unbooked ready orders in queue to PostEx"
-                  >
-                    {isPushingAllQueue ? (
-                      <span>⏳ Pushing Queue...</span>
-                    ) : (
-                      <>
-                        <span>⚡ Push All in Queue</span>
-                        <span
-                          style={{
-                            background: "#111",
-                            color: "var(--admin-accent)",
-                            fontSize: 11,
-                            fontWeight: 800,
-                            padding: "1px 6px",
-                            borderRadius: 10,
-                          }}
-                        >
-                          {
-                            orders.filter(
-                              (o) =>
-                                (o.orderStatus === "READY_TO_SHIP" || o.status === "placed" || o.status === "confirmed") &&
-                                !o.trackingNumber &&
-                                !o.postexTrackingNumber &&
-                                o.orderStatus !== "ON_HOLD" &&
-                                o.orderStatus !== "CANCELLED" &&
-                                o.courierBookingStatus !== "booked"
-                            ).length
-                          }
-                        </span>
-                      </>
-                    )}
-                  </button>
+                  {/* CREATE NEW ORDER & PUSH ALL IN QUEUE BUTTONS */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto", flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      style={{
+                        background: "var(--admin-accent)",
+                        color: "#111",
+                        fontWeight: 800,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        boxShadow: "0 2px 10px rgba(200, 255, 0, 0.22)",
+                      }}
+                      onClick={openNewOrderModal}
+                      title="Quick create a new customer order manually"
+                    >
+                      <IconPlus size={14} />
+                      <span>+ New Order</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      disabled={isPushingAllQueue || loading}
+                      style={{
+                        borderColor: "var(--admin-border)",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                      onClick={handlePushAllInQueue}
+                      title="Push all unbooked ready orders in queue to PostEx"
+                    >
+                      {isPushingAllQueue ? (
+                        <span>⏳ Pushing Queue...</span>
+                      ) : (
+                        <>
+                          <span>⚡ Push All in Queue</span>
+                          <span
+                            style={{
+                              background: "var(--admin-surface-2)",
+                              color: "var(--admin-accent)",
+                              fontSize: 11,
+                              fontWeight: 800,
+                              padding: "1px 6px",
+                              borderRadius: 10,
+                              border: "1px solid var(--admin-border)",
+                            }}
+                          >
+                            {
+                              orders.filter(
+                                (o) =>
+                                  (o.orderStatus === "READY_TO_SHIP" || o.status === "placed" || o.status === "confirmed") &&
+                                  !o.trackingNumber &&
+                                  !o.postexTrackingNumber &&
+                                  o.orderStatus !== "ON_HOLD" &&
+                                  o.orderStatus !== "CANCELLED" &&
+                                  o.courierBookingStatus !== "booked"
+                              ).length
+                            }
+                          </span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -6170,17 +6478,67 @@ export default function AdminPage() {
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                   {/* Status ID Selector */}
                   <div className="field">
-                    <label style={{ fontSize: 12.5, fontWeight: 600 }}>Advice Type (PostEx Status ID)</label>
+                    <label style={{ fontSize: 12.5, fontWeight: 600 }}>Advice / Remark Type</label>
                     <select
                       value={remarksStatusId}
-                      onChange={(e) => setRemarksStatusId(Number(e.target.value))}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setRemarksStatusId(val);
+                        if (val === 1 || val === 2) {
+                          setRemarksSyncPostex(Boolean(remarksHistory.trackingNumber));
+                        } else {
+                          setRemarksSyncPostex(false);
+                        }
+                      }}
                       style={{ padding: "8px 10px", fontSize: 13, borderRadius: 4, background: "var(--admin-surface)" }}
                     >
-                      <option value={0}>0 — General Remarks / Instruction</option>
-                      <option value={2}>2 — Mark Retry Attempt (Reattempt Delivery)</option>
-                      <option value={1}>1 — Mark Return Requested (Return to Origin)</option>
+                      <option value={0}>📝 Internal Order Note (Store DB Only)</option>
+                      <option value={2}>🚚 2 — Mark Retry Attempt (PostEx Courier Reattempt)</option>
+                      <option value={1}>📦 1 — Mark Return Requested (PostEx Return to Origin)</option>
                     </select>
                   </div>
+
+                  {/* Contextual Notice based on selected advice type */}
+                  {remarksStatusId === 0 ? (
+                    <div
+                      style={{
+                        background: "rgba(200, 255, 0, 0.08)",
+                        border: "1px solid rgba(200, 255, 0, 0.25)",
+                        borderRadius: 6,
+                        padding: "8px 12px",
+                        fontSize: 12,
+                        color: "var(--admin-accent)",
+                      }}
+                    >
+                      ℹ️ <strong>Internal Store Note:</strong> This remark will be stored locally in the order history and customer notes. It will NOT be sent to PostEx courier.
+                    </div>
+                  ) : remarksHistory.trackingNumber ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
+                      <input
+                        type="checkbox"
+                        id="syncPostexCheck"
+                        checked={remarksSyncPostex}
+                        onChange={(e) => setRemarksSyncPostex(e.target.checked)}
+                      />
+                      <label htmlFor="syncPostexCheck" style={{ fontSize: 12.5, margin: 0, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }}>
+                        <IconZap size={13} style={{ color: "var(--admin-accent)" }} />
+                        <span>Dispatch to PostEx Courier Rider via Save Shipper Advice API (Status ID: {remarksStatusId})</span>
+                      </label>
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        background: "rgba(245, 158, 11, 0.1)",
+                        border: "1px solid rgba(245, 158, 11, 0.3)",
+                        borderRadius: 6,
+                        padding: "8px 12px",
+                        fontSize: 12,
+                        color: "#fbbf24",
+                      }}
+                    >
+                      ⚠️ <strong>Courier Dispatch Disabled:</strong> This order does not have an active PostEx tracking number. This remark will be saved to your local database only.
+                    </div>
+                  )}
 
                   {/* Remarks Input */}
                   <div className="field">
@@ -6202,22 +6560,6 @@ export default function AdminPage() {
                       style={{ width: "100%", padding: "8px 10px", fontSize: 13, borderRadius: 4, background: "var(--admin-surface)" }}
                     />
                   </div>
-
-                  {/* Sync to PostEx Checkbox */}
-                  {remarksHistory.trackingNumber && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
-                      <input
-                        type="checkbox"
-                        id="syncPostexCheck"
-                        checked={remarksSyncPostex}
-                        onChange={(e) => setRemarksSyncPostex(e.target.checked)}
-                      />
-                      <label htmlFor="syncPostexCheck" style={{ fontSize: 12.5, margin: 0, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }}>
-                        <IconZap size={13} style={{ color: "var(--admin-accent)" }} />
-                        Submit to PostEx via Save Shipper Advice API (Section 3.11)
-                      </label>
-                    </div>
-                  )}
 
                   {/* Action Buttons */}
                   <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 10 }}>
@@ -6725,6 +7067,1048 @@ export default function AdminPage() {
           </div>
         );
       })()}
+
+      {/* Quick Create New Order Modal */}
+      {showNewOrderModal && (() => {
+        const subtotal = newOrderForm.items.reduce(
+          (sum, it) => sum + it.price * (it.quantity || 1),
+          0
+        );
+        const discount = Math.min(subtotal, Math.max(0, Number(newOrderForm.discount) || 0));
+        const shippingFee = Math.max(0, Number(newOrderForm.shippingFee) || 0);
+        const netTotal = Math.max(0, subtotal - discount) + shippingFee;
+
+        const selectedProd = products.find((p) => p.id === newOrderSelectedProdId) || products[0];
+        const selectedProdColors = getProductColors(selectedProd);
+        const selectedProdSizes = getProductSizes(selectedProd);
+
+        return (
+          <div
+            className="modal-overlay"
+            onClick={() => {
+              if (!creatingNewOrder) {
+                setShowNewOrderModal(false);
+              }
+            }}
+          >
+            <div
+              className="modal"
+              style={{
+                maxWidth: 860,
+                maxHeight: "94vh",
+                display: "flex",
+                flexDirection: "column",
+                boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div
+                className="modal-head"
+                style={{
+                  borderBottom: "1px solid var(--admin-border)",
+                  padding: "16px 22px",
+                  background: "var(--admin-surface)",
+                }}
+              >
+                <div>
+                  <h3
+                    style={{
+                      margin: 0,
+                      fontSize: 18,
+                      fontWeight: 800,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      color: "var(--admin-text)",
+                    }}
+                  >
+                    <span
+                      style={{
+                        background: "var(--admin-accent)",
+                        color: "#111",
+                        padding: "3px 8px",
+                        borderRadius: 6,
+                        fontSize: 13,
+                        fontWeight: 900,
+                      }}
+                    >
+                      + NEW
+                    </span>
+                    <span>Quick Create Order</span>
+                  </h3>
+                  <div
+                    style={{
+                      fontSize: 12.5,
+                      color: "var(--admin-text-soft)",
+                      marginTop: 3,
+                    }}
+                  >
+                    Manually generate customer order, reserve stock, and queue for PostEx dispatch.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="modal-close"
+                  disabled={creatingNewOrder}
+                  onClick={() => setShowNewOrderModal(false)}
+                  aria-label="Close create order modal"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Form & Body */}
+              <form
+                onSubmit={handleCreateNewOrder}
+                style={{ display: "flex", flexDirection: "column", overflow: "hidden", flex: 1 }}
+              >
+                <div
+                  className="modal-body"
+                  style={{
+                    overflowY: "auto",
+                    padding: "20px 22px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 20,
+                  }}
+                >
+                  {/* City Datalist for autocomplete */}
+                  <datalist id="admin-new-order-cities-list">
+                    {Array.from(
+                      new Set([
+                        ...courierCities.defaultCities,
+                        ...courierCities.dbCities.map((c) => c.cityName),
+                        "KARACHI",
+                        "LAHORE",
+                        "ISLAMABAD",
+                        "RAWALPINDI",
+                        "FAISALABAD",
+                        "MULTAN",
+                        "PESHAWAR",
+                        "QUETTA",
+                        "SIALKOT",
+                        "GUJRANWALA",
+                        "HYDERABAD",
+                        "ABBOTTABAD",
+                        "ATTOCK",
+                        "HAZRO",
+                        "SARGODHA",
+                        "BAHAWALPUR",
+                        "SUKKUR",
+                        "LARKANA",
+                        "SHEIKHUPURA",
+                        "JHANG",
+                        "RAHIM YAR KHAN",
+                        "GUJRAT",
+                        "KASUR",
+                        "MARDAN",
+                      ])
+                    )
+                      .sort()
+                      .map((cityName) => (
+                        <option key={cityName} value={cityName} />
+                      ))}
+                  </datalist>
+
+                  {/* Error Alert */}
+                  {newOrderError && (
+                    <div
+                      style={{
+                        background: "rgba(239, 68, 68, 0.12)",
+                        border: "1px solid rgba(239, 68, 68, 0.35)",
+                        borderRadius: 6,
+                        padding: "10px 14px",
+                        fontSize: 12.5,
+                        color: "var(--admin-danger)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <IconAlert size={16} />
+                      <span>{newOrderError}</span>
+                    </div>
+                  )}
+
+                  {/* SECTION 1: CUSTOMER & DELIVERY DETAILS */}
+                  <div
+                    style={{
+                      background: "var(--admin-surface)",
+                      border: "1px solid var(--admin-border)",
+                      borderRadius: 8,
+                      padding: "16px 18px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 12.5,
+                        fontWeight: 800,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.04em",
+                        marginBottom: 12,
+                        color: "var(--admin-accent)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                    >
+                      <span>1. Customer &amp; Delivery Information</span>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      <div className="field">
+                        <label style={{ fontSize: 12, fontWeight: 600 }}>
+                          Customer Full Name <span style={{ color: "var(--admin-danger)" }}>*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Muhammad Ali"
+                          value={newOrderForm.customerName}
+                          onChange={(e) =>
+                            setNewOrderForm({ ...newOrderForm, customerName: e.target.value })
+                          }
+                          disabled={creatingNewOrder}
+                          style={{
+                            width: "100%",
+                            padding: "8px 12px",
+                            fontSize: 13,
+                            borderRadius: 6,
+                            background: "var(--admin-surface-2)",
+                            border: "1px solid var(--admin-border)",
+                            color: "var(--admin-text)",
+                          }}
+                        />
+                      </div>
+
+                      <div className="field">
+                        <label style={{ fontSize: 12, fontWeight: 600 }}>
+                          Phone Number <span style={{ color: "var(--admin-danger)" }}>*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. 03001234567"
+                          value={newOrderForm.phone}
+                          onChange={(e) =>
+                            setNewOrderForm({ ...newOrderForm, phone: e.target.value })
+                          }
+                          disabled={creatingNewOrder}
+                          style={{
+                            width: "100%",
+                            padding: "8px 12px",
+                            fontSize: 13,
+                            borderRadius: 6,
+                            background: "var(--admin-surface-2)",
+                            border: "1px solid var(--admin-border)",
+                            color: "var(--admin-text)",
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 10 }}>
+                      <div className="field">
+                        <label style={{ fontSize: 12, fontWeight: 600 }}>
+                          Email Address <span style={{ color: "var(--admin-text-soft)", fontSize: 11 }}>(Optional)</span>
+                        </label>
+                        <input
+                          type="email"
+                          placeholder="customer@example.com"
+                          value={newOrderForm.email}
+                          onChange={(e) =>
+                            setNewOrderForm({ ...newOrderForm, email: e.target.value })
+                          }
+                          disabled={creatingNewOrder}
+                          style={{
+                            width: "100%",
+                            padding: "8px 12px",
+                            fontSize: 13,
+                            borderRadius: 6,
+                            background: "var(--admin-surface-2)",
+                            border: "1px solid var(--admin-border)",
+                            color: "var(--admin-text)",
+                          }}
+                        />
+                      </div>
+
+                      <div className="field">
+                        <label style={{ fontSize: 12, fontWeight: 600 }}>
+                          City <span style={{ color: "var(--admin-danger)" }}>*</span>
+                        </label>
+                        <input
+                          type="text"
+                          list="admin-new-order-cities-list"
+                          required
+                          placeholder="e.g. KARACHI / LAHORE"
+                          value={newOrderForm.city}
+                          onChange={(e) =>
+                            setNewOrderForm({ ...newOrderForm, city: e.target.value })
+                          }
+                          disabled={creatingNewOrder}
+                          style={{
+                            width: "100%",
+                            padding: "8px 12px",
+                            fontSize: 13,
+                            borderRadius: 6,
+                            background: "var(--admin-surface-2)",
+                            border: "1px solid var(--admin-border)",
+                            color: "var(--admin-text)",
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="field" style={{ marginTop: 10 }}>
+                      <label style={{ fontSize: 12, fontWeight: 600 }}>
+                        Delivery Complete Address <span style={{ color: "var(--admin-danger)" }}>*</span>
+                      </label>
+                      <textarea
+                        rows={2}
+                        required
+                        placeholder="House / Apartment #, Street address, Sector / Area, Landmark"
+                        value={newOrderForm.address}
+                        onChange={(e) =>
+                          setNewOrderForm({ ...newOrderForm, address: e.target.value })
+                        }
+                        disabled={creatingNewOrder}
+                        style={{
+                          width: "100%",
+                          padding: "8px 12px",
+                          fontSize: 13,
+                          borderRadius: 6,
+                          background: "var(--admin-surface-2)",
+                          border: "1px solid var(--admin-border)",
+                          color: "var(--admin-text)",
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 10 }}>
+                      <div className="field">
+                        <label style={{ fontSize: 12, fontWeight: 600 }}>
+                          Customer / Courier Note <span style={{ color: "var(--admin-text-soft)", fontSize: 11 }}>(Optional)</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Call before delivery, deliver in afternoon"
+                          value={newOrderForm.notes}
+                          onChange={(e) =>
+                            setNewOrderForm({ ...newOrderForm, notes: e.target.value })
+                          }
+                          disabled={creatingNewOrder}
+                          style={{
+                            width: "100%",
+                            padding: "8px 12px",
+                            fontSize: 13,
+                            borderRadius: 6,
+                            background: "var(--admin-surface-2)",
+                            border: "1px solid var(--admin-border)",
+                            color: "var(--admin-text)",
+                          }}
+                        />
+                      </div>
+
+                      <div className="field">
+                        <label style={{ fontSize: 12, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4, color: "var(--admin-accent)" }}>
+                          <IconLock size={12} />
+                          <span>Private Admin Note <span style={{ color: "var(--admin-text-soft)", fontSize: 11 }}>(Staff Only)</span></span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. WhatsApp verified / Manual Phone Order"
+                          value={newOrderForm.adminNote}
+                          onChange={(e) =>
+                            setNewOrderForm({ ...newOrderForm, adminNote: e.target.value })
+                          }
+                          disabled={creatingNewOrder}
+                          style={{
+                            width: "100%",
+                            padding: "8px 12px",
+                            fontSize: 13,
+                            borderRadius: 6,
+                            background: "var(--admin-surface-2)",
+                            border: "1px solid rgba(200, 255, 0, 0.3)",
+                            color: "var(--admin-text)",
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SECTION 2: PRODUCT ITEMS SELECTION */}
+                  <div
+                    style={{
+                      background: "var(--admin-surface)",
+                      border: "1px solid var(--admin-border)",
+                      borderRadius: 8,
+                      padding: "16px 18px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 12.5,
+                        fontWeight: 800,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.04em",
+                        marginBottom: 12,
+                        color: "var(--admin-accent)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <span>2. Select Products &amp; Line Items</span>
+                      <span style={{ fontSize: 11, color: "var(--admin-text-soft)", fontWeight: 600 }}>
+                        {newOrderForm.items.length} item{newOrderForm.items.length === 1 ? "" : "s"} in order
+                      </span>
+                    </div>
+
+                    {/* Add Item Form Bar */}
+                    <div
+                      style={{
+                        background: "var(--admin-surface-2)",
+                        border: "1px solid var(--admin-border)",
+                        borderRadius: 8,
+                        padding: "12px 14px",
+                        display: "grid",
+                        gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr auto",
+                        gap: 8,
+                        alignItems: "flex-end",
+                      }}
+                    >
+                      <div className="field" style={{ margin: 0 }}>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--admin-text-soft)" }}>
+                          Product
+                        </label>
+                        <select
+                          value={newOrderSelectedProdId}
+                          onChange={(e) => handleSelectNewOrderProduct(e.target.value)}
+                          disabled={creatingNewOrder || products.length === 0}
+                          style={{
+                            width: "100%",
+                            padding: "7px 10px",
+                            fontSize: 12.5,
+                            borderRadius: 4,
+                            background: "var(--admin-surface)",
+                            color: "var(--admin-text)",
+                            border: "1px solid var(--admin-border)",
+                          }}
+                        >
+                          {products.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} ({fmtPrice(p.price)})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="field" style={{ margin: 0 }}>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--admin-text-soft)" }}>
+                          Color
+                        </label>
+                        <select
+                          value={newOrderSelectedColor}
+                          onChange={(e) => setNewOrderSelectedColor(e.target.value)}
+                          disabled={creatingNewOrder}
+                          style={{
+                            width: "100%",
+                            padding: "7px 10px",
+                            fontSize: 12.5,
+                            borderRadius: 4,
+                            background: "var(--admin-surface)",
+                            color: "var(--admin-text)",
+                            border: "1px solid var(--admin-border)",
+                          }}
+                        >
+                          {selectedProdColors.map((c) => (
+                            <option key={c} value={c}>
+                              {c}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="field" style={{ margin: 0 }}>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--admin-text-soft)" }}>
+                          Size
+                        </label>
+                        <select
+                          value={newOrderSelectedSize}
+                          onChange={(e) => setNewOrderSelectedSize(e.target.value)}
+                          disabled={creatingNewOrder}
+                          style={{
+                            width: "100%",
+                            padding: "7px 10px",
+                            fontSize: 12.5,
+                            borderRadius: 4,
+                            background: "var(--admin-surface)",
+                            color: "var(--admin-text)",
+                            border: "1px solid var(--admin-border)",
+                          }}
+                        >
+                          {selectedProdSizes.map((s) => (
+                            <option key={s} value={s}>
+                              {s}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="field" style={{ margin: 0 }}>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--admin-text-soft)" }}>
+                          Qty
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="999"
+                          value={newOrderSelectedQty}
+                          onChange={(e) =>
+                            setNewOrderSelectedQty(Math.max(1, parseInt(e.target.value, 10) || 1))
+                          }
+                          disabled={creatingNewOrder}
+                          style={{
+                            width: "100%",
+                            padding: "7px 10px",
+                            fontSize: 12.5,
+                            borderRadius: 4,
+                            background: "var(--admin-surface)",
+                            color: "var(--admin-text)",
+                            border: "1px solid var(--admin-border)",
+                          }}
+                        />
+                      </div>
+
+                      <div className="field" style={{ margin: 0 }}>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--admin-text-soft)" }}>
+                          Price (PKR)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="10"
+                          placeholder="Price"
+                          value={newOrderCustomPrice}
+                          onChange={(e) => setNewOrderCustomPrice(e.target.value)}
+                          disabled={creatingNewOrder}
+                          style={{
+                            width: "100%",
+                            padding: "7px 10px",
+                            fontSize: 12.5,
+                            borderRadius: 4,
+                            background: "var(--admin-surface)",
+                            color: "var(--admin-text)",
+                            border: "1px solid var(--admin-border)",
+                          }}
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleAddItemToNewOrder}
+                        disabled={creatingNewOrder || !newOrderSelectedProdId}
+                        style={{
+                          padding: "7px 14px",
+                          borderRadius: 4,
+                          background: "var(--admin-accent)",
+                          color: "#111",
+                          fontWeight: 700,
+                          fontSize: 12.5,
+                          border: "none",
+                          cursor: "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          height: 34,
+                        }}
+                      >
+                        <IconPlus size={13} />
+                        <span>Add Item</span>
+                      </button>
+                    </div>
+
+                    {/* Added Items List */}
+                    <div style={{ marginTop: 12 }}>
+                      {newOrderForm.items.length === 0 ? (
+                        <div
+                          style={{
+                            padding: "18px",
+                            textAlign: "center",
+                            fontSize: 13,
+                            color: "var(--admin-text-soft)",
+                            border: "1px dashed var(--admin-border)",
+                            borderRadius: 6,
+                          }}
+                        >
+                          No items added yet. Select a product above and click <strong>&ldquo;Add Item&rdquo;</strong>.
+                        </div>
+                      ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                          {newOrderForm.items.map((item, index) => (
+                            <div
+                              key={`${item.productId}-${item.color}-${item.size}-${index}`}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                background: "var(--admin-surface-2)",
+                                border: "1px solid var(--admin-border)",
+                                borderRadius: 6,
+                                padding: "8px 12px",
+                                gap: 10,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 10,
+                                  flex: 1,
+                                  minWidth: 0,
+                                }}
+                              >
+                                {item.hero ? (
+                                  /* eslint-disable-next-line @next/next/no-img-element */
+                                  <img
+                                    src={item.hero}
+                                    alt=""
+                                    width={36}
+                                    height={36}
+                                    style={{ objectFit: "cover", borderRadius: 4 }}
+                                  />
+                                ) : (
+                                  <div
+                                    style={{
+                                      width: 36,
+                                      height: 36,
+                                      background: "var(--admin-surface)",
+                                      borderRadius: 4,
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      fontSize: 10,
+                                      color: "var(--admin-text-soft)",
+                                    }}
+                                  >
+                                    Nanos
+                                  </div>
+                                )}
+                                <div style={{ minWidth: 0 }}>
+                                  <strong
+                                    style={{
+                                      fontSize: 13,
+                                      display: "block",
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    {item.name}
+                                  </strong>
+                                  <span style={{ fontSize: 12, color: "var(--admin-text-soft)" }}>
+                                    {item.color} · {item.size} · {fmtPrice(item.price)} each
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Quantity and Line Total */}
+                              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                  <button
+                                    type="button"
+                                    className="btn btn-outline btn-sm"
+                                    style={{
+                                      width: 26,
+                                      height: 26,
+                                      padding: 0,
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      fontSize: 13,
+                                    }}
+                                    disabled={creatingNewOrder || item.quantity <= 1}
+                                    onClick={() =>
+                                      handleUpdateItemQtyInNewOrder(index, item.quantity - 1)
+                                    }
+                                  >
+                                    -
+                                  </button>
+                                  <span
+                                    style={{
+                                      fontWeight: 700,
+                                      minWidth: 22,
+                                      textAlign: "center",
+                                      fontSize: 13,
+                                    }}
+                                  >
+                                    {item.quantity}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    className="btn btn-outline btn-sm"
+                                    style={{
+                                      width: 26,
+                                      height: 26,
+                                      padding: 0,
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      fontSize: 13,
+                                    }}
+                                    disabled={creatingNewOrder}
+                                    onClick={() =>
+                                      handleUpdateItemQtyInNewOrder(index, item.quantity + 1)
+                                    }
+                                  >
+                                    +
+                                  </button>
+                                </div>
+
+                                <div
+                                  style={{
+                                    minWidth: 90,
+                                    textAlign: "right",
+                                    fontWeight: 700,
+                                    fontSize: 13.5,
+                                  }}
+                                >
+                                  {fmtPrice(item.quantity * item.price)}
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveItemFromNewOrder(index)}
+                                  disabled={creatingNewOrder}
+                                  title="Remove item"
+                                  style={{
+                                    background: "none",
+                                    border: "none",
+                                    color: "var(--admin-danger)",
+                                    cursor: "pointer",
+                                    padding: 4,
+                                    display: "flex",
+                                    alignItems: "center",
+                                  }}
+                                >
+                                  <IconTrash size={14} />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* SECTION 3: PAYMENT, STATUS & PRICING TOTALS */}
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1.1fr 0.9fr",
+                      gap: 16,
+                    }}
+                  >
+                    {/* Settings & Options */}
+                    <div
+                      style={{
+                        background: "var(--admin-surface)",
+                        border: "1px solid var(--admin-border)",
+                        borderRadius: 8,
+                        padding: "16px 18px",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 12,
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: 12.5,
+                          fontWeight: 800,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.04em",
+                          color: "var(--admin-accent)",
+                        }}
+                      >
+                        3. Payment &amp; Status Options
+                      </div>
+
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                        <div className="field">
+                          <label style={{ fontSize: 12, fontWeight: 600 }}>Payment Method</label>
+                          <select
+                            value={newOrderForm.payment}
+                            onChange={(e) =>
+                              setNewOrderForm({ ...newOrderForm, payment: e.target.value })
+                            }
+                            disabled={creatingNewOrder}
+                            style={{
+                              width: "100%",
+                              padding: "7px 10px",
+                              fontSize: 12.5,
+                              borderRadius: 4,
+                              background: "var(--admin-surface-2)",
+                              color: "var(--admin-text)",
+                              border: "1px solid var(--admin-border)",
+                            }}
+                          >
+                            <option value="cod">Cash on Delivery (COD)</option>
+                            <option value="paid">Paid (Online / Bank)</option>
+                            <option value="easypaisa">EasyPaisa</option>
+                            <option value="jazzcash">JazzCash</option>
+                          </select>
+                        </div>
+
+                        <div className="field">
+                          <label style={{ fontSize: 12, fontWeight: 600 }}>Initial Status</label>
+                          <select
+                            value={newOrderForm.orderStatus}
+                            onChange={(e) =>
+                              setNewOrderForm({ ...newOrderForm, orderStatus: e.target.value })
+                            }
+                            disabled={creatingNewOrder}
+                            style={{
+                              width: "100%",
+                              padding: "7px 10px",
+                              fontSize: 12.5,
+                              borderRadius: 4,
+                              background: "var(--admin-surface-2)",
+                              color: "var(--admin-text)",
+                              border: "1px solid var(--admin-border)",
+                            }}
+                          >
+                            <option value="READY_TO_SHIP">Ready to Ship (Queued)</option>
+                            <option value="ON_HOLD">On Hold (Verification)</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
+                        <label
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            fontSize: 12.5,
+                            cursor: "pointer",
+                            userSelect: "none",
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={newOrderForm.reserveInventory}
+                            onChange={(e) =>
+                              setNewOrderForm({
+                                ...newOrderForm,
+                                reserveInventory: e.target.checked,
+                              })
+                            }
+                            disabled={creatingNewOrder}
+                          />
+                          <span>Reserve stock inventory automatically for these items</span>
+                        </label>
+
+                        <label
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            fontSize: 12.5,
+                            cursor: "pointer",
+                            userSelect: "none",
+                            color: "var(--admin-text-soft)",
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={newOrderForm.isTest}
+                            onChange={(e) =>
+                              setNewOrderForm({ ...newOrderForm, isTest: e.target.checked })
+                            }
+                            disabled={creatingNewOrder}
+                          />
+                          <span>Mark as Test Order</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Financial Summary */}
+                    <div
+                      style={{
+                        background: "var(--admin-surface)",
+                        border: "1px solid var(--admin-border)",
+                        borderRadius: 8,
+                        padding: "16px 18px",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 10,
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: 12.5,
+                          fontWeight: 800,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.04em",
+                          color: "var(--admin-accent)",
+                        }}
+                      >
+                        4. Order Financials
+                      </div>
+
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                        <span style={{ color: "var(--admin-text-soft)" }}>Items Subtotal:</span>
+                        <strong>{fmtPrice(subtotal)}</strong>
+                      </div>
+
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 12,
+                        }}
+                      >
+                        <label style={{ fontSize: 12.5, color: "var(--admin-text-soft)", margin: 0 }}>
+                          Discount (PKR):
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="10"
+                          value={newOrderForm.discount}
+                          onChange={(e) =>
+                            setNewOrderForm({
+                              ...newOrderForm,
+                              discount: Math.max(0, Number(e.target.value) || 0),
+                            })
+                          }
+                          disabled={creatingNewOrder}
+                          style={{
+                            width: 100,
+                            padding: "5px 8px",
+                            fontSize: 12.5,
+                            textAlign: "right",
+                            borderRadius: 4,
+                            background: "var(--admin-surface-2)",
+                            border: "1px solid var(--admin-border)",
+                            color: "var(--admin-text)",
+                          }}
+                        />
+                      </div>
+
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 12,
+                        }}
+                      >
+                        <label style={{ fontSize: 12.5, color: "var(--admin-text-soft)", margin: 0 }}>
+                          Shipping Fee (PKR):
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="10"
+                          value={newOrderForm.shippingFee}
+                          onChange={(e) =>
+                            setNewOrderForm({
+                              ...newOrderForm,
+                              shippingFee: Math.max(0, Number(e.target.value) || 0),
+                            })
+                          }
+                          disabled={creatingNewOrder}
+                          style={{
+                            width: 100,
+                            padding: "5px 8px",
+                            fontSize: 12.5,
+                            textAlign: "right",
+                            borderRadius: 4,
+                            background: "var(--admin-surface-2)",
+                            border: "1px solid var(--admin-border)",
+                            color: "var(--admin-text)",
+                          }}
+                        />
+                      </div>
+
+                      <div
+                        style={{
+                          borderTop: "1px solid var(--admin-border)",
+                          paddingTop: 10,
+                          marginTop: 4,
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "baseline",
+                        }}
+                      >
+                        <span style={{ fontSize: 14, fontWeight: 700 }}>Total Payable:</span>
+                        <span
+                          style={{
+                            fontSize: 18,
+                            fontWeight: 900,
+                            color: "var(--admin-accent)",
+                          }}
+                        >
+                          {fmtPrice(netTotal)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Modal Footer Actions */}
+                <div
+                  className="modal-actions"
+                  style={{
+                    borderTop: "1px solid var(--admin-border)",
+                    padding: "14px 22px",
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    gap: 10,
+                    background: "var(--admin-surface-2)",
+                  }}
+                >
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    disabled={creatingNewOrder}
+                    onClick={() => setShowNewOrderModal(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary btn-sm"
+                    disabled={creatingNewOrder || newOrderForm.items.length === 0}
+                    style={{
+                      background: "var(--admin-accent)",
+                      color: "#111",
+                      fontWeight: 800,
+                      padding: "8px 22px",
+                      fontSize: 13.5,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      boxShadow: "0 2px 10px rgba(200, 255, 0, 0.25)",
+                    }}
+                  >
+                    <IconPlus size={14} />
+                    <span>
+                      {creatingNewOrder
+                        ? "Creating Order..."
+                        : `Create Order (${fmtPrice(netTotal)})`}
+                    </span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        );
+      })()}
+
     </div>
   );
 }

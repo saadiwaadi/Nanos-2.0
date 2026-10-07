@@ -6,7 +6,8 @@ export class PostexError extends Error {
     public code: "CONFIG" | "AUTH" | "REQUEST" | "SERVER" | "TIMEOUT" | "NETWORK",
     message: string,
     public retryable: boolean,
-    public status?: number
+    public status?: number,
+    public responseBody?: any
   ) {
     super(message);
     this.name = "PostexError";
@@ -27,14 +28,25 @@ export async function postexFetch<T = any>(
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? 15000);
   try {
-    const res = await fetch(`${BASE}${PREFIX}${path}`, {
+    const fullUrl = `${BASE}${PREFIX}${path}`;
+    const headers = { token, "Content-Type": "application/json" };
+    const redactedHeaders = { token: token ? "[REDACTED_PRESENT]" : "[EMPTY]", "Content-Type": "application/json" };
+
+    console.log(`[POSTEX_DIAG] >>> ${opts.method ?? "GET"} ${fullUrl}`);
+    console.log(`[POSTEX_DIAG] >>> headers:`, JSON.stringify(redactedHeaders));
+    console.log(`[POSTEX_DIAG] >>> body:`, JSON.stringify(opts.body ?? null));
+
+    const res = await fetch(fullUrl, {
       method: opts.method ?? "GET",
-      headers: { token, "Content-Type": "application/json" },
+      headers,
       body: opts.body ? JSON.stringify(opts.body) : undefined,
       signal: ctrl.signal,
       cache: "no-store",
     });
     const text = await res.text();
+    console.log(`[POSTEX_DIAG] <<< HTTP ${res.status} ${res.statusText}`);
+    console.log(`[POSTEX_DIAG] <<< raw body:`, text);
+
     let json: any;
     try {
       json = JSON.parse(text);
@@ -47,13 +59,13 @@ export async function postexFetch<T = any>(
       res.status === 403 ||
       (/token/i.test(msg) && /invalid|expired/i.test(msg));
     if (looksAuth)
-      throw new PostexError("AUTH", `PostEx rejected the token: ${msg}`, false, res.status);
+      throw new PostexError("AUTH", `PostEx rejected the token: ${msg}`, false, res.status, json);
     if (res.status === 429 || res.status >= 500)
-      throw new PostexError("SERVER", `PostEx error ${res.status}: ${msg}`, true, res.status);
-    if (!res.ok) throw new PostexError("REQUEST", msg, false, res.status);
+      throw new PostexError("SERVER", `PostEx error ${res.status}: ${msg}`, true, res.status, json);
+    if (!res.ok) throw new PostexError("REQUEST", msg, false, res.status, json);
     // PostEx sometimes returns HTTP 200 with statusCode "400" in the body
     if (json?.statusCode !== undefined && String(json.statusCode) !== "200")
-      throw new PostexError("REQUEST", msg, false, res.status);
+      throw new PostexError("REQUEST", msg, false, res.status, json);
     return json as T;
   } catch (e: any) {
     if (e instanceof PostexError) throw e;
