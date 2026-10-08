@@ -93,10 +93,11 @@ export function HomePageManager({
         if (data.config) setConfig(data.config);
         showToast("Homepage updated successfully!", "success");
       } else {
-        showToast("Failed to save changes", "error");
+        const errData = await res.json().catch(() => ({}));
+        showToast(errData.error || errData.message || "Failed to save changes", "error");
       }
-    } catch (err) {
-      showToast("Network error while saving", "error");
+    } catch (err: any) {
+      showToast(err.message || "Network error while saving homepage", "error");
     } finally {
       setSaving(false);
     }

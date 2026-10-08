@@ -346,7 +346,12 @@ export default function AdminPage() {
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("dark");
-  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
+
+  // Live Sync & Saving State
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncSaved, setSyncSaved] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   // Data states
   const [products, setProducts] = useState<AdminProduct[]>([]);
@@ -845,11 +850,12 @@ export default function AdminPage() {
         throw new Error(data.message || data.error || "Failed to create order");
       }
 
-      showToast(`✨ Order #${data.order?.id?.slice(-8) || "created"} added successfully!`);
+      showToast(`✨ Order #${data.order?.id?.slice(-8) || "created"} added successfully!`, "success");
       setShowNewOrderModal(false);
-      await loadMainData();
+      await loadMainData(true);
     } catch (err: any) {
       setNewOrderError(err.message || "Failed to create order");
+      showToast(err.message || "Failed to create order", "error");
     } finally {
       setCreatingNewOrder(false);
     }
@@ -861,9 +867,13 @@ export default function AdminPage() {
   const [savingAdminNote, setSavingAdminNote] = useState<boolean>(false);
 
   // Toast Helper
-  const showToast = useCallback((message: string, type: "success" | "error" = "success") => {
+  const showToast = useCallback((message: string, type: "success" | "error" | "info" = "success") => {
     setToast({ message, type });
-    setTimeout(() => setToast(null), 3200);
+    if (type === "success") {
+      setSyncSaved(true);
+      setTimeout(() => setSyncSaved(false), 2500);
+    }
+    setTimeout(() => setToast(null), 3500);
   }, []);
 
   const handleSaveInlineAdminNote = async (orderId: string, currentOrder: AdminOrder) => {
@@ -880,10 +890,10 @@ export default function AdminPage() {
       if (!res.ok) {
         throw new Error(data.message || data.error || "Failed to save admin note");
       }
-      showToast("Admin customer note saved!");
+      showToast("Admin customer note saved!", "success");
       setEditingAdminNoteOrderId(null);
       setAdminNoteInput("");
-      await loadMainData();
+      await loadMainData(true);
     } catch (err: any) {
       showToast(err.message || "Failed to save admin note", "error");
     } finally {
@@ -972,11 +982,12 @@ export default function AdminPage() {
         throw new Error(data.message || data.error || "Failed to update order");
       }
 
-      showToast("Order updated successfully!");
+      showToast("Order updated successfully!", "success");
       setEditingOrder(null);
-      await loadMainData();
+      await loadMainData(true);
     } catch (err: any) {
       setEditOrderError(err.message || "Failed to update order");
+      showToast(err.message || "Failed to update order", "error");
     } finally {
       setSavingEditOrder(false);
     }
@@ -1007,9 +1018,14 @@ export default function AdminPage() {
   );
 
   // Load Main Data (Products, Orders, Settings)
-  const loadMainData = useCallback(async () => {
-    setLoading(true);
+  const loadMainData = useCallback(async (silent = false) => {
+    if (!silent) {
+      setLoading(true);
+    } else {
+      setIsSyncing(true);
+    }
     setError(null);
+    setSyncError(null);
     try {
       const [resProd, resOrd, resSet, resBundle, resPromo, resShipping] = await Promise.all([
         authFetch("/api/admin/products"),
@@ -1085,12 +1101,22 @@ export default function AdminPage() {
           setSettingDrafts(drafts);
         }
       }
+
+      if (silent) {
+        setSyncSaved(true);
+        setTimeout(() => setSyncSaved(false), 2500);
+      }
     } catch (err: any) {
       if (err.message !== "Unauthorized") {
-        setError(err.message || "Failed to load data");
+        if (!silent) {
+          setError(err.message || "Failed to load data");
+        } else {
+          setSyncError(err.message || "Sync failed");
+        }
       }
     } finally {
       setLoading(false);
+      setIsSyncing(false);
     }
   }, [authFetch]);
 
@@ -1205,7 +1231,7 @@ export default function AdminPage() {
         }
 
         await fetchRemarksHistory(remarksOrder.id);
-        loadMainData();
+        loadMainData(true);
       }
     } catch (err: any) {
       showToast(err.message || "Failed to submit remark", "error");
@@ -1587,7 +1613,7 @@ export default function AdminPage() {
       });
 
       if (!res.ok) throw new Error("Failed to create product");
-      showToast("Product created successfully!");
+      showToast("Product created successfully!", "success");
       setShowAddModal(false);
       setAddForm({
         name: "",
@@ -1602,7 +1628,7 @@ export default function AdminPage() {
         sizesRaw: "",
         isSale: false,
       });
-      loadMainData();
+      loadMainData(true);
     } catch (err: any) {
       showToast(err.message || "Failed to create product", "error");
     } finally {
@@ -1660,9 +1686,10 @@ export default function AdminPage() {
         showToast(
           newValue
             ? "♾️ Unlimited stock enabled! Orders will never be blocked by inventory."
-            : "Stock limit tracking enabled."
+            : "Stock limit tracking enabled.",
+          "success"
         );
-        loadMainData();
+        loadMainData(true);
       } else {
         throw new Error("Failed to update stock mode");
       }
@@ -1710,8 +1737,8 @@ export default function AdminPage() {
         }),
       });
 
-      showToast("Product and bundle pricing saved successfully!");
-      loadMainData();
+      showToast("Product and bundle pricing saved successfully!", "success");
+      loadMainData(true);
     } catch (err: any) {
       showToast(err.message || "Failed to save product", "error");
     } finally {
@@ -1725,8 +1752,8 @@ export default function AdminPage() {
     try {
       const res = await authFetch(`/api/admin/products/${p.id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Failed to delete product");
-      showToast("Product deleted!");
-      loadMainData();
+      showToast("Product deleted!", "success");
+      loadMainData(true);
     } catch (err: any) {
       showToast(err.message || "Delete failed", "error");
     }
@@ -1948,8 +1975,8 @@ export default function AdminPage() {
       if (!res.ok) {
         throw new Error(data.message || "Failed to update order status");
       }
-      showToast(`Order status updated to ${toStatus}`);
-      loadMainData();
+      showToast(`Order status updated to ${toStatus}`, "success");
+      loadMainData(true);
     } catch (err: any) {
       showToast(err.message || "Failed to update order status", "error");
     } finally {
@@ -1974,8 +2001,8 @@ export default function AdminPage() {
       if (!res.ok) {
         throw new Error(data.error || data.message || "Failed to execute lifecycle action");
       }
-      showToast(data.message || "Order updated successfully!");
-      loadMainData();
+      showToast(data.message || "Order updated successfully!", "success");
+      loadMainData(true);
     } catch (err: any) {
       showToast(err.message || "Action failed", "error");
     } finally {
@@ -2041,7 +2068,7 @@ export default function AdminPage() {
     const ids = Array.from(selectedOrderIds);
     if (ids.length === 0) return;
 
-    setLoading(true);
+    setIsSyncing(true);
     try {
       const res = await authFetch("/api/admin/orders/bulk", {
         method: "POST",
@@ -2068,15 +2095,15 @@ export default function AdminPage() {
             : action === "release"
             ? "released from hold"
             : "cancelled";
-        showToast(`Bulk action complete: ${successes} order(s) ${actionTitle}!`);
+        showToast(`Bulk action complete: ${successes} order(s) ${actionTitle}!`, "success");
       }
 
       setSelectedOrderIds(new Set());
-      loadMainData();
+      loadMainData(true);
     } catch (err: any) {
       showToast(err.message || "Bulk action failed", "error");
     } finally {
-      setLoading(false);
+      setIsSyncing(false);
     }
   }
 
@@ -2319,8 +2346,8 @@ export default function AdminPage() {
         body: JSON.stringify({ lowStockThreshold: threshold }),
       });
       if (res.ok) {
-        showToast(`Updated low stock threshold for ${category} to ${threshold}`);
-        loadMainData();
+        showToast(`Updated low stock threshold for ${category} to ${threshold}`, "success");
+        loadMainData(true);
       }
     } catch {
       showToast("Failed to update setting", "error");
@@ -2344,7 +2371,8 @@ export default function AdminPage() {
       if (res.ok) {
         const data = await res.json();
         if (data.settings) setBundleSettings(data.settings);
-        showToast("Updated global bundle discount settings!");
+        showToast("Updated global bundle discount settings!", "success");
+        loadMainData(true);
       }
     } catch {
       showToast("Failed to update bundle settings", "error");
@@ -2367,7 +2395,8 @@ export default function AdminPage() {
       if (res.ok) {
         const data = await res.json();
         if (data.settings) setBundleSettings(data.settings);
-        showToast("Saved bundle pricing for product!");
+        showToast("Saved bundle pricing for product!", "success");
+        loadMainData(true);
       }
     } catch {
       showToast("Failed to save product bundle", "error");
@@ -2386,7 +2415,8 @@ export default function AdminPage() {
       if (res.ok) {
         const data = await res.json();
         if (data.settings) setPromoSettings(data.settings);
-        showToast("Updated promo code and discount settings!");
+        showToast("Updated promo code and discount settings!", "success");
+        loadMainData(true);
       } else {
         showToast("Failed to save promo settings", "error");
       }
@@ -2409,7 +2439,8 @@ export default function AdminPage() {
       if (res.ok) {
         const data = await res.json();
         if (data.settings) setShippingSettings(data.settings);
-        showToast("Updated delivery fee and shipping settings!");
+        showToast("Updated delivery fee and shipping settings!", "success");
+        loadMainData(true);
       } else {
         showToast("Failed to save delivery settings", "error");
       }
@@ -2750,22 +2781,21 @@ export default function AdminPage() {
     <div className="admin-layout-shell">
       {/* Toast Notice */}
       {toast && (
-        <div
-          style={{
-            position: "fixed",
-            top: 16,
-            right: 16,
-            zIndex: 9999,
-            padding: "10px 18px",
-            borderRadius: 6,
-            fontSize: 13,
-            fontWeight: 600,
-            color: "#ffffff",
-            background: toast.type === "success" ? "#2e7d32" : "#c62828",
-            boxShadow: "0 8px 24px rgba(0,0,0,0.2)",
-          }}
-        >
-          {toast.message}
+        <div className="toast-container">
+          <div className={`toast ${toast.type}`}>
+            <span style={{ fontSize: 16 }}>
+              {toast.type === "success" ? "✅" : toast.type === "error" ? "❌" : "ℹ️"}
+            </span>
+            <span style={{ flex: 1 }}>{toast.message}</span>
+            <button
+              type="button"
+              className="toast-close"
+              onClick={() => setToast(null)}
+              aria-label="Dismiss notice"
+            >
+              ✕
+            </button>
+          </div>
         </div>
       )}
 
@@ -2884,7 +2914,7 @@ export default function AdminPage() {
         {/* TOPBAR */}
         <header className="topbar">
           <div className="topbar-left">
-            <button type="button" className="hamburger" onClick={() => setSidebarOpen(true)}>
+            <button type="button" className="hamburger" onClick={() => setSidebarOpen(true)} title="Toggle menu">
               ☰
             </button>
             <div>
@@ -2929,22 +2959,124 @@ export default function AdminPage() {
             </div>
           </div>
 
-          <div className="topbar-right">
+          <div className="topbar-right" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {isSyncing ? (
+              <span className="sync-status syncing">
+                <span className="sync-dot pulse" />
+                <span>Saving...</span>
+              </span>
+            ) : syncSaved ? (
+              <span className="sync-status saved">
+                <span className="sync-dot" />
+                <span>Saved</span>
+              </span>
+            ) : syncError ? (
+              <button
+                type="button"
+                className="sync-status error"
+                onClick={() => loadMainData(false)}
+                title="Click to retry syncing data"
+              >
+                <span className="sync-dot" />
+                <span>Sync Error (Retry)</span>
+              </button>
+            ) : null}
+
+            <Link
+              href="/"
+              target="_blank"
+              className="btn btn-dark btn-sm"
+              title="View live storefront"
+              style={{ textDecoration: "none", fontSize: 12, padding: "5px 10px" }}
+            >
+              <span>Storefront</span>
+              <span style={{ fontSize: 10, opacity: 0.75 }}>↗</span>
+            </Link>
+
             <button type="button" className="admin-icon-btn" onClick={toggleTheme} title="Toggle theme">
               {theme === "light" ? "◐" : "☀️"}
             </button>
           </div>
         </header>
 
+        {/* MOBILE / TABLET QUICK NAVIGATION STRIP */}
+        <nav className="admin-mobile-nav" aria-label="Quick Section Switcher">
+          <button
+            type="button"
+            className={`admin-mobile-nav-btn ${activeTab === "dashboard" ? "active" : ""}`}
+            onClick={() => switchTab("dashboard")}
+          >
+            <span>📊 Dashboard</span>
+          </button>
+          <button
+            type="button"
+            className={`admin-mobile-nav-btn ${activeTab === "orders" ? "active" : ""}`}
+            onClick={() => switchTab("orders")}
+          >
+            <span>📦 Orders</span>
+            {orders.filter((o) => o.status.toLowerCase() === "processing").length > 0 && (
+              <span className="admin-mobile-nav-badge">
+                {orders.filter((o) => o.status.toLowerCase() === "processing").length}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            className={`admin-mobile-nav-btn ${activeTab === "delivered" ? "active" : ""}`}
+            onClick={() => switchTab("delivered")}
+          >
+            <span>✅ Delivered</span>
+          </button>
+          <button
+            type="button"
+            className={`admin-mobile-nav-btn ${activeTab === "courier" ? "active" : ""}`}
+            onClick={() => switchTab("courier")}
+          >
+            <span>🚚 Courier</span>
+          </button>
+          <button
+            type="button"
+            className={`admin-mobile-nav-btn ${activeTab === "home" ? "active" : ""}`}
+            onClick={() => switchTab("home")}
+          >
+            <span>🏠 Home</span>
+          </button>
+          <button
+            type="button"
+            className={`admin-mobile-nav-btn ${activeTab === "products" || activeTab === "edit-product" ? "active" : ""}`}
+            onClick={() => switchTab("products")}
+          >
+            <span>🏷️ Products</span>
+          </button>
+          <button
+            type="button"
+            className={`admin-mobile-nav-btn ${activeTab === "size-charts" ? "active" : ""}`}
+            onClick={() => switchTab("size-charts")}
+          >
+            <span>📐 Sizes</span>
+          </button>
+          <button
+            type="button"
+            className={`admin-mobile-nav-btn ${activeTab === "settings" ? "active" : ""}`}
+            onClick={() => switchTab("settings")}
+          >
+            <span>⚙️ Settings</span>
+          </button>
+        </nav>
+
         {/* CONTENT CONTAINER */}
         <main className="content">
-          {loading ? (
-            <div style={{ padding: "40px 0", textAlign: "center", color: "var(--admin-text-soft)" }}>
-              Loading store metrics...
+          {loading && products.length === 0 && orders.length === 0 ? (
+            <div style={{ padding: "60px 0", textAlign: "center", color: "var(--admin-text-soft)" }}>
+              <div style={{ fontSize: 24, marginBottom: 12 }}>⚡</div>
+              <div style={{ fontWeight: 600 }}>Loading store metrics...</div>
             </div>
-          ) : error ? (
-            <div style={{ padding: 16, background: "var(--admin-danger-bg)", color: "var(--admin-danger)", borderRadius: 6 }}>
-              {error}
+          ) : error && products.length === 0 && orders.length === 0 ? (
+            <div style={{ padding: 16, background: "var(--admin-danger-bg)", color: "var(--admin-danger)", borderRadius: 8, margin: "20px 0" }}>
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>Failed to load data: {error}</div>
+              <button type="button" className="btn btn-dark btn-sm" onClick={() => loadMainData(false)}>
+                Retry
+              </button>
             </div>
           ) : activeTab === "dashboard" ? (
             /* TAB 1: DASHBOARD */
@@ -5691,7 +5823,7 @@ export default function AdminPage() {
             <HomePageManager
               authFetch={authFetch}
               allProducts={products}
-              onRefreshProducts={loadMainData}
+              onRefreshProducts={() => loadMainData(true)}
               showToast={showToast}
             />
           ) : (
