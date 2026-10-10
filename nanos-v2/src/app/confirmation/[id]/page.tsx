@@ -117,6 +117,16 @@ export default function ConfirmationPage({
               external_id: data.id,
             }).finally(() => {
               trackTikTok(
+                "CompletePayment",
+                {
+                  contents: tikTokContents,
+                  value: data.total,
+                  currency: "PKR",
+                },
+                data.id
+              );
+
+              trackTikTok(
                 "PlaceAnOrder",
                 {
                   contents: tikTokContents,

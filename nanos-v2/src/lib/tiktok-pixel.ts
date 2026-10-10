@@ -88,6 +88,7 @@ export function trackTikTok(
     | "AddPaymentInfo"
     | "InitiateCheckout"
     | "PlaceAnOrder"
+    | "CompletePayment"
     | "CompleteRegistration"
     | "Purchase"
     | string,
