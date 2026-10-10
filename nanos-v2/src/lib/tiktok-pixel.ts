@@ -1,5 +1,5 @@
 export const TIKTOK_PIXEL_ID =
-  process.env.NEXT_PUBLIC_TIKTOK_PIXEL_ID || "DB2U9KRC77UA626EI5OG";
+  process.env.NEXT_PUBLIC_TIKTOK_PIXEL_ID || "DB57MQRC77U074LG2QGG";
 
 export interface TikTokContentItem {
   content_id: string;
