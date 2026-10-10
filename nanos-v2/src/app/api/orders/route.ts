@@ -4,6 +4,7 @@ import { getProductById } from "@/lib/products";
 import { prisma } from "@/lib/prisma";
 import { isAutoBookCity } from "@/lib/postex";
 import { MetaCapiService } from "@/lib/meta-capi";
+import { TikTokEventsApiService } from "@/lib/tiktok-events-api";
 import { reserveStock } from "@/lib/stock";
 import { AppError } from "@/lib/order-state";
 import { getPromoSettings, calculatePromoDiscount } from "@/lib/promo-settings";
@@ -34,7 +35,18 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { items, shippingInfo, promoCode, guestEmail, guestName, fbp, fbc, eventId } = body || {};
+    const {
+      items,
+      shippingInfo,
+      promoCode,
+      guestEmail,
+      guestName,
+      fbp,
+      fbc,
+      ttp,
+      ttclid,
+      eventId,
+    } = body || {};
 
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
@@ -238,9 +250,33 @@ export async function POST(request: Request) {
         num_items: numItems,
       };
 
+      const tikTokUserData = {
+        email: userEmail || null,
+        phone: shippingInfo.phone,
+        name: shippingInfo.name || guestName,
+        external_id: validUserId || orderId,
+        clientIp,
+        clientUserAgent,
+        ttp,
+        ttclid,
+      };
+
+      const tikTokProperties = {
+        value: total,
+        currency: "PKR",
+        contents: resolvedItems.map((i) => ({
+          content_id: i.productId,
+          content_type: "product",
+          content_name: i.name,
+          quantity: i.quantity,
+          price: i.unitPrice,
+        })),
+      };
+
       after(async () => {
         const events: Promise<void>[] = [];
 
+        // Meta CAPI
         if (eventId) {
           events.push(
             MetaCapiService.sendEvent(
@@ -263,10 +299,43 @@ export async function POST(request: Request) {
           )
         );
 
+        // TikTok Events API (Server-side)
+        if (eventId) {
+          events.push(
+            TikTokEventsApiService.sendEvent(
+              "InitiateCheckout",
+              eventId,
+              eventSourceUrl,
+              tikTokUserData,
+              tikTokProperties
+            )
+          );
+        }
+
+        events.push(
+          TikTokEventsApiService.sendEvent(
+            "PlaceAnOrder",
+            orderId,
+            eventSourceUrl,
+            tikTokUserData,
+            tikTokProperties
+          )
+        );
+
+        events.push(
+          TikTokEventsApiService.sendEvent(
+            "CompletePayment",
+            orderId,
+            eventSourceUrl,
+            tikTokUserData,
+            tikTokProperties
+          )
+        );
+
         await Promise.allSettled(events);
       });
     } catch (capiErr) {
-      console.error("Failed to trigger CAPI events:", capiErr);
+      console.error("Failed to trigger CAPI / Events API tracking:", capiErr);
     }
 
     return NextResponse.json(

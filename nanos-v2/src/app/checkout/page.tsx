@@ -262,6 +262,12 @@ export default function CheckoutPage() {
         guestName: currentToken ? undefined : name.trim(),
         fbp: getCookie("_fbp"),
         fbc: getCookie("_fbc"),
+        ttp: getCookie("_ttp"),
+        ttclid:
+          getCookie("ttclid") ||
+          (typeof window !== "undefined"
+            ? new URLSearchParams(window.location.search).get("ttclid") || undefined
+            : undefined),
         eventId: initiateCheckoutEventId,
       };
 
