@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
@@ -73,6 +73,7 @@ export function PdpActions({
   const [size, setSize] = useState<string | null>(null);
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
+  const trackedProductIdRef = useRef<string | null>(null);
 
   // Independent configuration per pair for bundle tiers (up to 3 pairs)
   const [bundlePairs, setBundlePairs] = useState<BundlePairSelection[]>([
@@ -87,6 +88,9 @@ export function PdpActions({
 
   useEffect(() => {
     setMounted(true);
+    if (trackedProductIdRef.current === p.id) return;
+    trackedProductIdRef.current = p.id;
+
     const eventId = crypto.randomUUID();
     trackMeta(
       "ViewContent",

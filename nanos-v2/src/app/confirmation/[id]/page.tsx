@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useState, useRef, use } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
@@ -51,6 +51,7 @@ export default function ConfirmationPage({
   const [order, setOrder] = useState<OrderData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const purchaseFiredRef = useRef<boolean>(false);
 
   useEffect(() => {
     async function fetchOrder() {
@@ -78,8 +79,15 @@ export default function ConfirmationPage({
         // Fire Purchase Meta & TikTok Pixel Events
         try {
           const storageKey = `meta_purchase_fired_${data.id}`;
-          if (typeof window !== "undefined" && !sessionStorage.getItem(storageKey)) {
-            sessionStorage.setItem(storageKey, "true");
+          const isSessionFired =
+            typeof window !== "undefined" && Boolean(sessionStorage.getItem(storageKey));
+
+          if (!purchaseFiredRef.current && !isSessionFired) {
+            purchaseFiredRef.current = true;
+            if (typeof window !== "undefined") {
+              sessionStorage.setItem(storageKey, "true");
+            }
+
             const items = data.items || [];
             const contentIds = items.map((i: any) => i.productId).filter(Boolean);
             const contents = items.map((i: any) => ({
@@ -92,10 +100,10 @@ export default function ConfirmationPage({
             trackMeta(
               "Purchase",
               {
+                content_ids: contentIds.length > 0 ? contentIds : [data.id],
+                content_type: "product",
                 value: data.total,
                 currency: "PKR",
-                content_type: "product",
-                content_ids: contentIds,
                 contents,
                 num_items: numItems,
               },

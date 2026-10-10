@@ -1,4 +1,5 @@
-export const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID;
+export const META_PIXEL_ID =
+  process.env.NEXT_PUBLIC_META_PIXEL_ID || "969572164409296";
 
 /**
  * Checks if the current pathname or search parameters contain paths or tokens
@@ -32,24 +33,36 @@ export function shouldSuppressPixel(
 
 /**
  * Route every event through one safe, typed helper.
- * Safe when fbq is blocked, missing, or NEXT_PUBLIC_META_PIXEL_ID is unset.
+ * Safe when fbq is loaded, loading, or NEXT_PUBLIC_META_PIXEL_ID is unset.
  */
 export function trackMeta(
   eventName: string,
   params: Record<string, any> = {},
   eventId?: string
 ): void {
-  if (!META_PIXEL_ID) return;
-  if (typeof window === "undefined") return;
+  if (typeof window === "undefined" || !META_PIXEL_ID) return;
 
-  const fbq = (window as any).fbq;
-  if (typeof fbq !== "function") return;
+  const w = window as any;
+  if (!w.fbq) {
+    w.fbq = function () {
+      if (w.fbq.callMethod) {
+        w.fbq.callMethod.apply(w.fbq, arguments);
+      } else {
+        w.fbq.queue.push(arguments);
+      }
+    };
+    if (!w._fbq) w._fbq = w.fbq;
+    w.fbq.push = w.fbq;
+    w.fbq.loaded = true;
+    w.fbq.version = "2.0";
+    w.fbq.queue = w.fbq.queue || [];
+  }
 
   try {
     if (eventId) {
-      fbq("track", eventName, params, { eventID: eventId });
+      w.fbq("track", eventName, params, { eventID: eventId });
     } else {
-      fbq("track", eventName, params);
+      w.fbq("track", eventName, params);
     }
   } catch (err) {
     console.warn("Meta Pixel track error:", err);
