@@ -1150,7 +1150,8 @@ export function PdpActions({
                     margin: 0,
                     fontSize: "22px",
                     fontWeight: 800,
-                    color: "#1F1E1D",
+                    fontFamily: "var(--font-head, sans-serif)",
+                    color: "var(--black, #111111)",
                     letterSpacing: "-0.01em",
                   }}
                 >
@@ -1206,7 +1207,8 @@ export function PdpActions({
                     style={{
                       fontSize: "16px",
                       fontWeight: 800,
-                      color: "#1F1E1D",
+                      fontFamily: "var(--font-head, sans-serif)",
+                      color: "var(--black, #111111)",
                       marginBottom: 8,
                     }}
                   >
@@ -1249,13 +1251,18 @@ export function PdpActions({
                             minWidth: "125px",
                             borderRadius: "10px",
                             border: isSelected
-                              ? "2px solid #8D7B68"
-                              : "1.5px solid #E5E5E5",
-                            background: isSelected ? "#FAF8F5" : "#FFFFFF",
+                              ? "2px solid var(--black, #111111)"
+                              : "1.5px solid var(--stone, #D9D6CF)",
+                            background: isSelected
+                              ? "rgba(200, 255, 0, 0.12)"
+                              : "var(--white, #FFFFFF)",
                             padding: "6px",
                             cursor: "pointer",
                             transition: "all 0.15s ease",
-                            boxShadow: isSelected ? "0 2px 8px rgba(141, 123, 104, 0.18)" : "none",
+                            boxShadow: isSelected
+                              ? "0 4px 14px rgba(0, 0, 0, 0.08)"
+                              : "none",
+                            position: "relative",
                           }}
                         >
                           <div
@@ -1264,7 +1271,8 @@ export function PdpActions({
                               aspectRatio: "1 / 1",
                               borderRadius: "7px",
                               overflow: "hidden",
-                              backgroundColor: "#F0EFEA",
+                              backgroundColor: "var(--off-white, #F7F5F0)",
+                              position: "relative",
                             }}
                           >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1278,6 +1286,28 @@ export function PdpActions({
                                 display: "block",
                               }}
                             />
+                            {isSelected && (
+                              <div
+                                style={{
+                                  position: "absolute",
+                                  top: 5,
+                                  right: 5,
+                                  width: 20,
+                                  height: 20,
+                                  borderRadius: "50%",
+                                  backgroundColor: "var(--black, #111111)",
+                                  color: "var(--lime, #C8FF00)",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  boxShadow: "0 2px 5px rgba(0,0,0,0.25)",
+                                }}
+                              >
+                                <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <polyline points="2.5 6 5 8.5 9.5 3.5" />
+                                </svg>
+                              </div>
+                            )}
                           </div>
 
                           <div
@@ -1285,7 +1315,7 @@ export function PdpActions({
                             style={{
                               fontSize: "11.5px",
                               fontWeight: 600,
-                              color: "#1F1E1D",
+                              color: "var(--black, #111111)",
                               marginTop: 6,
                               lineHeight: "1.3",
                               display: "-webkit-box",
@@ -1303,7 +1333,7 @@ export function PdpActions({
                               fontSize: "11px",
                               color: "#666",
                               marginTop: 2,
-                              fontWeight: 600,
+                              fontWeight: 700,
                             }}
                           >
                             {fmtPrice(art.price)}
@@ -1342,11 +1372,20 @@ export function PdpActions({
                             padding: "8px 20px",
                             fontSize: "13.5px",
                             fontWeight: isSelected ? 800 : 600,
-                            border: isSelected ? "1.5px solid #8D7B68" : "1.5px solid #D9D6CF",
-                            backgroundColor: isSelected ? "#FAF8F5" : "#FFFFFF",
-                            color: isSelected ? "#8D7B68" : "#111111",
+                            border: isSelected
+                              ? "1.5px solid var(--black, #111111)"
+                              : "1.5px solid var(--stone, #D9D6CF)",
+                            backgroundColor: isSelected
+                              ? "var(--black, #111111)"
+                              : "var(--white, #FFFFFF)",
+                            color: isSelected
+                              ? "var(--white, #FFFFFF)"
+                              : "var(--black, #111111)",
                             cursor: "pointer",
                             transition: "all 0.15s ease",
+                            boxShadow: isSelected
+                              ? "0 2px 6px rgba(0, 0, 0, 0.18)"
+                              : "none",
                           }}
                         >
                           {sz}
@@ -1388,7 +1427,14 @@ export function PdpActions({
                   Total
                 </div>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                  <span style={{ fontSize: "21px", fontWeight: 800, color: "#111111" }}>
+                  <span
+                    style={{
+                      fontSize: "21px",
+                      fontWeight: 800,
+                      color: "var(--black, #111111)",
+                      fontFamily: "var(--font-head, sans-serif)",
+                    }}
+                  >
                     {fmtPrice(bundleDiscountedTotal)}
                   </span>
                   {bundleSavings > 0 && (
@@ -1407,10 +1453,17 @@ export function PdpActions({
                 {bundleSavings > 0 && (
                   <div
                     style={{
-                      fontSize: "12.5px",
-                      color: "#166534",
-                      fontWeight: 700,
-                      marginTop: 2,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                      fontSize: "11.5px",
+                      fontWeight: 800,
+                      color: "var(--black, #111111)",
+                      backgroundColor: "rgba(200, 255, 0, 0.4)",
+                      border: "1px solid rgba(160, 204, 0, 0.7)",
+                      padding: "2px 8px",
+                      borderRadius: "6px",
+                      marginTop: 4,
                     }}
                   >
                     You save {fmtPrice(bundleSavings)} ({discountPercent}% off)
@@ -1423,20 +1476,34 @@ export function PdpActions({
                 disabled={!isAllBundleSizesSelected}
                 onClick={handleAdd}
                 style={{
-                  backgroundColor: isAllBundleSizesSelected ? "#B8A898" : "#D4CCC5",
-                  color: "#FFFFFF",
+                  backgroundColor: isAllBundleSizesSelected
+                    ? "var(--black, #111111)"
+                    : "var(--stone, #D9D6CF)",
+                  color: isAllBundleSizesSelected
+                    ? "var(--white, #FFFFFF)"
+                    : "#777777",
                   border: "none",
-                  borderRadius: "10px",
+                  borderRadius: "8px",
                   padding: "13px 32px",
                   fontSize: "13.5px",
                   fontWeight: 800,
                   letterSpacing: "0.06em",
                   textTransform: "uppercase",
                   cursor: isAllBundleSizesSelected ? "pointer" : "not-allowed",
-                  transition: "background-color 0.15s ease",
+                  transition: "all 0.15s ease",
                   boxShadow: isAllBundleSizesSelected
-                    ? "0 4px 12px rgba(184, 168, 152, 0.4)"
+                    ? "0 4px 14px rgba(0, 0, 0, 0.18)"
                     : "none",
+                }}
+                onMouseEnter={(e) => {
+                  if (isAllBundleSizesSelected) {
+                    e.currentTarget.style.backgroundColor = "var(--charcoal, #222222)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (isAllBundleSizesSelected) {
+                    e.currentTarget.style.backgroundColor = "var(--black, #111111)";
+                  }
                 }}
               >
                 {isAllBundleSizesSelected
