@@ -1,5 +1,27 @@
-export const TIKTOK_PIXEL_ID =
-  process.env.NEXT_PUBLIC_TIKTOK_PIXEL_ID || "DB57MQRC77U074LG2QGG";
+import { Market, getClientMarket } from "@/lib/market";
+
+export const TIKTOK_PIXEL_ID_PK =
+  process.env.NEXT_PUBLIC_TIKTOK_PIXEL_ID_PK ||
+  process.env.NEXT_PUBLIC_TIKTOK_PIXEL_ID ||
+  "DB57MQRC77U074LG2QGG";
+
+export const TIKTOK_PIXEL_ID_USA =
+  process.env.NEXT_PUBLIC_TIKTOK_PIXEL_ID_USA || "";
+
+// Backwards-compatible alias (defaults to PK pixel)
+export const TIKTOK_PIXEL_ID = TIKTOK_PIXEL_ID_PK;
+
+/**
+ * Returns the active TikTok Pixel ID for the current visitor's market
+ */
+export function getActiveTikTokPixelId(marketOverride?: Market): string {
+  const market = marketOverride || getClientMarket();
+  if (market === "USA") {
+    // If USA pixel ID is set, use it. If not set yet (placeholder), fall back to PK pixel.
+    return TIKTOK_PIXEL_ID_USA || TIKTOK_PIXEL_ID_PK;
+  }
+  return TIKTOK_PIXEL_ID_PK;
+}
 
 export interface TikTokContentItem {
   content_id: string;
@@ -41,12 +63,17 @@ export async function sha256(value: string): Promise<string> {
 }
 
 /**
- * Identify user with client-side SHA-256 hashed PII before firing events
+ * Identify user with client-side SHA-256 hashed PII before firing events.
+ * Scoped to the active market pixel instance.
  */
-export async function identifyTikTok(data: TikTokIdentifyData): Promise<void> {
-  if (!TIKTOK_PIXEL_ID || typeof window === "undefined") return;
+export async function identifyTikTok(
+  data: TikTokIdentifyData,
+  marketOverride?: Market
+): Promise<void> {
+  const activePixelId = getActiveTikTokPixelId(marketOverride);
+  if (!activePixelId || typeof window === "undefined") return;
   const ttq = (window as any).ttq;
-  if (!ttq || typeof ttq.identify !== "function") return;
+  if (!ttq) return;
 
   try {
     const payload: Record<string, string> = {};
@@ -69,7 +96,11 @@ export async function identifyTikTok(data: TikTokIdentifyData): Promise<void> {
     }
 
     if (Object.keys(payload).length > 0) {
-      ttq.identify(payload);
+      const instance = typeof ttq.instance === "function" ? ttq.instance(activePixelId) : null;
+      const target = instance && typeof instance.identify === "function" ? instance : ttq;
+      if (typeof target.identify === "function") {
+        target.identify(payload);
+      }
     }
   } catch (err) {
     console.warn("TikTok Pixel identify error:", err);
@@ -77,7 +108,7 @@ export async function identifyTikTok(data: TikTokIdentifyData): Promise<void> {
 }
 
 /**
- * Safe wrapper for ttq.track
+ * Safe wrapper for ttq.track — routes ONLY to the active market pixel instance
  */
 export function trackTikTok(
   eventName:
@@ -93,17 +124,30 @@ export function trackTikTok(
     | "Purchase"
     | string,
   params: TikTokEventParams = {},
-  eventId?: string
+  eventId?: string,
+  marketOverride?: Market
 ): void {
-  if (!TIKTOK_PIXEL_ID || typeof window === "undefined") return;
+  const activePixelId = getActiveTikTokPixelId(marketOverride);
+  if (!activePixelId || typeof window === "undefined") return;
   const ttq = (window as any).ttq;
-  if (!ttq || typeof ttq.track !== "function") return;
+  if (!ttq) return;
 
   try {
+    const currentMarket = marketOverride || getClientMarket();
+    const resolvedParams: TikTokEventParams = { ...params };
+    if (currentMarket === "USA" && (!resolvedParams.currency || resolvedParams.currency === "PKR")) {
+      resolvedParams.currency = "USD";
+    }
+
+    const instance = typeof ttq.instance === "function" ? ttq.instance(activePixelId) : null;
+    const target = instance && typeof instance.track === "function" ? instance : ttq;
+
+    if (typeof target.track !== "function") return;
+
     if (eventId) {
-      ttq.track(eventName, params, { event_id: eventId });
+      target.track(eventName, resolvedParams, { event_id: eventId });
     } else {
-      ttq.track(eventName, params);
+      target.track(eventName, resolvedParams);
     }
   } catch (err) {
     console.warn(`TikTok Pixel [${eventName}] error:`, err);
@@ -111,15 +155,21 @@ export function trackTikTok(
 }
 
 /**
- * Fire PageView
+ * Fire PageView for active market pixel
  */
-export function tiktokPageView(): void {
+export function tiktokPageView(marketOverride?: Market): void {
   if (typeof window === "undefined") return;
+  const activePixelId = getActiveTikTokPixelId(marketOverride);
+  if (!activePixelId) return;
   const ttq = (window as any).ttq;
-  if (ttq && typeof ttq.page !== "function") return;
+  if (!ttq) return;
 
   try {
-    ttq.page();
+    const instance = typeof ttq.instance === "function" ? ttq.instance(activePixelId) : null;
+    const target = instance && typeof instance.page === "function" ? instance : ttq;
+    if (typeof target.page === "function") {
+      target.page();
+    }
   } catch (err) {
     console.warn("TikTok Pixel pageview error:", err);
   }

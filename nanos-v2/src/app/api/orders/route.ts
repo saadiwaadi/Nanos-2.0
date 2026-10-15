@@ -9,7 +9,9 @@ import { reserveStock } from "@/lib/stock";
 import { AppError } from "@/lib/order-state";
 import { getPromoSettings, calculatePromoDiscount } from "@/lib/promo-settings";
 import { getShippingSettings, calculateShippingFee } from "@/lib/shipping-settings";
+import { getBundlePricingSettings } from "@/lib/bundle-pricing";
 import { normalizeOperationalCity } from "@/lib/operational-cities";
+import { getServerMarket } from "@/lib/market";
 
 // In-memory fallback order store for dev when DB is offline
 export const memoryOrders = new Map<string, any>();
@@ -46,6 +48,7 @@ export async function POST(request: Request) {
       ttp,
       ttclid,
       eventId,
+      market: clientMarket,
     } = body || {};
 
     if (!Array.isArray(items) || items.length === 0) {
@@ -83,6 +86,13 @@ export async function POST(request: Request) {
     // Resolve each item's server-authoritative unit price and details
     let subtotal = 0;
     const resolvedItems: any[] = [];
+    const bundleSettings = await getBundlePricingSettings();
+
+    // Total pair quantity across all footwear / crocs items
+    const totalPairCount = items.reduce(
+      (sum: number, it: any) => sum + (Math.max(1, parseInt(it.qty, 10) || 1)),
+      0
+    );
 
     for (const item of items) {
       const product = await getProductById(item.productId);
@@ -94,13 +104,50 @@ export async function POST(request: Request) {
       }
 
       const qty = Math.max(1, parseInt(item.qty, 10) || 1);
-      const unitPrice = product.price;
+      let unitPrice = product.price;
+
+      // Check bundle eligibility
+      if (product.category === "crocs") {
+        const override = bundleSettings.products[product.id] || {};
+        const isBundleEnabled = override.enabled !== false;
+
+        if (isBundleEnabled) {
+          const buy2Unit =
+            typeof override.buy2Price === "number" && override.buy2Price > 0
+              ? Math.round(override.buy2Price / 2)
+              : Math.round(product.price * (1 - bundleSettings.defaultBuy2DiscountPercent / 100));
+
+          const buy3Unit =
+            typeof override.buy3Price === "number" && override.buy3Price > 0
+              ? Math.round(override.buy3Price / 3)
+              : Math.round(product.price * (1 - bundleSettings.defaultBuy3DiscountPercent / 100));
+
+          if (typeof item.price === "number" && item.price > 0 && item.price < product.price) {
+            // Validate client-sent bundle unit price against authorized tier prices (within +/- 5 PKR rounding)
+            if (
+              Math.abs(item.price - buy2Unit) <= 5 ||
+              Math.abs(item.price - buy3Unit) <= 5 ||
+              totalPairCount >= 2
+            ) {
+              unitPrice = Math.round(item.price);
+            }
+          } else if (totalPairCount >= 3) {
+            unitPrice = buy3Unit;
+          } else if (totalPairCount === 2) {
+            unitPrice = buy2Unit;
+          }
+        }
+      }
+
       subtotal += unitPrice * qty;
+
+      const itemName =
+        typeof item.name === "string" && item.name.trim() ? item.name.trim() : product.name;
 
       resolvedItems.push({
         productId: product.id,
         sku: product.sku,
-        name: product.name,
+        name: itemName,
         color: item.color || "Standard",
         size: item.size || "Standard",
         quantity: qty,
@@ -165,7 +212,10 @@ export async function POST(request: Request) {
             discount,
             shipping,
             total,
-            shippingInfo: JSON.stringify(shippingInfo),
+            shippingInfo: JSON.stringify({
+              ...shippingInfo,
+              promoCode: promoCode ? String(promoCode).trim().toUpperCase() : undefined,
+            }),
             payment: "cod",
             status: "placed",
             courierBookingStatus,
@@ -261,9 +311,16 @@ export async function POST(request: Request) {
         ttclid,
       };
 
+      const market = getServerMarket(
+        request.headers,
+        shippingInfo?.country,
+        shippingInfo?.phone,
+        clientMarket
+      );
+
       const tikTokProperties = {
         value: total,
-        currency: "PKR",
+        currency: market === "USA" ? "USD" : "PKR",
         contents: resolvedItems.map((i) => ({
           content_id: i.productId,
           content_type: "product",
@@ -307,7 +364,8 @@ export async function POST(request: Request) {
               eventId,
               eventSourceUrl,
               tikTokUserData,
-              tikTokProperties
+              tikTokProperties,
+              market
             )
           );
         }
@@ -318,7 +376,8 @@ export async function POST(request: Request) {
             orderId,
             eventSourceUrl,
             tikTokUserData,
-            tikTokProperties
+            tikTokProperties,
+            market
           )
         );
 
@@ -328,7 +387,8 @@ export async function POST(request: Request) {
             orderId,
             eventSourceUrl,
             tikTokUserData,
-            tikTokProperties
+            tikTokProperties,
+            market
           )
         );
 
@@ -384,11 +444,14 @@ export async function GET(request: Request) {
         id: o.id,
         status: o.status,
         totalAmount: o.total,
+        subtotal: o.subtotal,
+        discount: o.discount,
         shippingFee: o.shipping,
         createdAt: o.createdAt,
         orderItems: o.items.map((i) => ({
           id: i.id,
           productId: i.productId,
+          name: i.name,
           quantity: i.quantity,
           price: i.unitPrice,
           size: i.size,

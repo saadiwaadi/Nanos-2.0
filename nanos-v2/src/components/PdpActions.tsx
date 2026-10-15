@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
@@ -8,7 +8,7 @@ import { useWishlist } from "@/context/WishlistContext";
 import { fmtPrice } from "@/lib/cart";
 import { trackMeta } from "@/lib/fpixel";
 import { trackTikTok } from "@/lib/tiktok-pixel";
-import type { ProductColor } from "@/lib/types";
+import type { Product, ProductColor } from "@/lib/types";
 
 interface ProductData {
   id: string;
@@ -53,17 +53,24 @@ export interface BundlePricingInfo {
   enabled: boolean;
 }
 
-interface BundlePairSelection {
+export interface BundlePairSelection {
+  productId: string;
+  name: string;
   color: string;
   size: string | null;
+  price: number;
+  hero: string;
+  availableSizes: string[];
 }
 
 export function PdpActions({
   product: p,
   bundlePricing,
+  allProducts = [],
 }: {
   product: ProductData;
   bundlePricing?: BundlePricingInfo;
+  allProducts?: Product[];
 }) {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
@@ -75,11 +82,26 @@ export function PdpActions({
   const [added, setAdded] = useState(false);
   const trackedProductIdRef = useRef<string | null>(null);
 
+  const [isPairsModalOpen, setIsPairsModalOpen] = useState(false);
+
+  const createInitialPair = useCallback(
+    (): BundlePairSelection => ({
+      productId: p.id,
+      name: p.name,
+      color: p.colors[0]?.name || "Standard",
+      size: null,
+      price: p.price,
+      hero: p.hero || "",
+      availableSizes: p.sizes || [],
+    }),
+    [p.id, p.name, p.colors, p.price, p.hero, p.sizes]
+  );
+
   // Independent configuration per pair for bundle tiers (up to 3 pairs)
   const [bundlePairs, setBundlePairs] = useState<BundlePairSelection[]>([
-    { color: p.colors[0]?.name || "Standard", size: null },
-    { color: p.colors[0]?.name || "Standard", size: null },
-    { color: p.colors[0]?.name || "Standard", size: null },
+    createInitialPair(),
+    createInitialPair(),
+    createInitialPair(),
   ]);
 
   const cart = useCart();
@@ -200,24 +222,86 @@ export function PdpActions({
 
   const [bundleTier, setBundleTier] = useState<1 | 2 | 3>(1);
 
+  // Fallback fetching of articles if allProducts not passed
+  const [fetchedArticles, setFetchedArticles] = useState<Product[]>([]);
+
+  useEffect(() => {
+    if ((!allProducts || allProducts.length === 0) && p.category === "crocs") {
+      fetch("/api/products?category=crocs")
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data) => {
+          if (Array.isArray(data) && data.length > 0) {
+            setFetchedArticles(data);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [allProducts, p.category]);
+
+  const articles = useMemo(() => {
+    const source = allProducts && allProducts.length > 0 ? allProducts : fetchedArticles;
+    const list = source.length > 0 ? source : [p as any];
+    const filtered =
+      p.category === "crocs" ? list.filter((item) => item.category === "crocs") : list;
+    const others = filtered.filter((item) => item.id !== p.id);
+    return [p as any, ...others];
+  }, [allProducts, fetchedArticles, p]);
+
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    if (isPairsModalOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isPairsModalOpen]);
+
   const b1Price = bundlePricing?.buy1Price ?? p.price;
-  const b2Price = bundlePricing?.buy2Price ?? Math.round(p.price * 2 * 0.9);
   const b2UnitPrice = bundlePricing?.buy2UnitPrice ?? Math.round(p.price * 0.9);
   const b2DiscountText = bundlePricing?.buy2DiscountText ?? "10% OFF";
-  const b3Price = bundlePricing?.buy3Price ?? Math.round(p.price * 3 * 0.85);
   const b3UnitPrice = bundlePricing?.buy3UnitPrice ?? Math.round(p.price * 0.85);
   const b3DiscountText = bundlePricing?.buy3DiscountText ?? "15% OFF";
   const bundleEnabled = bundlePricing?.enabled !== false;
 
   const effectiveUnitPrice =
-    bundleTier === 2
-      ? b2UnitPrice
-      : bundleTier === 3
-      ? b3UnitPrice
-      : b1Price;
+    bundleTier === 2 ? b2UnitPrice : bundleTier === 3 ? b3UnitPrice : b1Price;
 
-  const effectiveTotal =
-    bundleTier === 2 ? b2Price : bundleTier === 3 ? b3Price : b1Price * qty;
+  const activePairs = bundlePairs.slice(0, bundleTier);
+  const bundleOriginalTotal = activePairs.reduce((sum, pair) => sum + pair.price, 0);
+
+  const discountPercent =
+    bundleTier === 2
+      ? (bundlePricing?.buy2DiscountText?.includes("%")
+          ? parseInt(bundlePricing.buy2DiscountText) || 10
+          : 10)
+      : bundleTier === 3
+      ? (bundlePricing?.buy3DiscountText?.includes("%")
+          ? parseInt(bundlePricing.buy3DiscountText) || 15
+          : 15)
+      : 0;
+
+  const bundleDiscountedTotal =
+    bundleTier > 1
+      ? Math.round(bundleOriginalTotal * (1 - discountPercent / 100))
+      : b1Price * qty;
+
+  const bundleSavings = Math.max(0, bundleOriginalTotal - bundleDiscountedTotal);
+
+  const getPairEffectivePrice = (pairIdx: number): number => {
+    if (bundleTier === 1) return b1Price;
+    if (pairIdx === bundleTier - 1) {
+      const previousTotal = activePairs
+        .slice(0, pairIdx)
+        .reduce((sum, pr) => sum + Math.round(pr.price * (1 - discountPercent / 100)), 0);
+      return Math.max(0, bundleDiscountedTotal - previousTotal);
+    }
+    return Math.round(activePairs[pairIdx].price * (1 - discountPercent / 100));
+  };
+
+  const effectiveTotal = bundleDiscountedTotal;
 
   function handleColorSelect(c: ProductColor) {
     setColor(c.name);
@@ -229,137 +313,30 @@ export function PdpActions({
     }
   }
 
-  function handleAdd() {
-    if (!isAllBundleSizesSelected || p.category === "trousers") return;
-
-    if (bundleTier === 1) {
-      if (!size) return;
-      cart.addItem(
-        {
-          productId: p.id,
-          name: p.name,
-          color,
-          size,
-          price: b1Price,
-          img: displayedImage,
-        },
-        qty
-      );
-    } else {
-      // Add each pair as its own line item with bundle unit price
-      for (let i = 0; i < bundleTier; i++) {
-        const pair = bundlePairs[i];
-        const pairColorObj = p.productColors?.find(
-          (c) => c.name.toLowerCase() === pair.color.toLowerCase()
-        );
-        let pairImg = displayedImage;
-        if (pairColorObj) {
-          try {
-            const parsed = JSON.parse(pairColorObj.imagesJson || "[]");
-            if (parsed[0]) pairImg = parsed[0];
-          } catch {}
-        }
-
-        const tierLabel = bundleTier === 2 ? b2DiscountText : b3DiscountText;
-        cart.addItem(
-          {
-            productId: p.id,
-            name: `${p.name} (Pair #${i + 1} of ${bundleTier} · ${tierLabel})`,
-            color: pair.color,
-            size: pair.size!,
-            price: effectiveUnitPrice,
-            img: pairImg,
-          },
-          1
-        );
-      }
-    }
-
-    setAdded(true);
-    setTimeout(() => setAdded(false), 1500);
-    router.push("/cart");
-  }
-
-  function handleBuyNow(e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!isAllBundleSizesSelected || p.category === "trousers") return;
-
-    if (bundleTier === 1) {
-      if (!size) return;
-      cart.addItem(
-        {
-          productId: p.id,
-          name: p.name,
-          color,
-          size,
-          price: b1Price,
-          img: displayedImage,
-        },
-        qty
-      );
-    } else {
-      for (let i = 0; i < bundleTier; i++) {
-        const pair = bundlePairs[i];
-        const pairColorObj = p.productColors?.find(
-          (c) => c.name.toLowerCase() === pair.color.toLowerCase()
-        );
-        let pairImg = displayedImage;
-        if (pairColorObj) {
-          try {
-            const parsed = JSON.parse(pairColorObj.imagesJson || "[]");
-            if (parsed[0]) pairImg = parsed[0];
-          } catch {}
-        }
-
-        const tierLabel = bundleTier === 2 ? b2DiscountText : b3DiscountText;
-        cart.addItem(
-          {
-            productId: p.id,
-            name: `${p.name} (Pair #${i + 1} of ${bundleTier} · ${tierLabel})`,
-            color: pair.color,
-            size: pair.size!,
-            price: effectiveUnitPrice,
-            img: pairImg,
-          },
-          1
-        );
-      }
-    }
-
-    router.push("/checkout");
-  }
-
-  function handlePairColorSelect(pairIndex: number, newColorName: string) {
+  function handlePairArticleSelect(pairIdx: number, article: Product | ProductData) {
     setBundlePairs((prev) => {
       const next = [...prev];
-      const currentSize = next[pairIndex]?.size;
-      const stock = currentSize ? getStockForColorAndSize(newColorName, currentSize) : 0;
-      next[pairIndex] = {
-        color: newColorName,
-        size: stock > 0 ? currentSize : null,
+      const cur = next[pairIdx];
+      const newSizes = article.sizes || [];
+      const keepSize = cur.size && newSizes.includes(cur.size) ? cur.size : null;
+      next[pairIdx] = {
+        productId: article.id,
+        name: article.name,
+        color: article.colors[0]?.name || "Standard",
+        size: keepSize,
+        price: article.price,
+        hero: article.hero || "",
+        availableSizes: newSizes,
       };
       return next;
     });
-
-    const pairColorObj = p.productColors?.find(
-      (c) => c.name.toLowerCase() === newColorName.toLowerCase()
-    );
-    if (pairColorObj) {
-      try {
-        const parsed = JSON.parse(pairColorObj.imagesJson || "[]");
-        if (parsed[0]) {
-          setActiveImage(parsed[0]);
-        }
-      } catch {}
-    }
   }
 
-  function handlePairSizeSelect(pairIndex: number, newSize: string) {
+  function handlePairSizeSelect(pairIdx: number, newSize: string) {
     setBundlePairs((prev) => {
       const next = [...prev];
-      next[pairIndex] = {
-        ...next[pairIndex],
+      next[pairIdx] = {
+        ...next[pairIdx],
         size: newSize,
       };
       return next;
@@ -369,11 +346,103 @@ export function PdpActions({
   const missingPairIndex =
     bundleTier === 1
       ? (!size ? 0 : -1)
-      : bundlePairs
-          .slice(0, bundleTier)
-          .findIndex((pair) => !pair.size || getStockForColorAndSize(pair.color, pair.size) === 0);
+      : activePairs.findIndex((pair) => !pair.size);
 
   const isAllBundleSizesSelected = missingPairIndex === -1;
+
+  function handleAdd() {
+    if (p.category === "trousers") return;
+
+    if (bundleTier === 1) {
+      if (!size) return;
+      cart.addItem(
+        {
+          productId: p.id,
+          name: p.name,
+          color,
+          size,
+          price: b1Price,
+          img: displayedImage,
+        },
+        qty
+      );
+    } else {
+      if (!isAllBundleSizesSelected) {
+        setIsPairsModalOpen(true);
+        return;
+      }
+
+      for (let i = 0; i < bundleTier; i++) {
+        const pair = activePairs[i];
+        const tierLabel = bundleTier === 2 ? b2DiscountText : b3DiscountText;
+        const pairPrice = getPairEffectivePrice(i);
+
+        cart.addItem(
+          {
+            productId: pair.productId,
+            name: `${pair.name} (Pair #${i + 1} of ${bundleTier} · ${tierLabel})`,
+            color: pair.color,
+            size: pair.size!,
+            price: pairPrice,
+            img: pair.hero || displayedImage,
+          },
+          1
+        );
+      }
+    }
+
+    setIsPairsModalOpen(false);
+    setAdded(true);
+    setTimeout(() => setAdded(false), 1500);
+    router.push("/cart");
+  }
+
+  function handleBuyNow(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (p.category === "trousers") return;
+
+    if (bundleTier === 1) {
+      if (!size) return;
+      cart.addItem(
+        {
+          productId: p.id,
+          name: p.name,
+          color,
+          size,
+          price: b1Price,
+          img: displayedImage,
+        },
+        qty
+      );
+    } else {
+      if (!isAllBundleSizesSelected) {
+        setIsPairsModalOpen(true);
+        return;
+      }
+
+      for (let i = 0; i < bundleTier; i++) {
+        const pair = activePairs[i];
+        const tierLabel = bundleTier === 2 ? b2DiscountText : b3DiscountText;
+        const pairPrice = getPairEffectivePrice(i);
+
+        cart.addItem(
+          {
+            productId: pair.productId,
+            name: `${pair.name} (Pair #${i + 1} of ${bundleTier} · ${tierLabel})`,
+            color: pair.color,
+            size: pair.size!,
+            price: pairPrice,
+            img: pair.hero || displayedImage,
+          },
+          1
+        );
+      }
+    }
+
+    setIsPairsModalOpen(false);
+    router.push("/checkout");
+  }
 
   const buttonText = (() => {
     if (added) return "Added ✓";
@@ -383,7 +452,7 @@ export function PdpActions({
       return `Add to Cart — ${fmtPrice(effectiveTotal)}`;
     }
     if (missingPairIndex !== -1) {
-      return `Select size for Pair ${missingPairIndex + 1}`;
+      return `Choose your pairs (${bundleTier} Pairs)`;
     }
     return `Add to Cart — ${fmtPrice(effectiveTotal)}`;
   })();
@@ -666,14 +735,7 @@ export function PdpActions({
               <div
                 onClick={() => {
                   setBundleTier(2);
-                  setBundlePairs((prev) => {
-                    const next = [...prev];
-                    next[0] = {
-                      color: color,
-                      size: size && getStockForColorAndSize(color, size) > 0 ? size : next[0]?.size || null,
-                    };
-                    return next;
-                  });
+                  setIsPairsModalOpen(true);
                 }}
                 className="bundle-card"
                 style={{
@@ -707,20 +769,18 @@ export function PdpActions({
                       </span>
                     </div>
                     <div className="bundle-card-desc">
-                      {fmtPrice(b2UnitPrice)} each · Mix &amp; match colors &amp; sizes
+                      {fmtPrice(b2UnitPrice)} each · Mix &amp; match articles &amp; sizes
                     </div>
                   </div>
                 </div>
 
                 <div className="bundle-card-right">
                   <div className="bundle-card-price">
-                    {fmtPrice(b2Price)}
+                    {fmtPrice(Math.round(p.price * 2 * (1 - discountPercent / 100)))}
                   </div>
-                  {b2Price < b1Price * 2 && (
-                    <div className="bundle-card-old-price">
-                      {fmtPrice(b1Price * 2)}
-                    </div>
-                  )}
+                  <div className="bundle-card-old-price">
+                    {fmtPrice(p.price * 2)}
+                  </div>
                 </div>
               </div>
 
@@ -728,14 +788,7 @@ export function PdpActions({
               <div
                 onClick={() => {
                   setBundleTier(3);
-                  setBundlePairs((prev) => {
-                    const next = [...prev];
-                    next[0] = {
-                      color: color,
-                      size: size && getStockForColorAndSize(color, size) > 0 ? size : next[0]?.size || null,
-                    };
-                    return next;
-                  });
+                  setIsPairsModalOpen(true);
                 }}
                 className="bundle-card"
                 style={{
@@ -769,27 +822,25 @@ export function PdpActions({
                       </span>
                     </div>
                     <div className="bundle-card-desc">
-                      {fmtPrice(b3UnitPrice)} each · Mix &amp; match colors &amp; sizes
+                      {fmtPrice(b3UnitPrice)} each · Mix &amp; match articles &amp; sizes
                     </div>
                   </div>
                 </div>
 
                 <div className="bundle-card-right">
                   <div className="bundle-card-price">
-                    {fmtPrice(b3Price)}
+                    {fmtPrice(Math.round(p.price * 3 * (1 - 15 / 100)))}
                   </div>
-                  {b3Price < b1Price * 3 && (
-                    <div className="bundle-card-old-price">
-                      {fmtPrice(b1Price * 3)}
-                    </div>
-                  )}
+                  <div className="bundle-card-old-price">
+                    {fmtPrice(p.price * 3)}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* MULTI-PAIR BUNDLE SELECTOR (TIER 2 & TIER 3) */}
+        {/* MULTI-PAIR BUNDLE SELECTOR & SUMMARY (TIER 2 & TIER 3) */}
         {bundleTier > 1 && (
           <div style={{ marginBottom: 24 }}>
             <div
@@ -799,165 +850,128 @@ export function PdpActions({
                 justifyContent: "space-between",
                 marginBottom: 12,
                 flexWrap: "wrap",
-                gap: 6,
+                gap: 8,
               }}
             >
-              <span style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.02em" }}>
-                Choose Your Pairs ({bundleTier} Pairs)
-              </span>
-              <span style={{ fontSize: 11.5, color: "#666" }}>
-                Mix &amp; match colors &amp; sizes
-              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.02em",
+                  }}
+                >
+                  Selected Pairs ({bundleTier} Pairs)
+                </span>
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 800,
+                    backgroundColor: "#166534",
+                    color: "#FFFFFF",
+                    padding: "2px 8px",
+                    borderRadius: 4,
+                  }}
+                >
+                  Save {discountPercent}%
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPairsModalOpen(true)}
+                style={{
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  color: "#111111",
+                  background: "#F5F3EF",
+                  border: "1px solid #D9D6CF",
+                  borderRadius: 6,
+                  padding: "5px 12px",
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                <span>Choose / Change Pairs</span>
+                <span>✏️</span>
+              </button>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              {Array.from({ length: bundleTier }).map((_, idx) => {
-                const pair = bundlePairs[idx] || { color: p.colors[0]?.name || "Standard", size: null };
-                const pairColorObj = p.colors.find((c) => c.name.toLowerCase() === pair.color.toLowerCase()) || p.colors[0];
-
-                return (
-                  <div
-                    key={`pair-card-${idx}`}
-                    style={{
-                      border: "1.5px solid var(--stone, #D9D6CF)",
-                      borderRadius: 8,
-                      padding: "12px 14px",
-                      background: "var(--white, #FFFFFF)",
-                      boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
-                    }}
-                  >
-                    {/* Header: Pair Number & Color Tag */}
-                    <div
+            {/* Selected pairs summary cards */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {activePairs.map((pair, idx) => (
+                <div
+                  key={`pdp-pair-${idx}-${pair.productId}`}
+                  onClick={() => setIsPairsModalOpen(true)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "10px 14px",
+                    borderRadius: 8,
+                    border: pair.size ? "1.5px solid #D9D6CF" : "2px dashed #D97706",
+                    background: pair.size ? "#FFFFFF" : "#FFFBEB",
+                    cursor: "pointer",
+                    gap: 12,
+                    boxShadow: "0 2px 6px rgba(0,0,0,0.02)",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+                    <span
                       style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        marginBottom: 10,
-                        paddingBottom: 8,
-                        borderBottom: "1px solid #ECEAE5",
-                        gap: 8,
-                        flexWrap: "wrap",
+                        background: "#111111",
+                        color: "#FFFFFF",
+                        fontSize: 10.5,
+                        fontWeight: 800,
+                        padding: "3px 8px",
+                        borderRadius: 4,
+                        letterSpacing: "0.05em",
+                        flexShrink: 0,
                       }}
                     >
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span
-                          style={{
-                            background: "var(--black, #111111)",
-                            color: "var(--white, #FFFFFF)",
-                            fontSize: 10.5,
-                            fontWeight: 800,
-                            padding: "2px 8px",
-                            borderRadius: 4,
-                            letterSpacing: "0.06em",
-                            textTransform: "uppercase",
-                          }}
-                        >
-                          Pair {idx + 1}
-                        </span>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: "#222" }}>
-                          {pair.color}
-                        </span>
+                      PAIR {idx + 1}
+                    </span>
+                    {pair.hero ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={pair.hero}
+                        alt={pair.name}
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 6,
+                          objectFit: "cover",
+                          flexShrink: 0,
+                          border: "1px solid #E5E5E5",
+                        }}
+                      />
+                    ) : null}
+                    <div style={{ minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 700,
+                          color: "#111",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
+                        {pair.name}
                       </div>
-
-                      <div style={{ fontSize: 12, color: pair.size ? "var(--black, #111111)" : "#888", fontWeight: 600 }}>
-                        {pair.size ? `Size: ${pair.size}` : "Size not selected"}
-                      </div>
-                    </div>
-
-                    {/* Color Swatches for this pair */}
-                    {p.colors.length > 1 && (
-                      <div style={{ marginBottom: 12 }}>
-                        <div style={{ fontSize: 11.5, color: "#666", marginBottom: 6, fontWeight: 500 }}>
-                          Select Color:
-                        </div>
-                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                          {p.colors.map((c) => (
-                            <button
-                              key={`pair-${idx}-color-${c.name}`}
-                              type="button"
-                              title={c.name}
-                              aria-label={`Select ${c.name} for pair ${idx + 1}`}
-                              onClick={() => handlePairColorSelect(idx, c.name)}
-                              style={{
-                                width: 34,
-                                height: 34,
-                                minWidth: 34,
-                                minHeight: 34,
-                                borderRadius: "50%",
-                                border: pair.color === c.name ? "2px solid var(--black, #111)" : "1.5px solid transparent",
-                                padding: 2,
-                                cursor: "pointer",
-                                background: "none",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                              }}
-                            >
-                              <span
-                                style={{
-                                  width: "100%",
-                                  height: "100%",
-                                  borderRadius: "50%",
-                                  background: c.hex,
-                                  border: "1px solid rgba(0,0,0,0.15)",
-                                  display: "block",
-                                }}
-                              />
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Size Selector for this pair */}
-                    <div>
-                      <div style={{ fontSize: 11.5, color: "#666", marginBottom: 6, fontWeight: 500 }}>
-                        Select Size:
-                      </div>
-                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                        {p.sizes.map((s) => {
-                          const stk = getStockForColorAndSize(pair.color, s);
-                          const isOutOfStock = stk === 0;
-                          const isSelected = pair.size === s;
-
-                          return (
-                            <button
-                              key={`pair-${idx}-size-${s}`}
-                              type="button"
-                              disabled={isOutOfStock || p.category === "trousers"}
-                              aria-label={`Select size ${s} for pair ${idx + 1}`}
-                              onClick={() => {
-                                if (!isOutOfStock && p.category !== "trousers") {
-                                  handlePairSizeSelect(idx, s);
-                                }
-                              }}
-                              style={{
-                                minWidth: 44,
-                                minHeight: 40,
-                                height: 40,
-                                padding: "0 12px",
-                                borderRadius: 4,
-                                fontSize: 13,
-                                fontWeight: isSelected ? 700 : 500,
-                                border: isSelected ? "2px solid var(--black, #111)" : "1.5px solid var(--stone, #D9D6CF)",
-                                background: isSelected ? "var(--black, #111)" : "var(--white, #FFF)",
-                                color: isSelected ? "#FFFFFF" : isOutOfStock ? "#AAA" : "#111111",
-                                WebkitTextFillColor: isSelected ? "#FFFFFF" : isOutOfStock ? "#AAA" : "#111111",
-                                textDecoration: isOutOfStock ? "line-through" : "none",
-                                opacity: isOutOfStock || p.category === "trousers" ? 0.35 : 1,
-                                cursor: isOutOfStock || p.category === "trousers" ? "not-allowed" : "pointer",
-                                transition: "all 0.15s ease",
-                              }}
-                            >
-                              {s}
-                            </button>
-                          );
-                        })}
+                      <div style={{ fontSize: 11.5, color: "#666" }}>
+                        {pair.color} · {pair.size ? `Size: ${pair.size}` : "⚠️ Size not selected (Click to choose)"}
                       </div>
                     </div>
                   </div>
-                );
-              })}
+
+                  <span style={{ fontSize: 12, color: "#888", fontWeight: 600, flexShrink: 0 }}>
+                    Change →
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -1080,6 +1094,359 @@ export function PdpActions({
           </details>
         </div>
       </div>
+
+      {/* CHOOSE YOUR PAIRS MODAL */}
+      {isPairsModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="choose-pairs-title"
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.65)",
+            backdropFilter: "blur(4px)",
+            WebkitBackdropFilter: "blur(4px)",
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "16px",
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setIsPairsModalOpen(false);
+            }
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#FFFFFF",
+              borderRadius: "16px",
+              maxWidth: "640px",
+              width: "100%",
+              maxHeight: "92vh",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 25px 60px -15px rgba(0, 0, 0, 0.35)",
+              overflow: "hidden",
+              position: "relative",
+            }}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "20px 24px",
+                borderBottom: "1px solid #ECEAE5",
+              }}
+            >
+              <div>
+                <h2
+                  id="choose-pairs-title"
+                  style={{
+                    margin: 0,
+                    fontSize: "22px",
+                    fontWeight: 800,
+                    color: "#1F1E1D",
+                    letterSpacing: "-0.01em",
+                  }}
+                >
+                  Choose your pairs
+                </h2>
+                <div style={{ fontSize: "12px", color: "#666", marginTop: 2 }}>
+                  Mix &amp; match any article and size for all {bundleTier} pairs
+                </div>
+              </div>
+
+              <button
+                type="button"
+                aria-label="Close modal"
+                onClick={() => setIsPairsModalOpen(false)}
+                style={{
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "50%",
+                  backgroundColor: "#F3F2EE",
+                  border: "none",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#333",
+                  transition: "background-color 0.15s ease",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#E5E3DD")}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#F3F2EE")}
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <line x1="1" y1="1" x2="13" y2="13" />
+                  <line x1="13" y1="1" x2="1" y2="13" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal Scrollable Body */}
+            <div
+              style={{
+                flex: 1,
+                overflowY: "auto",
+                padding: "22px 24px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 24,
+              }}
+            >
+              {activePairs.map((pair, pairIdx) => (
+                <div key={`modal-pair-${pairIdx}`}>
+                  {/* Pair Title */}
+                  <div
+                    style={{
+                      fontSize: "16px",
+                      fontWeight: 800,
+                      color: "#1F1E1D",
+                      marginBottom: 8,
+                    }}
+                  >
+                    Pair {pairIdx + 1}
+                  </div>
+
+                  {/* ARTICLE Label */}
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                      color: "#777777",
+                      marginBottom: 10,
+                    }}
+                  >
+                    ARTICLE
+                  </div>
+
+                  {/* Article Horizontal Scroll Carousel */}
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 12,
+                      overflowX: "auto",
+                      paddingBottom: 8,
+                      scrollbarWidth: "thin",
+                      WebkitOverflowScrolling: "touch",
+                    }}
+                  >
+                    {articles.map((art) => {
+                      const isSelected = pair.productId === art.id;
+                      return (
+                        <div
+                          key={`pair-${pairIdx}-art-${art.id}`}
+                          onClick={() => handlePairArticleSelect(pairIdx, art)}
+                          style={{
+                            width: "125px",
+                            minWidth: "125px",
+                            borderRadius: "10px",
+                            border: isSelected
+                              ? "2px solid #8D7B68"
+                              : "1.5px solid #E5E5E5",
+                            background: isSelected ? "#FAF8F5" : "#FFFFFF",
+                            padding: "6px",
+                            cursor: "pointer",
+                            transition: "all 0.15s ease",
+                            boxShadow: isSelected ? "0 2px 8px rgba(141, 123, 104, 0.18)" : "none",
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: "100%",
+                              aspectRatio: "1 / 1",
+                              borderRadius: "7px",
+                              overflow: "hidden",
+                              backgroundColor: "#F0EFEA",
+                            }}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={art.hero || "/placeholder.jpg"}
+                              alt={art.name}
+                              style={{
+                                width: "100%",
+                                height: "100%",
+                                objectFit: "cover",
+                                display: "block",
+                              }}
+                            />
+                          </div>
+
+                          <div
+                            title={art.name}
+                            style={{
+                              fontSize: "11.5px",
+                              fontWeight: 600,
+                              color: "#1F1E1D",
+                              marginTop: 6,
+                              lineHeight: "1.3",
+                              display: "-webkit-box",
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: "vertical",
+                              overflow: "hidden",
+                              height: "30px",
+                            }}
+                          >
+                            {art.name}
+                          </div>
+
+                          <div
+                            style={{
+                              fontSize: "11px",
+                              color: "#666",
+                              marginTop: 2,
+                              fontWeight: 600,
+                            }}
+                          >
+                            {fmtPrice(art.price)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* SIZE Label */}
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                      color: "#777777",
+                      marginTop: 16,
+                      marginBottom: 10,
+                    }}
+                  >
+                    SIZE
+                  </div>
+
+                  {/* Sizes Row */}
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {(pair.availableSizes.length > 0 ? pair.availableSizes : p.sizes).map((sz) => {
+                      const isSelected = pair.size === sz;
+                      return (
+                        <button
+                          key={`pair-${pairIdx}-size-${sz}`}
+                          type="button"
+                          onClick={() => handlePairSizeSelect(pairIdx, sz)}
+                          style={{
+                            borderRadius: "9999px",
+                            padding: "8px 20px",
+                            fontSize: "13.5px",
+                            fontWeight: isSelected ? 800 : 600,
+                            border: isSelected ? "1.5px solid #8D7B68" : "1.5px solid #D9D6CF",
+                            backgroundColor: isSelected ? "#FAF8F5" : "#FFFFFF",
+                            color: isSelected ? "#8D7B68" : "#111111",
+                            cursor: "pointer",
+                            transition: "all 0.15s ease",
+                          }}
+                        >
+                          {sz}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Divider line between pairs */}
+                  {pairIdx < bundleTier - 1 && (
+                    <hr
+                      style={{
+                        border: "none",
+                        borderTop: "1px solid #ECEAE5",
+                        margin: "24px 0 0 0",
+                      }}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Modal Bottom Sticky Bar */}
+            <div
+              style={{
+                padding: "16px 24px",
+                borderTop: "1px solid #ECEAE5",
+                backgroundColor: "#FFFFFF",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                boxShadow: "0 -4px 16px rgba(0,0,0,0.04)",
+                gap: 16,
+                flexWrap: "wrap",
+              }}
+            >
+              <div>
+                <div style={{ fontSize: "11.5px", color: "#666", marginBottom: 2 }}>
+                  Total
+                </div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                  <span style={{ fontSize: "21px", fontWeight: 800, color: "#111111" }}>
+                    {fmtPrice(bundleDiscountedTotal)}
+                  </span>
+                  {bundleSavings > 0 && (
+                    <span
+                      style={{
+                        fontSize: "14px",
+                        color: "#888888",
+                        textDecoration: "line-through",
+                        fontWeight: 500,
+                      }}
+                    >
+                      {fmtPrice(bundleOriginalTotal)}
+                    </span>
+                  )}
+                </div>
+                {bundleSavings > 0 && (
+                  <div
+                    style={{
+                      fontSize: "12.5px",
+                      color: "#166534",
+                      fontWeight: 700,
+                      marginTop: 2,
+                    }}
+                  >
+                    You save {fmtPrice(bundleSavings)} ({discountPercent}% off)
+                  </div>
+                )}
+              </div>
+
+              <button
+                type="button"
+                disabled={!isAllBundleSizesSelected}
+                onClick={handleAdd}
+                style={{
+                  backgroundColor: isAllBundleSizesSelected ? "#B8A898" : "#D4CCC5",
+                  color: "#FFFFFF",
+                  border: "none",
+                  borderRadius: "10px",
+                  padding: "13px 32px",
+                  fontSize: "13.5px",
+                  fontWeight: 800,
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                  cursor: isAllBundleSizesSelected ? "pointer" : "not-allowed",
+                  transition: "background-color 0.15s ease",
+                  boxShadow: isAllBundleSizesSelected
+                    ? "0 4px 12px rgba(184, 168, 152, 0.4)"
+                    : "none",
+                }}
+              >
+                {isAllBundleSizesSelected
+                  ? "ADD TO CART"
+                  : `Select Size for Pair ${missingPairIndex + 1}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

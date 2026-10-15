@@ -21,7 +21,7 @@ export async function GET(request: Request) {
         items: {
           include: {
             product: {
-              select: { id: true, name: true, hero: true },
+              select: { id: true, name: true, hero: true, price: true },
             },
           },
         },
@@ -71,15 +71,24 @@ export async function GET(request: Request) {
         orderItems: o.items.map((i) => ({
           id: i.id,
           productId: i.productId,
+          name: i.name,
           quantity: i.quantity,
           price: i.unitPrice,
           size: i.size,
           color: i.color,
-          product: i.product || {
-            id: i.productId,
-            name: i.name || "Nanos Product",
-            hero: "",
-          },
+          product: i.product
+            ? {
+                id: i.product.id,
+                name: i.product.name,
+                hero: i.product.hero,
+                price: (i.product as any).price,
+              }
+            : {
+                id: i.productId,
+                name: i.name || "Nanos Product",
+                hero: "",
+                price: i.unitPrice,
+              },
         })),
         auditLogs: (o as any).auditLogs || [],
       };
@@ -118,6 +127,7 @@ export async function GET(request: Request) {
       orderItems: (o.items || []).map((i: any, idx: number) => ({
         id: `${o.id}_item_${idx}`,
         productId: i.productId,
+        name: i.name,
         quantity: i.quantity || i.qty || 1,
         price: i.unitPrice || i.price || 0,
         size: i.size,
@@ -396,6 +406,7 @@ export async function POST(request: Request) {
           orderItems: createdOrder.items.map((i) => ({
             id: i.id,
             productId: i.productId,
+            name: i.name,
             quantity: i.quantity,
             price: i.unitPrice,
             size: i.size,

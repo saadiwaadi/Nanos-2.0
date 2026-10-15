@@ -51,11 +51,12 @@ interface AdminProduct {
 interface OrderItem {
   id: string;
   productId: string;
+  name?: string;
   quantity: number;
   price: number;
   size?: string;
   color?: string;
-  product?: { id: string; name: string; hero: string };
+  product?: { id: string; name: string; hero: string; price?: number };
 }
 
 interface BookingLog {
@@ -345,6 +346,8 @@ export default function AdminPage() {
   >("dashboard");
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1.0);
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
 
@@ -1503,6 +1506,19 @@ export default function AdminPage() {
       const initialTheme = savedTheme || "dark";
       setTheme(initialTheme);
       document.documentElement.setAttribute("data-theme", initialTheme);
+
+      const savedSidebar = localStorage.getItem("nanos_admin_sidebar_collapsed_v1");
+      if (savedSidebar === "true") {
+        setSidebarCollapsed(true);
+      }
+
+      const savedZoom = localStorage.getItem("nanos_admin_zoom_v1");
+      if (savedZoom) {
+        const z = parseFloat(savedZoom);
+        if (!isNaN(z) && z >= 0.5 && z <= 1.5) {
+          setZoomLevel(z);
+        }
+      }
     } else {
       document.documentElement.setAttribute("data-theme", "dark");
     }
@@ -1517,6 +1533,77 @@ export default function AdminPage() {
       setLoading(false);
     }
   }, [loadMainData]);
+
+  // Sidebar Collapse & Mobile Drawer Handlers
+  const toggleSidebarCollapse = useCallback(() => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("nanos_admin_sidebar_collapsed_v1", String(next));
+        } catch {}
+      }
+      return next;
+    });
+  }, []);
+
+  const handleToggleSidebar = useCallback(() => {
+    if (typeof window !== "undefined" && window.innerWidth <= 960) {
+      setSidebarOpen((prev) => !prev);
+    } else {
+      toggleSidebarCollapse();
+    }
+  }, [toggleSidebarCollapse]);
+
+  // Zoom In / Zoom Out Handlers
+  const handleZoomIn = useCallback(() => {
+    setZoomLevel((prev) => {
+      const next = Math.min(1.4, Math.round((prev + 0.1) * 10) / 10);
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("nanos_admin_zoom_v1", String(next));
+        } catch {}
+      }
+      return next;
+    });
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setZoomLevel((prev) => {
+      const next = Math.max(0.6, Math.round((prev - 0.1) * 10) / 10);
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("nanos_admin_zoom_v1", String(next));
+        } catch {}
+      }
+      return next;
+    });
+  }, []);
+
+  const handleResetZoom = useCallback(() => {
+    setZoomLevel(1.0);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("nanos_admin_zoom_v1", "1.0");
+      } catch {}
+    }
+  }, []);
+
+  // Keyboard shortcut Ctrl+B / Cmd+B to toggle sidebar
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
+        const target = e.target as HTMLElement;
+        if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+          return;
+        }
+        e.preventDefault();
+        handleToggleSidebar();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleToggleSidebar]);
 
   // Tab Navigation Handler
   const switchTab = (tab: typeof activeTab) => {
@@ -2800,20 +2887,31 @@ export default function AdminPage() {
       )}
 
       {/* SIDEBAR NAVIGATION */}
-      <aside className={`admin-sidebar ${sidebarOpen ? "open" : ""}`}>
+      <aside className={`admin-sidebar ${sidebarOpen ? "open" : ""} ${sidebarCollapsed ? "collapsed" : ""}`}>
         <div>
           <div className="sidebar-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <Link href="/" className="brand-font">
               nanos.pk
             </Link>
-            <button
-              type="button"
-              className="admin-sidebar-close"
-              onClick={() => setSidebarOpen(false)}
-              aria-label="Close sidebar"
-            >
-              ✕
-            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <button
+                type="button"
+                className="admin-sidebar-collapse-btn"
+                onClick={toggleSidebarCollapse}
+                title="Collapse sidebar (Ctrl+B)"
+                aria-label="Collapse sidebar"
+              >
+                «
+              </button>
+              <button
+                type="button"
+                className="admin-sidebar-close"
+                onClick={() => setSidebarOpen(false)}
+                aria-label="Close sidebar"
+              >
+                ✕
+              </button>
+            </div>
           </div>
 
           <div className="sidebar-section-label">Overview</div>
@@ -2914,8 +3012,14 @@ export default function AdminPage() {
         {/* TOPBAR */}
         <header className="topbar">
           <div className="topbar-left">
-            <button type="button" className="hamburger" onClick={() => setSidebarOpen(true)} title="Toggle menu">
-              ☰
+            <button
+              type="button"
+              className={`hamburger ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}
+              onClick={handleToggleSidebar}
+              title={sidebarCollapsed ? "Expand sidebar (Ctrl+B)" : "Toggle sidebar (Ctrl+B)"}
+              aria-label="Toggle navigation menu"
+            >
+              {sidebarCollapsed ? "»" : "☰"}
             </button>
             <div>
               <h1 className="page-title">
@@ -2959,7 +3063,40 @@ export default function AdminPage() {
             </div>
           </div>
 
-          <div className="topbar-right" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div className="topbar-right" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {/* Mobile & Topbar Zoom In / Out Controls */}
+            <div className="admin-zoom-controls" title="Adjust view scale">
+              <button
+                type="button"
+                className="admin-zoom-btn"
+                onClick={handleZoomOut}
+                disabled={zoomLevel <= 0.6}
+                aria-label="Zoom out"
+                title="Zoom out (−10%)"
+              >
+                −
+              </button>
+              <button
+                type="button"
+                className="admin-zoom-val"
+                onClick={handleResetZoom}
+                title="Current scale. Click to reset to 100%"
+                aria-label="Current scale. Click to reset to 100%"
+              >
+                {Math.round(zoomLevel * 100)}%
+              </button>
+              <button
+                type="button"
+                className="admin-zoom-btn"
+                onClick={handleZoomIn}
+                disabled={zoomLevel >= 1.4}
+                aria-label="Zoom in"
+                title="Zoom in (+10%)"
+              >
+                +
+              </button>
+            </div>
+
             {isSyncing ? (
               <span className="sync-status syncing">
                 <span className="sync-dot pulse" />
@@ -2985,11 +3122,11 @@ export default function AdminPage() {
             <Link
               href="/"
               target="_blank"
-              className="btn btn-dark btn-sm"
+              className="btn btn-dark btn-sm topbar-store-link"
               title="View live storefront"
               style={{ textDecoration: "none", fontSize: 12, padding: "5px 10px" }}
             >
-              <span>Storefront</span>
+              <span className="topbar-storefront-text">Storefront</span>
               <span style={{ fontSize: 10, opacity: 0.75 }}>↗</span>
             </Link>
 
@@ -3006,14 +3143,14 @@ export default function AdminPage() {
             className={`admin-mobile-nav-btn ${activeTab === "dashboard" ? "active" : ""}`}
             onClick={() => switchTab("dashboard")}
           >
-            <span>📊 Dashboard</span>
+            <span>Dashboard</span>
           </button>
           <button
             type="button"
             className={`admin-mobile-nav-btn ${activeTab === "orders" ? "active" : ""}`}
             onClick={() => switchTab("orders")}
           >
-            <span>📦 Orders</span>
+            <span>Orders</span>
             {orders.filter((o) => o.status.toLowerCase() === "processing").length > 0 && (
               <span className="admin-mobile-nav-badge">
                 {orders.filter((o) => o.status.toLowerCase() === "processing").length}
@@ -3025,47 +3162,53 @@ export default function AdminPage() {
             className={`admin-mobile-nav-btn ${activeTab === "delivered" ? "active" : ""}`}
             onClick={() => switchTab("delivered")}
           >
-            <span>✅ Delivered</span>
+            <span>Delivered</span>
           </button>
           <button
             type="button"
             className={`admin-mobile-nav-btn ${activeTab === "courier" ? "active" : ""}`}
             onClick={() => switchTab("courier")}
           >
-            <span>🚚 Courier</span>
+            <span>Courier</span>
           </button>
           <button
             type="button"
             className={`admin-mobile-nav-btn ${activeTab === "home" ? "active" : ""}`}
             onClick={() => switchTab("home")}
           >
-            <span>🏠 Home</span>
+            <span>Home</span>
           </button>
           <button
             type="button"
             className={`admin-mobile-nav-btn ${activeTab === "products" || activeTab === "edit-product" ? "active" : ""}`}
             onClick={() => switchTab("products")}
           >
-            <span>🏷️ Products</span>
+            <span>Products</span>
           </button>
           <button
             type="button"
             className={`admin-mobile-nav-btn ${activeTab === "size-charts" ? "active" : ""}`}
             onClick={() => switchTab("size-charts")}
           >
-            <span>📐 Sizes</span>
+            <span>Sizes</span>
           </button>
           <button
             type="button"
             className={`admin-mobile-nav-btn ${activeTab === "settings" ? "active" : ""}`}
             onClick={() => switchTab("settings")}
           >
-            <span>⚙️ Settings</span>
+            <span>Settings</span>
           </button>
         </nav>
 
         {/* CONTENT CONTAINER */}
-        <main className="content">
+        <main
+          className="content"
+          style={{
+            zoom: zoomLevel,
+            ...({ "--admin-zoom": zoomLevel } as React.CSSProperties),
+          }}
+        >
           {loading && products.length === 0 && orders.length === 0 ? (
             <div style={{ padding: "60px 0", textAlign: "center", color: "var(--admin-text-soft)" }}>
               <div style={{ fontSize: 24, marginBottom: 12 }}>⚡</div>
@@ -3633,7 +3776,20 @@ export default function AdminPage() {
                                 {o.orderItems.reduce((s, i) => s + i.quantity, 0)}
                               </td>
                               <td style={{ whiteSpace: "nowrap" }}>
-                                <strong>{fmtPrice(o.total)}</strong>
+                                <div><strong>{fmtPrice(o.total)}</strong></div>
+                                {o.discount > 0 ? (
+                                  <div style={{ fontSize: 11, color: "#10b981", fontWeight: 700, marginTop: 2 }}>
+                                    -{fmtPrice(o.discount)} ({o.subtotal > 0 ? Math.round((o.discount / o.subtotal) * 100) : 10}% off)
+                                  </div>
+                                ) : o.orderItems.some((i) => i.name?.toLowerCase().includes("off") || (i.product?.price && i.product.price > i.price)) ? (
+                                  <div style={{ fontSize: 11, color: "#38bdf8", fontWeight: 700, marginTop: 2 }}>
+                                    Bundle applied
+                                  </div>
+                                ) : (
+                                  <div style={{ fontSize: 10.5, color: "var(--admin-text-soft)", marginTop: 2 }}>
+                                    No discount
+                                  </div>
+                                )}
                               </td>
                               <td style={{ whiteSpace: "nowrap" }}>
                                 <span
@@ -3999,47 +4155,203 @@ export default function AdminPage() {
                                   })()}
 
                                   {/* Order Items */}
-                                  <div style={{ fontWeight: 700, marginTop: 18, marginBottom: 8 }}>Order Items</div>
+                                  <div style={{ fontWeight: 700, marginTop: 18, marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                    <span>Order Items ({o.orderItems.reduce((s, i) => s + i.quantity, 0)})</span>
+                                    {o.discount > 0 ? (
+                                      <span style={{ fontSize: 12, color: "#10b981", fontWeight: 700, background: "rgba(16, 185, 129, 0.12)", padding: "2px 8px", borderRadius: 4 }}>
+                                        {o.subtotal > 0 ? Math.round((o.discount / o.subtotal) * 100) : 10}% Promo Discount Applied
+                                      </span>
+                                    ) : o.orderItems.some((i) => i.name?.toLowerCase().includes("off") || (i.product?.price && i.product.price > i.price)) ? (
+                                      <span style={{ fontSize: 12, color: "#38bdf8", fontWeight: 700, background: "rgba(56, 189, 248, 0.12)", padding: "2px 8px", borderRadius: 4 }}>
+                                        Multi-Pair Bundle Discount Applied
+                                      </span>
+                                    ) : (
+                                      <span style={{ fontSize: 12, color: "var(--admin-text-soft)", fontWeight: 500, background: "var(--admin-surface)", padding: "2px 8px", borderRadius: 4, border: "1px solid var(--admin-border)" }}>
+                                        Standard Pricing (No Discount)
+                                      </span>
+                                    )}
+                                  </div>
                                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                                    {o.orderItems.map((item) => (
-                                      <div
-                                        key={item.id}
-                                        style={{
-                                          display: "flex",
-                                          alignItems: "center",
-                                          justifyContent: "space-between",
-                                          background: "var(--admin-surface)",
-                                          color: "var(--admin-text)",
-                                          padding: "10px 14px",
-                                          borderRadius: 6,
-                                          border: "1px solid var(--admin-border)",
-                                        }}
-                                      >
-                                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                          {item.product?.hero && (
-                                            /* eslint-disable-next-line @next/next/no-img-element */
-                                            <img
-                                              src={item.product.hero}
-                                              alt=""
-                                              width={32}
-                                              height={32}
-                                              style={{ objectFit: "cover", borderRadius: 4 }}
-                                            />
-                                          )}
-                                          <div>
-                                            <strong>{item.product?.name || item.productId}</strong>{" "}
-                                            <span style={{ color: "var(--admin-text-soft)", fontSize: "12.5px" }}>
-                                              ({item.color}/{item.size})
-                                            </span>
+                                    {o.orderItems.map((item) => {
+                                      const rawName = item.name || item.product?.name || item.productId;
+                                      const bundleMatch = rawName.match(/\((Pair\s*#[^)]+)\)/i) || rawName.match(/\(([^)]*%\s*OFF[^)]*)\)/i);
+                                      const cleanDisplayName = bundleMatch ? rawName.replace(bundleMatch[0], "").trim() : (item.product?.name || rawName);
+                                      const bundleTag = bundleMatch ? bundleMatch[1].trim() : null;
+                                      const isDiscountedUnit = (item.product?.price && item.product.price > item.price) || Boolean(bundleTag && bundleTag.includes("OFF"));
+
+                                      return (
+                                        <div
+                                          key={item.id}
+                                          style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "space-between",
+                                            background: "var(--admin-surface)",
+                                            color: "var(--admin-text)",
+                                            padding: "10px 14px",
+                                            borderRadius: 6,
+                                            border: "1px solid var(--admin-border)",
+                                          }}
+                                        >
+                                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                            {item.product?.hero && (
+                                              /* eslint-disable-next-line @next/next/no-img-element */
+                                              <img
+                                                src={item.product.hero}
+                                                alt=""
+                                                width={34}
+                                                height={34}
+                                                style={{ objectFit: "cover", borderRadius: 4 }}
+                                              />
+                                            )}
+                                            <div>
+                                              <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                                                <strong>{cleanDisplayName}</strong>
+                                                {bundleTag && (
+                                                  <span
+                                                    style={{
+                                                      fontSize: 11,
+                                                      fontWeight: 700,
+                                                      padding: "1px 7px",
+                                                      borderRadius: 4,
+                                                      background: "rgba(56, 189, 248, 0.15)",
+                                                      color: "#38bdf8",
+                                                      border: "1px solid rgba(56, 189, 248, 0.3)",
+                                                    }}
+                                                  >
+                                                    {bundleTag}
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <div style={{ color: "var(--admin-text-soft)", fontSize: "12.5px", marginTop: 2 }}>
+                                                Color: <strong>{item.color}</strong> · Size: <strong>{item.size}</strong>
+                                              </div>
+                                            </div>
+                                          </div>
+                                          <div style={{ fontSize: "13.5px", textAlign: "right" }}>
+                                            <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "flex-end" }}>
+                                              {isDiscountedUnit && item.product?.price && item.product.price > item.price && (
+                                                <span style={{ textDecoration: "line-through", color: "var(--admin-text-soft)", fontSize: "12px" }}>
+                                                  {fmtPrice(item.product.price)}
+                                                </span>
+                                              )}
+                                              <span>
+                                                {item.quantity} × {fmtPrice(item.price)} ={" "}
+                                                <strong>{fmtPrice(item.quantity * item.price)}</strong>
+                                              </span>
+                                            </div>
                                           </div>
                                         </div>
-                                        <div style={{ fontSize: "13.5px" }}>
-                                          {item.quantity} × {fmtPrice(item.price)} ={" "}
-                                          <strong>{fmtPrice(item.quantity * item.price)}</strong>
+                                      );
+                                    })}
+                                  </div>
+
+                                  {/* Order Financial Breakdown & Discount Status */}
+                                  {(() => {
+                                    const sInfo = parseShippingInfo(o.shippingInfo);
+                                    const promoCode = sInfo?.promoCode || null;
+                                    const hasPromoDiscount = (o.discount || 0) > 0;
+                                    const promoDiscountPct = o.subtotal > 0 && hasPromoDiscount
+                                      ? Math.round((o.discount / o.subtotal) * 100)
+                                      : 10;
+
+                                    const hasBundleItems = o.orderItems.some(
+                                      (i) => i.name?.toLowerCase().includes("off") || (i.product?.price && i.product.price > i.price)
+                                    );
+
+                                    return (
+                                      <div
+                                        style={{
+                                          marginTop: 12,
+                                          marginBottom: 16,
+                                          background: "var(--admin-surface)",
+                                          border: "1px solid var(--admin-border)",
+                                          borderRadius: 6,
+                                          padding: "12px 16px",
+                                          display: "flex",
+                                          flexDirection: "column",
+                                          gap: 6,
+                                          fontSize: 13,
+                                        }}
+                                      >
+                                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid var(--admin-border)", paddingBottom: 8, marginBottom: 2, flexWrap: "wrap", gap: 6 }}>
+                                          <strong style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: "0.03em", color: "var(--admin-text)" }}>
+                                            Financial Summary &amp; Discount Breakdown
+                                          </strong>
+                                          {hasPromoDiscount ? (
+                                            <span style={{ fontSize: 11.5, fontWeight: 700, padding: "2px 8px", borderRadius: 4, background: "rgba(16, 185, 129, 0.15)", color: "#10b981", border: "1px solid rgba(16, 185, 129, 0.3)" }}>
+                                              ✓ {promoDiscountPct}% PROMO APPLIED {promoCode ? `(${promoCode})` : ""}
+                                            </span>
+                                          ) : hasBundleItems ? (
+                                            <span style={{ fontSize: 11.5, fontWeight: 700, padding: "2px 8px", borderRadius: 4, background: "rgba(56, 189, 248, 0.15)", color: "#38bdf8", border: "1px solid rgba(56, 189, 248, 0.3)" }}>
+                                              ✓ MULTI-PAIR BUNDLE DISCOUNT APPLIED
+                                            </span>
+                                          ) : (
+                                            <span style={{ fontSize: 11.5, fontWeight: 600, padding: "2px 8px", borderRadius: 4, background: "var(--admin-surface-2)", color: "var(--admin-text-soft)", border: "1px solid var(--admin-border)" }}>
+                                              NO DISCOUNT APPLIED (STANDARD PRICE)
+                                            </span>
+                                          )}
+                                        </div>
+
+                                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                          <span style={{ color: "var(--admin-text-soft)" }}>Items Subtotal:</span>
+                                          <strong style={{ color: "var(--admin-text)" }}>{fmtPrice(o.subtotal)}</strong>
+                                        </div>
+
+                                        {/* Multi-pair Bundle Promotion */}
+                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                          <span style={{ color: "var(--admin-text-soft)" }}>Multi-Pair Bundle Promotion:</span>
+                                          {hasBundleItems ? (
+                                            <span style={{ color: "#38bdf8", fontWeight: 700 }}>
+                                              Applied (15% Multi-Pair Discount included in item rates)
+                                            </span>
+                                          ) : (
+                                            <span style={{ color: "var(--admin-text-soft)", fontStyle: "italic" }}>
+                                              None (Standard single-pair pricing)
+                                            </span>
+                                          )}
+                                        </div>
+
+                                        {/* Promo Code Discount */}
+                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                          <span style={{ color: "var(--admin-text-soft)" }}>Promo Code Discount:</span>
+                                          {hasPromoDiscount ? (
+                                            <span style={{ color: "#10b981", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                                              <span>- {fmtPrice(o.discount)}</span>
+                                              <span style={{ fontSize: 11, background: "rgba(16, 185, 129, 0.18)", padding: "1px 6px", borderRadius: 3 }}>
+                                                {promoDiscountPct}% OFF {promoCode ? `· ${promoCode}` : ""}
+                                              </span>
+                                            </span>
+                                          ) : (
+                                            <span style={{ color: "var(--admin-text-soft)", fontStyle: "italic" }}>
+                                              No promo code applied (0% discount)
+                                            </span>
+                                          )}
+                                        </div>
+
+                                        {/* Shipping */}
+                                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                          <span style={{ color: "var(--admin-text-soft)" }}>Shipping / Delivery Fee:</span>
+                                          <span>{o.shipping === 0 ? <strong style={{ color: "#10b981" }}>FREE</strong> : fmtPrice(o.shipping)}</span>
+                                        </div>
+
+                                        {/* Final Total */}
+                                        <div
+                                          style={{
+                                            display: "flex",
+                                            justifyContent: "space-between",
+                                            alignItems: "center",
+                                            borderTop: "1px solid var(--admin-border)",
+                                            paddingTop: 8,
+                                            marginTop: 2,
+                                          }}
+                                        >
+                                          <span style={{ fontWeight: 700, fontSize: 14 }}>Total Order Amount (COD):</span>
+                                          <strong style={{ fontSize: 16, color: "var(--admin-accent)" }}>{fmtPrice(o.total)}</strong>
                                         </div>
                                       </div>
-                                    ))}
-                                  </div>
+                                    );
+                                  })()}
 
                                   {/* REMARKS & POSTEX SHIPPER ADVICE PANEL */}
                                   <div style={{ borderTop: "1px solid var(--admin-border)", paddingTop: 16, marginBottom: 16 }}>
@@ -7136,10 +7448,15 @@ export default function AdminPage() {
                       <span style={{ color: "var(--admin-text-soft)" }}>Items Subtotal:</span>
                       <span>{fmtPrice(liveSubtotal)}</span>
                     </div>
-                    {liveDiscount > 0 && (
-                      <div style={{ display: "flex", justifyContent: "space-between", color: "#10b981" }}>
-                        <span>Discount:</span>
-                        <span>- {fmtPrice(liveDiscount)}</span>
+                    {liveDiscount > 0 ? (
+                      <div style={{ display: "flex", justifyContent: "space-between", color: "#10b981", fontWeight: 600 }}>
+                        <span>Promo Discount Applied:</span>
+                        <span>- {fmtPrice(liveDiscount)} ({Math.round((liveDiscount / (liveSubtotal || 1)) * 100)}% OFF)</span>
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", justifyContent: "space-between", color: "var(--admin-text-soft)" }}>
+                        <span>Promo Discount:</span>
+                        <span>None (0% discount)</span>
                       </div>
                     )}
                     <div style={{ display: "flex", justifyContent: "space-between" }}>

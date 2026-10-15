@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { Market } from "./market";
 
 export interface TikTokUserData {
   email?: string | null;
@@ -39,18 +40,53 @@ function hashField(val?: string | null): string | undefined {
   return sha256(cleaned);
 }
 
-function formatPhone(phone?: string | null): string | undefined {
+function formatPhone(phone?: string | null, market: Market = "PK"): string | undefined {
   if (!phone) return undefined;
-  let digits = phone.replace(/\D/g, "");
+  const trimmed = phone.trim();
+  if (!trimmed) return undefined;
+
+  const hasPlus = trimmed.startsWith("+");
+  const digits = trimmed.replace(/\D/g, "");
   if (!digits) return undefined;
-  if (digits.startsWith("0")) {
-    digits = "+92" + digits.slice(1);
-  } else if (digits.startsWith("92")) {
-    digits = "+" + digits;
-  } else if (!digits.startsWith("+")) {
-    digits = "+92" + digits;
+
+  let e164 = "";
+  if (hasPlus) {
+    e164 = `+${digits}`;
+  } else if (
+    market === "USA" ||
+    (digits.length === 11 && digits.startsWith("1")) ||
+    (digits.length === 10 && !digits.startsWith("0"))
+  ) {
+    // US format
+    if (digits.length === 11 && digits.startsWith("1")) {
+      e164 = `+${digits}`;
+    } else if (digits.length === 10) {
+      e164 = `+1${digits}`;
+    } else {
+      e164 = `+${digits}`;
+    }
+  } else {
+    // Pakistan / default format
+    if (digits.startsWith("0")) {
+      e164 = `+92${digits.slice(1)}`;
+    } else if (digits.startsWith("92")) {
+      e164 = `+${digits}`;
+    } else {
+      e164 = `+92${digits}`;
+    }
   }
-  return sha256(digits);
+  return sha256(e164);
+}
+
+function isPlaceholder(val?: string): boolean {
+  if (!val) return true;
+  const lower = val.trim().toLowerCase();
+  return (
+    lower.length === 0 ||
+    lower.includes("placeholder") ||
+    lower.startsWith("your_") ||
+    lower.includes("enter_")
+  );
 }
 
 export class TikTokEventsApiService {
@@ -59,21 +95,47 @@ export class TikTokEventsApiService {
     eventId: string,
     eventSourceUrl: string,
     userData: TikTokUserData,
-    properties?: TikTokCustomProperties
+    properties?: TikTokCustomProperties,
+    market?: Market
   ): Promise<void> {
-    const pixelId =
-      process.env.NEXT_PUBLIC_TIKTOK_PIXEL_ID || "DB57MQRC77U074LG2QGG";
-    const accessToken =
-      process.env.TIKTOK_EVENTS_API_ACCESS_TOKEN ||
-      process.env.TIKTOK_ACCESS_TOKEN;
+    const resolvedMarket: Market =
+      market ||
+      (userData.phone && (userData.phone.startsWith("+1") || userData.phone.startsWith("1"))
+        ? "USA"
+        : "PK");
 
-    if (!pixelId || !accessToken) {
+    let pixelId = "";
+    let accessToken = "";
+
+    if (resolvedMarket === "USA") {
+      pixelId = (process.env.NEXT_PUBLIC_TIKTOK_PIXEL_ID_USA || "").trim();
+      accessToken = (process.env.TIKTOK_EVENTS_API_ACCESS_TOKEN_USA || "").trim();
+    } else {
+      pixelId = (
+        process.env.NEXT_PUBLIC_TIKTOK_PIXEL_ID_PK ||
+        process.env.NEXT_PUBLIC_TIKTOK_PIXEL_ID ||
+        "DB57MQRC77U074LG2QGG"
+      ).trim();
+      accessToken = (
+        process.env.TIKTOK_EVENTS_API_ACCESS_TOKEN_PK ||
+        process.env.TIKTOK_EVENTS_API_ACCESS_TOKEN ||
+        process.env.TIKTOK_ACCESS_TOKEN ||
+        ""
+      ).trim();
+    }
+
+    if (isPlaceholder(pixelId) || isPlaceholder(accessToken)) {
+      if (resolvedMarket === "USA") {
+        console.warn(
+          `[TikTok CAPI] USA credentials not configured yet (pixel: "${pixelId || "none"}", token: "${accessToken ? "set" : "missing"}"). Event "${eventName}" (${eventId}) skipped.`
+        );
+      }
       return;
     }
 
     try {
       const hashedEmail = hashField(userData.email);
-      const hashedPhone = formatPhone(userData.phone);
+      const hashedPhone = formatPhone(userData.phone, resolvedMarket);
       const hashedExternalId = hashField(userData.external_id);
 
       const userPayload: Record<string, any> = {
@@ -99,7 +161,7 @@ export class TikTokEventsApiService {
 
       if (properties) {
         eventItem.properties = {
-          currency: properties.currency || "PKR",
+          currency: properties.currency || (resolvedMarket === "USA" ? "USD" : "PKR"),
           value: properties.value,
           contents: properties.contents?.map((c) => ({
             content_id: c.content_id,

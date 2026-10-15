@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { fmtPrice } from "@/lib/cart";
 import { trackMeta } from "@/lib/fpixel";
 import { trackTikTok, identifyTikTok } from "@/lib/tiktok-pixel";
+import { getClientMarket } from "@/lib/market";
 
 function getCookie(name: string): string | undefined {
   if (typeof document === "undefined") return undefined;
@@ -245,9 +246,11 @@ export default function CheckoutPage() {
       const orderPayload = {
         items: cart.items.map((i) => ({
           productId: i.productId,
+          name: i.name,
           color: i.color,
           size: i.size,
           qty: i.qty,
+          price: i.price,
         })),
         shippingInfo: {
           name: name.trim(),
@@ -256,6 +259,7 @@ export default function CheckoutPage() {
           address: address.trim(),
           city: city.trim(),
           postal: postal.trim() || undefined,
+          promoCode: cart.promo || undefined,
         },
         promoCode: cart.promo || undefined,
         guestEmail: currentToken ? undefined : (trimmedEmail || undefined),
@@ -269,6 +273,7 @@ export default function CheckoutPage() {
             ? new URLSearchParams(window.location.search).get("ttclid") || undefined
             : undefined),
         eventId: initiateCheckoutEventId,
+        market: getClientMarket(),
       };
 
       const orderRes = await fetch("/api/orders", {
@@ -515,9 +520,9 @@ export default function CheckoutPage() {
           <div>
             <div className="summary-box">
               <h3>Order Summary</h3>
-              {cart.items.map((item) => (
+              {cart.items.map((item, idx) => (
                 <div
-                  key={`${item.productId}|${item.color}|${item.size}`}
+                  key={`${item.productId}|${item.name}|${item.color}|${item.size}|${idx}`}
                   className="order-summary-mini"
                 >
                   <span style={{ fontSize: 13.5, fontWeight: 600 }}>

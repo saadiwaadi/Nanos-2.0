@@ -31,6 +31,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
       initialProduct={product}
       bundlePricing={bundlePricing}
       initialRelated={related}
+      allProducts={allProducts}
     />
   );
 }

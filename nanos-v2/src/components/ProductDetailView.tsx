@@ -10,6 +10,7 @@ interface ProductDetailViewProps {
   initialProduct: Product;
   bundlePricing: BundlePricingInfo;
   initialRelated: Product[];
+  allProducts?: Product[];
 }
 
 async function fetchProductDetailApi(id: string): Promise<Product> {
@@ -24,6 +25,7 @@ export function ProductDetailView({
   initialProduct,
   bundlePricing,
   initialRelated,
+  allProducts,
 }: ProductDetailViewProps) {
   // SWR hook for product detail: instant render from cache on returning visits, 60s background revalidation
   const { data: cachedProduct } = useSWR<Product>(
@@ -51,7 +53,11 @@ export function ProductDetailView({
         </div>
 
         {/* PDP Main Content */}
-        <PdpActions product={product} bundlePricing={bundlePricing} />
+        <PdpActions
+          product={product}
+          bundlePricing={bundlePricing}
+          allProducts={allProducts}
+        />
 
         {/* You May Also Like Section */}
         {initialRelated.length > 0 && (

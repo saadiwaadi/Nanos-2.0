@@ -397,7 +397,7 @@ export default function AccountPage() {
                                 )}
                                 <div style={{ flex: 1 }}>
                                   <div style={{ fontWeight: 600, fontSize: 14 }}>
-                                    {item.product?.name || "Product"}
+                                    {(item as any).name || item.product?.name || "Product"}
                                   </div>
                                   {(item.color || item.size) && (
                                     <div style={{ fontSize: 12, color: "#666" }}>
@@ -421,9 +421,18 @@ export default function AccountPage() {
                               justifyContent: "space-between",
                               fontSize: 14,
                               fontWeight: 600,
+                              flexWrap: "wrap",
+                              gap: 8,
                             }}
                           >
-                            <span>Total: {formatPrice(order.totalAmount)}</span>
+                            <div>
+                              <span>Total: {formatPrice(order.totalAmount)}</span>
+                              {(order as any).discount > 0 && (
+                                <div style={{ fontSize: 12, color: "#16a34a", fontWeight: 600, marginTop: 2 }}>
+                                  Includes -{formatPrice((order as any).discount)} discount
+                                </div>
+                              )}
+                            </div>
                             <span style={{ color: "#666", fontWeight: 500 }}>
                               Shipping: {order.shippingFee === 0 ? "FREE" : formatPrice(order.shippingFee)}
                             </span>

@@ -1084,7 +1084,15 @@ noscript { display: none !important; }
 }
 
 .admin-layout-shell { display: flex; min-height: 100vh; background: var(--admin-bg); color: var(--admin-text); }
-.admin-sidebar { width: 240px; background: #0A0A0A; border-right: 1px solid var(--admin-border); color: #FFFFFF; display: flex; flex-direction: column; justify-content: space-between; padding: 24px 16px; flex-shrink: 0; transition: transform .25s cubic-bezier(0.4, 0, 0.2, 1); z-index: 50; }
+.admin-sidebar { width: 240px; background: #0A0A0A; border-right: 1px solid var(--admin-border); color: #FFFFFF; display: flex; flex-direction: column; justify-content: space-between; padding: 24px 16px; flex-shrink: 0; transition: width .25s cubic-bezier(0.4, 0, 0.2, 1), padding .25s ease, opacity .2s ease, transform .25s cubic-bezier(0.4, 0, 0.2, 1); z-index: 50; overflow-x: hidden; white-space: nowrap; }
+@media (min-width: 961px) {
+  .admin-sidebar.collapsed { width: 0 !important; min-width: 0 !important; padding-left: 0 !important; padding-right: 0 !important; border-right-color: transparent !important; opacity: 0 !important; pointer-events: none !important; visibility: hidden !important; overflow: hidden !important; }
+}
+.admin-sidebar-collapse-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: var(--admin-surface-2); border: 1px solid var(--admin-border); color: var(--admin-text-soft); border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 700; line-height: 1; transition: all .15s ease; }
+.admin-sidebar-collapse-btn:hover { background: var(--admin-surface-3); color: var(--admin-accent); border-color: var(--admin-accent); }
+@media (max-width: 960px) {
+  .admin-sidebar-collapse-btn { display: none; }
+}
 .admin-sidebar-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(2px); z-index: 45; display: none; }
 .admin-sidebar.open + .admin-sidebar-overlay { display: block; }
 .sidebar-header { padding: 0 8px 24px; border-bottom: 1px solid var(--admin-border); }
@@ -1103,7 +1111,19 @@ noscript { display: none !important; }
 .topbar-left { display: flex; align-items: center; gap: 16px; }
 .page-title { font-family: var(--font-head); font-size: 22px; font-weight: 800; color: var(--admin-text); margin: 0; letter-spacing: -0.01em; }
 .page-sub { font-size: 13px; color: var(--admin-text-soft); margin-top: 3px; }
-.hamburger { display: none; background: var(--admin-surface-2); border: 1px solid var(--admin-border); border-radius: 8px; padding: 8px 10px; cursor: pointer; color: var(--admin-text); }
+.hamburger { display: inline-flex; align-items: center; justify-content: center; background: var(--admin-surface-2); border: 1px solid var(--admin-border); border-radius: 8px; width: 34px; height: 34px; padding: 0; cursor: pointer; color: var(--admin-text); font-size: 16px; transition: all .15s ease; flex-shrink: 0; }
+.hamburger:hover { background: var(--admin-surface-3); color: var(--admin-accent); border-color: var(--admin-accent); }
+.hamburger.sidebar-collapsed { border-color: var(--admin-accent); color: var(--admin-accent); background: var(--admin-surface-3); }
+
+/* Admin Mobile & Topbar Zoom Controls */
+.admin-zoom-controls { display: inline-flex; align-items: center; background: var(--admin-surface-2); border: 1px solid var(--admin-border); border-radius: 8px; padding: 2px 3px; height: 34px; box-sizing: border-box; gap: 2px; flex-shrink: 0; box-shadow: 0 1px 4px rgba(0,0,0,0.15); }
+.admin-zoom-btn { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; background: transparent; border: none; border-radius: 6px; color: var(--admin-text); font-size: 16px; font-weight: 800; line-height: 1; cursor: pointer; transition: all .15s ease; padding: 0; user-select: none; -webkit-user-select: none; }
+.admin-zoom-btn:hover:not(:disabled) { background: var(--admin-surface-3); color: var(--admin-accent); }
+.admin-zoom-btn:active:not(:disabled) { transform: scale(0.92); }
+.admin-zoom-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.admin-zoom-val { background: transparent; border: none; color: var(--admin-accent); font-size: 11.5px; font-weight: 800; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; padding: 0 5px; cursor: pointer; min-width: 40px; text-align: center; line-height: 26px; border-radius: 4px; transition: background .15s ease; user-select: none; -webkit-user-select: none; }
+.admin-zoom-val:hover { background: var(--admin-surface-3); text-decoration: underline; }
+
 .content { padding: 28px 32px; flex: 1; min-width: 0; }
 
 /* Admin components */
@@ -1441,10 +1461,11 @@ noscript { display: none !important; }
   .admin-sidebar.open { transform: translateX(0); }
   .admin-sidebar.open + .admin-sidebar-overlay { display: block; }
   .admin-sidebar-close { display: block; }
-  .hamburger { display: flex; align-items: center; justify-content: center; min-width: 38px; min-height: 38px; font-size: 18px; border-radius: 8px; background: var(--admin-surface-2); border: 1px solid var(--admin-border); }
-  .topbar { padding: 10px 16px; position: sticky; top: 0; z-index: 30; }
+  .hamburger { display: flex; align-items: center; justify-content: center; min-width: 36px; min-height: 36px; font-size: 17px; border-radius: 8px; background: var(--admin-surface-2); border: 1px solid var(--admin-border); }
+  .topbar { padding: 10px 14px; position: sticky; top: 0; z-index: 30; gap: 8px; }
   .topbar-left { gap: 10px; min-width: 0; }
-  .page-title { font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .topbar-right { gap: 6px; }
+  .page-title { font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .page-sub { display: none; }
   .admin-mobile-nav { display: flex; }
   .content { padding: 16px 12px; }
@@ -1455,6 +1476,10 @@ noscript { display: none !important; }
 }
 
 @media (max-width: 640px) {
+  .admin-zoom-controls { height: 30px; padding: 1px 2px; gap: 1px; }
+  .admin-zoom-btn { width: 24px; height: 24px; font-size: 14px; }
+  .admin-zoom-val { font-size: 10px; min-width: 32px; padding: 0 2px; line-height: 24px; }
+  .topbar-storefront-text { display: none; }
   .stat-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
   .stat-card { padding: 14px 12px; border-radius: 10px; }
   .stat-label { font-size: 10px; }

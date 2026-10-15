@@ -3,7 +3,11 @@
 import { useEffect, Suspense } from "react";
 import Script from "next/script";
 import { usePathname, useSearchParams } from "next/navigation";
-import { TIKTOK_PIXEL_ID, tiktokPageView } from "@/lib/tiktok-pixel";
+import {
+  TIKTOK_PIXEL_ID_PK,
+  TIKTOK_PIXEL_ID_USA,
+  tiktokPageView,
+} from "@/lib/tiktok-pixel";
 import { shouldSuppressPixel } from "@/lib/fpixel";
 
 function TikTokPixelNavigation() {
@@ -11,7 +15,7 @@ function TikTokPixelNavigation() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    if (!TIKTOK_PIXEL_ID) return;
+    if (!TIKTOK_PIXEL_ID_PK && !TIKTOK_PIXEL_ID_USA) return;
     if (shouldSuppressPixel(pathname, searchParams)) return;
     tiktokPageView();
   }, [pathname, searchParams]);
@@ -23,9 +27,19 @@ function TikTokPixelInner() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  if (!TIKTOK_PIXEL_ID || shouldSuppressPixel(pathname, searchParams)) {
+  const hasAnyPixel = Boolean(TIKTOK_PIXEL_ID_PK || TIKTOK_PIXEL_ID_USA);
+
+  if (!hasAnyPixel || shouldSuppressPixel(pathname, searchParams)) {
     return null;
   }
+
+  // Call ttq.load() for both PK and USA pixels, followed by ttq.page()
+  const loadCalls = [
+    TIKTOK_PIXEL_ID_PK ? `ttq.load('${TIKTOK_PIXEL_ID_PK}');` : "",
+    TIKTOK_PIXEL_ID_USA ? `ttq.load('${TIKTOK_PIXEL_ID_USA}');` : "",
+  ]
+    .filter(Boolean)
+    .join("\n              ");
 
   return (
     <>
@@ -45,7 +59,7 @@ function TikTokPixelInner() {
               n=document.createElement("script");n.type="text/javascript",n.async=!0,n.src=r+"?sdkid="+e+"&lib="+t;
               e=document.getElementsByTagName("script")[0];e.parentNode.insertBefore(n,e)};
 
-              ttq.load('${TIKTOK_PIXEL_ID}');
+              ${loadCalls}
               ttq.page();
             }(window, document, 'ttq');
           `,

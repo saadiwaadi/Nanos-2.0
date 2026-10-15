@@ -29,9 +29,9 @@ export async function getPromoSettings(): Promise<PromoSettings> {
     if (row && row.value) {
       const parsed = JSON.parse(row.value);
       return {
-        code: (parsed.code || DEFAULT_PROMO_SETTINGS.code).trim().toUpperCase(),
+        code: (parsed.code && parsed.code.trim() ? parsed.code : DEFAULT_PROMO_SETTINGS.code).trim().toUpperCase(),
         discountType: parsed.discountType === "fixed" ? "fixed" : "percent",
-        discountValue: typeof parsed.discountValue === "number" ? parsed.discountValue : 10,
+        discountValue: typeof parsed.discountValue === "number" && parsed.discountValue > 0 ? parsed.discountValue : DEFAULT_PROMO_SETTINGS.discountValue,
         minOrderAmount: typeof parsed.minOrderAmount === "number" ? parsed.minOrderAmount : 0,
         enabled: parsed.enabled !== false,
         description: parsed.description || "",

@@ -276,6 +276,11 @@ export default function ConfirmationPage({
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: 12, color: "#777", marginBottom: 2 }}>Total</div>
             <strong style={{ fontSize: 16 }}>{fmtPrice(order.total)}</strong>
+            {order.discount > 0 && (
+              <div style={{ fontSize: 11.5, color: "#16a34a", fontWeight: 600, marginTop: 2 }}>
+                Includes -{fmtPrice(order.discount)} discount
+              </div>
+            )}
           </div>
         </div>
 
