@@ -56,7 +56,7 @@ interface OrderItem {
   price: number;
   size?: string;
   color?: string;
-  product?: { id: string; name: string; hero: string; price?: number };
+  product?: { id: string; name: string; hero: string; price?: number; sizes?: string[]; category?: string };
 }
 
 interface BookingLog {
@@ -594,7 +594,9 @@ export default function AdminPage() {
       size: string;
       quantity: number;
       price: number;
+      originalPrice?: number;
       hero?: string;
+      availableSizes?: string[];
     }>;
   }>({
     customerName: "",
@@ -918,16 +920,33 @@ export default function AdminPage() {
       adminNote: sInfo.adminNote || "",
       shippingFee: o.shipping ?? 0,
       payment: o.payment || "cod",
-      items: (o.orderItems || []).map((item) => ({
-        id: item.id,
-        productId: item.productId,
-        name: item.product?.name || item.productId,
-        color: item.color || "",
-        size: item.size || "",
-        quantity: item.quantity || 1,
-        price: item.price || 0,
-        hero: item.product?.hero || "",
-      })),
+      items: (o.orderItems || []).map((item) => {
+        const prod = products.find((p) => p.id === item.productId);
+        const originalPrice =
+          typeof item.product?.price === "number" && item.product.price > 0
+            ? item.product.price
+            : typeof prod?.price === "number" && prod.price > 0
+            ? prod.price
+            : item.price || 0;
+        let availableSizes: string[] = [];
+        if (item.product?.sizes && Array.isArray(item.product.sizes) && item.product.sizes.length > 0) {
+          availableSizes = item.product.sizes;
+        } else if (prod?.sizes && Array.isArray(prod.sizes) && prod.sizes.length > 0) {
+          availableSizes = prod.sizes;
+        }
+        return {
+          id: item.id,
+          productId: item.productId,
+          name: item.name || item.product?.name || prod?.name || item.productId,
+          color: item.color || "",
+          size: item.size || "",
+          quantity: item.quantity || 1,
+          price: item.price || 0,
+          originalPrice,
+          hero: item.product?.hero || prod?.hero || "",
+          availableSizes,
+        };
+      }),
     });
   };
 
@@ -968,10 +987,14 @@ export default function AdminPage() {
         shippingFee: Number(editOrderForm.shippingFee) || 0,
         payment: editOrderForm.payment,
         items: editOrderForm.items.map((it) => ({
+          id: it.id,
           productId: it.productId,
+          name: it.name,
           color: it.color,
           size: it.size,
           qty: it.quantity,
+          unitPrice: it.price,
+          price: it.price,
         })),
       };
 
@@ -4255,9 +4278,33 @@ export default function AdminPage() {
                                       ? Math.round((o.discount / o.subtotal) * 100)
                                       : 10;
 
-                                    const hasBundleItems = o.orderItems.some(
-                                      (i) => i.name?.toLowerCase().includes("off") || (i.product?.price && i.product.price > i.price)
-                                    );
+                                    const orderRetailTotal = o.orderItems.reduce((sum, it) => {
+                                      const prod = products.find((p) => p.id === it.productId);
+                                      const retailUnit =
+                                        typeof it.product?.price === "number" && it.product.price > 0
+                                          ? it.product.price
+                                          : typeof prod?.price === "number" && prod.price > 0
+                                          ? prod.price
+                                          : it.price;
+                                      return sum + retailUnit * it.quantity;
+                                    }, 0);
+                                    const orderDealDiscount = Math.max(0, orderRetailTotal - o.subtotal);
+                                    const orderDealDiscountPct =
+                                      orderRetailTotal > 0
+                                        ? Math.round((orderDealDiscount / orderRetailTotal) * 100)
+                                        : 0;
+
+                                    const hasBundleItems =
+                                      orderDealDiscount > 0 ||
+                                      o.orderItems.some(
+                                        (i) => i.name?.toLowerCase().includes("off") || (i.product?.price && i.product.price > i.price)
+                                      );
+
+                                    const totalSavings = orderDealDiscount + (o.discount || 0);
+                                    const totalSavingsPct =
+                                      orderRetailTotal > 0
+                                        ? Math.round((totalSavings / orderRetailTotal) * 100)
+                                        : 0;
 
                                     return (
                                       <div
@@ -4278,32 +4325,50 @@ export default function AdminPage() {
                                           <strong style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: "0.03em", color: "var(--admin-text)" }}>
                                             Financial Summary &amp; Discount Breakdown
                                           </strong>
-                                          {hasPromoDiscount ? (
-                                            <span style={{ fontSize: 11.5, fontWeight: 700, padding: "2px 8px", borderRadius: 4, background: "rgba(16, 185, 129, 0.15)", color: "#10b981", border: "1px solid rgba(16, 185, 129, 0.3)" }}>
-                                              ✓ {promoDiscountPct}% PROMO APPLIED {promoCode ? `(${promoCode})` : ""}
+                                          <div style={{ display: "flex", gap: 6 }}>
+                                            {orderDealDiscount > 0 && (
+                                              <span style={{ fontSize: 11.5, fontWeight: 700, padding: "2px 8px", borderRadius: 4, background: "rgba(56, 189, 248, 0.15)", color: "#38bdf8", border: "1px solid rgba(56, 189, 248, 0.3)" }}>
+                                                ✓ {orderDealDiscountPct}% BUNDLE DEAL APPLIED
+                                              </span>
+                                            )}
+                                            {hasPromoDiscount && (
+                                              <span style={{ fontSize: 11.5, fontWeight: 700, padding: "2px 8px", borderRadius: 4, background: "rgba(16, 185, 129, 0.15)", color: "#10b981", border: "1px solid rgba(16, 185, 129, 0.3)" }}>
+                                                ✓ {promoDiscountPct}% PROMO APPLIED {promoCode ? `(${promoCode})` : ""}
+                                              </span>
+                                            )}
+                                            {orderDealDiscount === 0 && !hasPromoDiscount && (
+                                              <span style={{ fontSize: 11.5, fontWeight: 600, padding: "2px 8px", borderRadius: 4, background: "var(--admin-surface-2)", color: "var(--admin-text-soft)", border: "1px solid var(--admin-border)" }}>
+                                                STANDARD PRICING (NO DISCOUNT)
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+
+                                        {orderRetailTotal > o.subtotal && (
+                                          <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                            <span style={{ color: "var(--admin-text-soft)" }}>Original Retail Total:</span>
+                                            <span>{fmtPrice(orderRetailTotal)}</span>
+                                          </div>
+                                        )}
+
+                                        {/* 1. Multi-pair Bundle Deal Discount (Separated) */}
+                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                          <span style={{ color: orderDealDiscount > 0 ? "#38bdf8" : "var(--admin-text-soft)" }}>
+                                            <strong>Deal / Bundle Discount:</strong>
+                                            <span style={{ fontSize: 11.5, marginLeft: 5, color: "var(--admin-text-soft)" }}>
+                                              (Multi-pair rate savings)
+                                            </span>
+                                          </span>
+                                          {orderDealDiscount > 0 ? (
+                                            <span style={{ color: "#38bdf8", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                                              <span>- {fmtPrice(orderDealDiscount)}</span>
+                                              <span style={{ fontSize: 11, background: "rgba(56, 189, 248, 0.18)", padding: "1px 6px", borderRadius: 3 }}>
+                                                {orderDealDiscountPct}% Deal Savings
+                                              </span>
                                             </span>
                                           ) : hasBundleItems ? (
-                                            <span style={{ fontSize: 11.5, fontWeight: 700, padding: "2px 8px", borderRadius: 4, background: "rgba(56, 189, 248, 0.15)", color: "#38bdf8", border: "1px solid rgba(56, 189, 248, 0.3)" }}>
-                                              ✓ MULTI-PAIR BUNDLE DISCOUNT APPLIED
-                                            </span>
-                                          ) : (
-                                            <span style={{ fontSize: 11.5, fontWeight: 600, padding: "2px 8px", borderRadius: 4, background: "var(--admin-surface-2)", color: "var(--admin-text-soft)", border: "1px solid var(--admin-border)" }}>
-                                              NO DISCOUNT APPLIED (STANDARD PRICE)
-                                            </span>
-                                          )}
-                                        </div>
-
-                                        <div style={{ display: "flex", justifyContent: "space-between" }}>
-                                          <span style={{ color: "var(--admin-text-soft)" }}>Items Subtotal:</span>
-                                          <strong style={{ color: "var(--admin-text)" }}>{fmtPrice(o.subtotal)}</strong>
-                                        </div>
-
-                                        {/* Multi-pair Bundle Promotion */}
-                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                          <span style={{ color: "var(--admin-text-soft)" }}>Multi-Pair Bundle Promotion:</span>
-                                          {hasBundleItems ? (
                                             <span style={{ color: "#38bdf8", fontWeight: 700 }}>
-                                              Applied (15% Multi-Pair Discount included in item rates)
+                                              Applied (Multi-Pair Discount included in item rates)
                                             </span>
                                           ) : (
                                             <span style={{ color: "var(--admin-text-soft)", fontStyle: "italic" }}>
@@ -4312,9 +4377,19 @@ export default function AdminPage() {
                                           )}
                                         </div>
 
-                                        {/* Promo Code Discount */}
+                                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                          <span style={{ color: "var(--admin-text-soft)" }}>Items Subtotal (after Deal):</span>
+                                          <strong style={{ color: "var(--admin-text)" }}>{fmtPrice(o.subtotal)}</strong>
+                                        </div>
+
+                                        {/* 2. Promo Code Discount (Separated) */}
                                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                          <span style={{ color: "var(--admin-text-soft)" }}>Promo Code Discount:</span>
+                                          <span style={{ color: hasPromoDiscount ? "#10b981" : "var(--admin-text-soft)" }}>
+                                            <strong>Order Promo Code Discount:</strong>
+                                            <span style={{ fontSize: 11.5, marginLeft: 5, color: "var(--admin-text-soft)" }}>
+                                              (Checkout coupon)
+                                            </span>
+                                          </span>
                                           {hasPromoDiscount ? (
                                             <span style={{ color: "#10b981", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 6 }}>
                                               <span>- {fmtPrice(o.discount)}</span>
@@ -4329,10 +4404,30 @@ export default function AdminPage() {
                                           )}
                                         </div>
 
+                                        {totalSavings > 0 && (
+                                          <div
+                                            style={{
+                                              background: "rgba(200, 255, 0, 0.08)",
+                                              border: "1px dashed rgba(200, 255, 0, 0.3)",
+                                              borderRadius: 5,
+                                              padding: "5px 10px",
+                                              display: "flex",
+                                              justifyContent: "space-between",
+                                              alignItems: "center",
+                                              fontSize: 12,
+                                              color: "var(--admin-accent)",
+                                              fontWeight: 600,
+                                            }}
+                                          >
+                                            <span>Total Customer Discount (Deal + Order Promo):</span>
+                                            <span>- {fmtPrice(totalSavings)} ({totalSavingsPct}% overall savings)</span>
+                                          </div>
+                                        )}
+
                                         {/* Shipping */}
                                         <div style={{ display: "flex", justifyContent: "space-between" }}>
                                           <span style={{ color: "var(--admin-text-soft)" }}>Shipping / Delivery Fee:</span>
-                                          <span>{o.shipping === 0 ? <strong style={{ color: "#10b981" }}>FREE</strong> : fmtPrice(o.shipping)}</span>
+                                          <span>{o.shipping === 0 ? <strong style={{ color: "#10b981" }}>FREE SHIPPING</strong> : fmtPrice(o.shipping)}</span>
                                         </div>
 
                                         {/* Final Total */}
@@ -4346,8 +4441,8 @@ export default function AdminPage() {
                                             marginTop: 2,
                                           }}
                                         >
-                                          <span style={{ fontWeight: 700, fontSize: 14 }}>Total Order Amount (COD):</span>
-                                          <strong style={{ fontSize: 16, color: "var(--admin-accent)" }}>{fmtPrice(o.total)}</strong>
+                                          <span style={{ fontWeight: 800, fontSize: 14, color: "var(--admin-accent)" }}>TOTAL BILL (PAYABLE):</span>
+                                          <strong style={{ fontSize: 17, color: "var(--admin-accent)", fontWeight: 800 }}>{fmtPrice(o.total)}</strong>
                                         </div>
                                       </div>
                                     );
@@ -7041,10 +7136,91 @@ export default function AdminPage() {
           (editingOrder.courierBookingStatus === "booked" ||
             ["shipped", "delivered"].includes(editingOrder.status));
         const trackingNum = editingOrder.trackingNumber || editingOrder.postexTrackingNumber;
-        const liveSubtotal = editOrderForm.items.reduce((sum, it) => sum + (it.price * (it.quantity || 1)), 0);
-        const liveDiscount = Math.min(editingOrder.discount || 0, liveSubtotal);
+
+        // Separate Deal / Bundle discount vs Order Promo coupon discount
+        const liveRetailTotal = editOrderForm.items.reduce((sum, it) => {
+          const retailUnit =
+            typeof it.originalPrice === "number" && it.originalPrice > 0
+              ? it.originalPrice
+              : it.price;
+          return sum + retailUnit * (it.quantity || 1);
+        }, 0);
+
+        const liveDealSubtotal = editOrderForm.items.reduce(
+          (sum, it) => sum + it.price * (it.quantity || 1),
+          0
+        );
+
+        const liveDealDiscount = Math.max(0, liveRetailTotal - liveDealSubtotal);
+        const dealDiscountPct =
+          liveRetailTotal > 0 ? Math.round((liveDealDiscount / liveRetailTotal) * 100) : 0;
+
+        const liveOrderDiscount = Math.min(editingOrder.discount || 0, liveDealSubtotal);
+        const orderDiscountPct =
+          liveDealSubtotal > 0 ? Math.round((liveOrderDiscount / liveDealSubtotal) * 100) : 0;
+
         const liveShipping = Number(editOrderForm.shippingFee) || 0;
-        const liveTotal = liveSubtotal - liveDiscount + liveShipping;
+        const liveTotalBill = Math.max(0, liveDealSubtotal - liveOrderDiscount + liveShipping);
+
+        const totalSavings = liveDealDiscount + liveOrderDiscount;
+        const totalSavingsPct =
+          liveRetailTotal > 0 ? Math.round((totalSavings / liveRetailTotal) * 100) : 0;
+
+        const sInfo = parseShippingInfo(editingOrder.shippingInfo);
+        const promoCodeName = sInfo?.promoCode || null;
+
+        // Helper to get all relevant size options for an item
+        const getItemSizeOptions = (item: {
+          size: string;
+          availableSizes?: string[];
+          productId: string;
+        }) => {
+          const prod = products.find((p) => p.id === item.productId);
+          const isTrouser = prod?.category === "trousers";
+          const defaultFootwearSizes = [
+            "UK 6",
+            "UK 7",
+            "UK 8",
+            "UK 9",
+            "UK 10",
+            "UK 11",
+            "7/41",
+            "8/42",
+            "9/43",
+            "10/44",
+            "11/45",
+            "PK 6",
+            "PK 7",
+            "PK 8",
+            "PK 9",
+            "PK 10",
+            "PK 11",
+          ];
+          const defaultTrouserSizes = [
+            "28",
+            "30",
+            "32",
+            "34",
+            "36",
+            "38",
+            "S",
+            "M",
+            "L",
+            "XL",
+            "XXL",
+          ];
+          const baseList =
+            item.availableSizes && item.availableSizes.length > 0
+              ? item.availableSizes
+              : isTrouser
+              ? defaultTrouserSizes
+              : defaultFootwearSizes;
+          const set = new Set(baseList);
+          if (item.size && item.size.trim()) {
+            set.add(item.size.trim());
+          }
+          return Array.from(set);
+        };
 
         return (
           <div
@@ -7343,140 +7519,311 @@ export default function AdminPage() {
                     </div>
                   </div>
 
-                  {/* Section 4: Order Items & Quantities */}
+                  {/* Section 4: Order Items & Sizes */}
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", marginBottom: 8, color: "var(--admin-accent)" }}>
-                      4. Order Items
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 6 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", color: "var(--admin-accent)" }}>
+                        4. Order Items &amp; Sizes
+                      </div>
+                      <span style={{ fontSize: 11.5, color: "var(--admin-text-soft)" }}>
+                        Change sizes directly here · Deal &amp; bundle pricing is preserved
+                      </span>
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {editOrderForm.items.map((item, index) => (
-                        <div
-                          key={item.id || index}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            background: "var(--admin-surface)",
-                            border: "1px solid var(--admin-border)",
-                            borderRadius: 6,
-                            padding: "8px 12px",
-                            gap: 10,
-                          }}
-                        >
-                          <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
-                            {item.hero && (
-                              /* eslint-disable-next-line @next/next/no-img-element */
-                              <img
-                                src={item.hero}
-                                alt=""
-                                width={36}
-                                height={36}
-                                style={{ objectFit: "cover", borderRadius: 4 }}
-                              />
-                            )}
-                            <div style={{ minWidth: 0 }}>
-                              <strong style={{ fontSize: 13, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                {item.name}
-                              </strong>
-                              <span style={{ fontSize: 12, color: "var(--admin-text-soft)" }}>
-                                {item.color} / {item.size} · {fmtPrice(item.price)} each
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {editOrderForm.items.map((item, index) => {
+                        const sizeOptions = getItemSizeOptions(item);
+                        const isDiscountedUnit =
+                          typeof item.originalPrice === "number" && item.originalPrice > item.price;
+
+                        return (
+                          <div
+                            key={item.id || index}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              background: "var(--admin-surface)",
+                              border: "1px solid var(--admin-border)",
+                              borderRadius: 8,
+                              padding: "10px 14px",
+                              gap: 12,
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 260 }}>
+                              {item.hero && (
+                                /* eslint-disable-next-line @next/next/no-img-element */
+                                <img
+                                  src={item.hero}
+                                  alt=""
+                                  width={42}
+                                  height={42}
+                                  style={{ objectFit: "cover", borderRadius: 6, border: "1px solid var(--admin-border)" }}
+                                />
+                              )}
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <strong style={{ fontSize: 13.5, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  {item.name}
+                                </strong>
+
+                                <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4, flexWrap: "wrap" }}>
+                                  <span style={{ fontSize: 12, color: "var(--admin-text-soft)" }}>
+                                    Color: <strong>{item.color || "Standard"}</strong>
+                                  </span>
+
+                                  {/* Direct Interactive Size Selector */}
+                                  <div style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                                    <label
+                                      htmlFor={`edit-order-item-size-${index}`}
+                                      style={{ fontSize: 12, fontWeight: 700, color: "var(--admin-accent)" }}
+                                    >
+                                      Size:
+                                    </label>
+                                    <select
+                                      id={`edit-order-item-size-${index}`}
+                                      value={item.size}
+                                      disabled={savingEditOrder || isBooked}
+                                      onChange={(e) => {
+                                        const newSize = e.target.value;
+                                        const updated = [...editOrderForm.items];
+                                        updated[index] = { ...updated[index], size: newSize };
+                                        setEditOrderForm({ ...editOrderForm, items: updated });
+                                      }}
+                                      style={{
+                                        background: "var(--admin-surface-2)",
+                                        color: "var(--admin-text)",
+                                        border: "1px solid var(--admin-accent)",
+                                        borderRadius: 4,
+                                        padding: "3px 8px",
+                                        fontSize: 12.5,
+                                        fontWeight: 700,
+                                        cursor: isBooked ? "not-allowed" : "pointer",
+                                        outline: "none",
+                                      }}
+                                      title="Change size directly for this item"
+                                    >
+                                      {sizeOptions.map((s) => (
+                                        <option key={s} value={s}>
+                                          {s}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+
+                                  {/* Deal rate indication */}
+                                  {isDiscountedUnit ? (
+                                    <span
+                                      style={{
+                                        fontSize: 11,
+                                        fontWeight: 700,
+                                        padding: "1px 7px",
+                                        borderRadius: 4,
+                                        background: "rgba(56, 189, 248, 0.15)",
+                                        color: "#38bdf8",
+                                        border: "1px solid rgba(56, 189, 248, 0.3)",
+                                      }}
+                                    >
+                                      Deal Rate: {fmtPrice(item.price)} (Retail {fmtPrice(item.originalPrice!)})
+                                    </span>
+                                  ) : (
+                                    <span style={{ fontSize: 11.5, color: "var(--admin-text-soft)" }}>
+                                      {fmtPrice(item.price)} each
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Quantity control & Item Subtotal */}
+                            <div style={{ display: "flex", alignItems: "center", gap: 10, marginLeft: "auto" }}>
+                              {!isBooked && (
+                                <button
+                                  type="button"
+                                  className="btn btn-outline btn-sm"
+                                  style={{ width: 28, height: 28, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}
+                                  disabled={savingEditOrder || item.quantity <= 1}
+                                  onClick={() => {
+                                     const updated = [...editOrderForm.items];
+                                     updated[index] = { ...updated[index], quantity: Math.max(1, item.quantity - 1) };
+                                     setEditOrderForm({ ...editOrderForm, items: updated });
+                                  }}
+                                  title="Decrease quantity"
+                                >
+                                  -
+                                </button>
+                              )}
+
+                              <span style={{ fontWeight: 700, minWidth: 24, textAlign: "center", fontSize: 13.5 }}>
+                                {item.quantity}
                               </span>
+
+                              {!isBooked && (
+                                <button
+                                  type="button"
+                                  className="btn btn-outline btn-sm"
+                                  style={{ width: 28, height: 28, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}
+                                  disabled={savingEditOrder}
+                                  onClick={() => {
+                                     const updated = [...editOrderForm.items];
+                                     updated[index] = { ...updated[index], quantity: item.quantity + 1 };
+                                     setEditOrderForm({ ...editOrderForm, items: updated });
+                                  }}
+                                  title="Increase quantity"
+                                >
+                                  +
+                                </button>
+                              )}
+
+                              <div style={{ minWidth: 95, textAlign: "right", fontWeight: 700, fontSize: 13.5, color: "var(--admin-text)" }}>
+                                {fmtPrice(item.quantity * item.price)}
+                              </div>
                             </div>
                           </div>
-
-                          {/* Quantity control */}
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            {!isBooked && (
-                              <button
-                                type="button"
-                                className="btn btn-outline btn-sm"
-                                style={{ width: 28, height: 28, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}
-                                disabled={savingEditOrder || item.quantity <= 1}
-                                onClick={() => {
-                                   const updated = [...editOrderForm.items];
-                                   updated[index] = { ...updated[index], quantity: Math.max(1, item.quantity - 1) };
-                                   setEditOrderForm({ ...editOrderForm, items: updated });
-                                }}
-                              >
-                                -
-                              </button>
-                            )}
-
-                            <span style={{ fontWeight: 700, minWidth: 24, textAlign: "center", fontSize: 13 }}>
-                              {item.quantity}
-                            </span>
-
-                            {!isBooked && (
-                              <button
-                                type="button"
-                                className="btn btn-outline btn-sm"
-                                style={{ width: 28, height: 28, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}
-                                disabled={savingEditOrder}
-                                onClick={() => {
-                                   const updated = [...editOrderForm.items];
-                                   updated[index] = { ...updated[index], quantity: item.quantity + 1 };
-                                   setEditOrderForm({ ...editOrderForm, items: updated });
-                                }}
-                              >
-                                +
-                              </button>
-                            )}
-
-                            <div style={{ minWidth: 90, textAlign: "right", fontWeight: 700, fontSize: 13.5 }}>
-                              {fmtPrice(item.quantity * item.price)}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
 
-                  {/* Section 5: Order Total Summary */}
+                  {/* Section 5: Order Bill & Separate Deal vs Order Discount Breakdown */}
                   <div
                     style={{
                       background: "var(--admin-surface)",
                       border: "1px solid var(--admin-border)",
-                      borderRadius: 6,
-                      padding: "12px 16px",
+                      borderRadius: 8,
+                      padding: "16px 18px",
                       display: "flex",
                       flexDirection: "column",
-                      gap: 4,
+                      gap: 8,
                       fontSize: 13,
                     }}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span style={{ color: "var(--admin-text-soft)" }}>Items Subtotal:</span>
-                      <span>{fmtPrice(liveSubtotal)}</span>
-                    </div>
-                    {liveDiscount > 0 ? (
-                      <div style={{ display: "flex", justifyContent: "space-between", color: "#10b981", fontWeight: 600 }}>
-                        <span>Promo Discount Applied:</span>
-                        <span>- {fmtPrice(liveDiscount)} ({Math.round((liveDiscount / (liveSubtotal || 1)) * 100)}% OFF)</span>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--admin-border)", paddingBottom: 10, marginBottom: 4, flexWrap: "wrap", gap: 6 }}>
+                      <strong style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: "0.03em", color: "var(--admin-text)" }}>
+                        5. Order Bill &amp; Discount Breakdown
+                      </strong>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        {liveDealDiscount > 0 && (
+                          <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 4, background: "rgba(56, 189, 248, 0.15)", color: "#38bdf8", border: "1px solid rgba(56, 189, 248, 0.3)" }}>
+                            ✓ BUNDLE DEAL APPLIED
+                          </span>
+                        )}
+                        {liveOrderDiscount > 0 && (
+                          <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 4, background: "rgba(16, 185, 129, 0.15)", color: "#10b981", border: "1px solid rgba(16, 185, 129, 0.3)" }}>
+                            ✓ PROMO DISCOUNT APPLIED
+                          </span>
+                        )}
                       </div>
-                    ) : (
-                      <div style={{ display: "flex", justifyContent: "space-between", color: "var(--admin-text-soft)" }}>
-                        <span>Promo Discount:</span>
-                        <span>None (0% discount)</span>
+                    </div>
+
+                    {/* Original Retail Total */}
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ color: "var(--admin-text-soft)" }}>Original Retail Total:</span>
+                      <span>{fmtPrice(liveRetailTotal)}</span>
+                    </div>
+
+                    {/* 1. Deal Discount (Separated) */}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ color: liveDealDiscount > 0 ? "#38bdf8" : "var(--admin-text-soft)" }}>
+                        <strong>Deal / Bundle Discount:</strong>
+                        <span style={{ fontSize: 11.5, marginLeft: 5, color: "var(--admin-text-soft)" }}>
+                          (Multi-pair automatic bundle rate)
+                        </span>
+                      </span>
+                      {liveDealDiscount > 0 ? (
+                        <span style={{ color: "#38bdf8", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                          <span>- {fmtPrice(liveDealDiscount)}</span>
+                          <span style={{ fontSize: 11, background: "rgba(56, 189, 248, 0.18)", padding: "1px 6px", borderRadius: 3 }}>
+                            {dealDiscountPct}% OFF Deal
+                          </span>
+                        </span>
+                      ) : (
+                        <span style={{ color: "var(--admin-text-soft)", fontStyle: "italic" }}>
+                          None (Standard single-pair pricing)
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Items Subtotal after Deal */}
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ color: "var(--admin-text-soft)" }}>Items Subtotal (after Deal):</span>
+                      <strong style={{ color: "var(--admin-text)" }}>{fmtPrice(liveDealSubtotal)}</strong>
+                    </div>
+
+                    {/* 2. Order Promo Discount (Separated) */}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ color: liveOrderDiscount > 0 ? "#10b981" : "var(--admin-text-soft)" }}>
+                        <strong>Order Promo Code Discount:</strong>
+                        <span style={{ fontSize: 11.5, marginLeft: 5, color: "var(--admin-text-soft)" }}>
+                          (Checkout coupon code)
+                        </span>
+                      </span>
+                      {liveOrderDiscount > 0 ? (
+                        <span style={{ color: "#10b981", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                          <span>- {fmtPrice(liveOrderDiscount)}</span>
+                          <span style={{ fontSize: 11, background: "rgba(16, 185, 129, 0.18)", padding: "1px 6px", borderRadius: 3 }}>
+                            {orderDiscountPct}% OFF {promoCodeName ? `· ${promoCodeName}` : ""}
+                          </span>
+                        </span>
+                      ) : (
+                        <span style={{ color: "var(--admin-text-soft)", fontStyle: "italic" }}>
+                          None (0% discount)
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Total Combined Savings */}
+                    {totalSavings > 0 && (
+                      <div
+                        style={{
+                          background: "rgba(200, 255, 0, 0.08)",
+                          border: "1px dashed rgba(200, 255, 0, 0.3)",
+                          borderRadius: 6,
+                          padding: "6px 12px",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          fontSize: 12.5,
+                          color: "var(--admin-accent)",
+                          fontWeight: 600,
+                        }}
+                      >
+                        <span>Total Discounts Combined (Deal + Order):</span>
+                        <span>- {fmtPrice(totalSavings)} ({totalSavingsPct}% total savings)</span>
                       </div>
                     )}
+
+                    {/* Shipping Fee */}
                     <div style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span style={{ color: "var(--admin-text-soft)" }}>Shipping Fee:</span>
-                      <span>{fmtPrice(liveShipping)}</span>
+                      <span style={{ color: "var(--admin-text-soft)" }}>Shipping / Delivery Fee:</span>
+                      <span>{liveShipping === 0 ? <strong style={{ color: "#10b981" }}>FREE SHIPPING</strong> : fmtPrice(liveShipping)}</span>
                     </div>
+
+                    {/* Final TOTAL BILL (Payable by Customer) Callout */}
                     <div
                       style={{
                         display: "flex",
                         justifyContent: "space-between",
-                        borderTop: "1px solid var(--admin-border)",
-                        paddingTop: 8,
-                        marginTop: 4,
-                        fontSize: 15,
-                        fontWeight: 700,
-                        color: "var(--admin-accent)",
+                        alignItems: "center",
+                        background: "rgba(200, 255, 0, 0.1)",
+                        border: "1px solid var(--admin-accent)",
+                        borderRadius: 6,
+                        padding: "12px 16px",
+                        marginTop: 6,
                       }}
                     >
-                      <span>New Order Total:</span>
-                      <span>{fmtPrice(liveTotal)}</span>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--admin-accent)" }}>
+                          TOTAL BILL (PAYABLE):
+                        </div>
+                        <div style={{ fontSize: 11.5, color: "var(--admin-text-soft)", marginTop: 2 }}>
+                          {editOrderForm.payment === "cod" ? "Payable in cash to courier rider upon delivery" : `Payment via ${editOrderForm.payment.toUpperCase()}`}
+                          {" · "}{editOrderForm.items.reduce((s, it) => s + (it.quantity || 1), 0)} items
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 20, fontWeight: 800, color: "var(--admin-accent)" }}>
+                        {fmtPrice(liveTotalBill)}
+                      </div>
                     </div>
                   </div>
                 </div>

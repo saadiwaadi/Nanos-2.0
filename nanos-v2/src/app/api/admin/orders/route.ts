@@ -21,7 +21,7 @@ export async function GET(request: Request) {
         items: {
           include: {
             product: {
-              select: { id: true, name: true, hero: true, price: true },
+              select: { id: true, name: true, hero: true, price: true, sizes: true, category: true },
             },
           },
         },
@@ -68,28 +68,41 @@ export async function GET(request: Request) {
         version: o.version,
         isTest: o.isTest,
         user: o.user,
-        orderItems: o.items.map((i) => ({
-          id: i.id,
-          productId: i.productId,
-          name: i.name,
-          quantity: i.quantity,
-          price: i.unitPrice,
-          size: i.size,
-          color: i.color,
-          product: i.product
-            ? {
-                id: i.product.id,
-                name: i.product.name,
-                hero: i.product.hero,
-                price: (i.product as any).price,
-              }
-            : {
-                id: i.productId,
-                name: i.name || "Nanos Product",
-                hero: "",
-                price: i.unitPrice,
-              },
-        })),
+        orderItems: o.items.map((i) => {
+          let parsedSizes: string[] = [];
+          if (i.product?.sizes) {
+            try {
+              parsedSizes = typeof i.product.sizes === "string" ? JSON.parse(i.product.sizes) : i.product.sizes;
+            } catch {
+              parsedSizes = [];
+            }
+          }
+          return {
+            id: i.id,
+            productId: i.productId,
+            name: i.name,
+            quantity: i.quantity,
+            price: i.unitPrice,
+            size: i.size,
+            color: i.color,
+            product: i.product
+              ? {
+                  id: i.product.id,
+                  name: i.product.name,
+                  hero: i.product.hero,
+                  price: (i.product as any).price,
+                  sizes: parsedSizes,
+                  category: (i.product as any).category,
+                }
+              : {
+                  id: i.productId,
+                  name: i.name || "Nanos Product",
+                  hero: "",
+                  price: i.unitPrice,
+                  sizes: [],
+                },
+          };
+        }),
         auditLogs: (o as any).auditLogs || [],
       };
     });

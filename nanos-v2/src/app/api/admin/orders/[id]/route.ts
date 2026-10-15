@@ -152,18 +152,38 @@ export async function PATCH(
           }
 
           const qty = Math.max(1, parseInt(item.qty, 10) || 1);
-          // Preserve original unit price if unchanged item
-          const existingItem = order.items.find(
-            (i) => i.productId === item.productId && i.color === item.color && i.size === item.size
-          );
-          const unitPrice = existingItem ? existingItem.unitPrice : prod.price;
+          // Preserve original unit price (including multi-pair deal bundle rates) if size or qty is changed
+          const existingItemById = item.id ? order.items.find((i) => i.id === item.id) : null;
+          const existingItemByAttrs =
+            order.items.find(
+              (i) => i.productId === item.productId && i.color === item.color && i.size === item.size
+            ) ||
+            order.items.find(
+              (i) => i.productId === item.productId && i.color === item.color
+            ) ||
+            order.items.find((i) => i.productId === item.productId);
+          const existingItem = existingItemById || existingItemByAttrs;
+
+          let unitPrice = prod.price;
+          if (typeof item.unitPrice === "number" && item.unitPrice > 0) {
+            unitPrice = item.unitPrice;
+          } else if (typeof item.price === "number" && item.price > 0) {
+            unitPrice = item.price;
+          } else if (existingItem && typeof existingItem.unitPrice === "number" && existingItem.unitPrice > 0) {
+            unitPrice = existingItem.unitPrice;
+          }
+
+          const itemName =
+            item.name && typeof item.name === "string" && item.name.trim()
+              ? item.name.trim()
+              : existingItem?.name || prod.name;
 
           calculatedSubtotal += unitPrice * qty;
 
           resolvedLines.push({
             productId: prod.id,
             sku: prod.sku,
-            name: prod.name,
+            name: itemName,
             color: item.color,
             size: item.size,
             quantity: qty,
