@@ -887,15 +887,30 @@ export function PdpActions({
                   background: "#F5F3EF",
                   border: "1px solid #D9D6CF",
                   borderRadius: 6,
-                  padding: "5px 12px",
+                  padding: "6px 12px",
                   cursor: "pointer",
                   display: "inline-flex",
                   alignItems: "center",
                   gap: 6,
+                  transition: "background 0.15s ease",
                 }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "#EBE8E1")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "#F5F3EF")}
               >
                 <span>Choose / Change Pairs</span>
-                <span>✏️</span>
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{ opacity: 0.8 }}
+                >
+                  <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                </svg>
               </button>
             </div>
 
@@ -961,14 +976,66 @@ export function PdpActions({
                       >
                         {pair.name}
                       </div>
-                      <div style={{ fontSize: 11.5, color: "#666" }}>
-                        {pair.color} · {pair.size ? `Size: ${pair.size}` : "⚠️ Size not selected (Click to choose)"}
+                      <div style={{ fontSize: 11.5, color: "#666", marginTop: 2 }}>
+                        {pair.color} ·{" "}
+                        {pair.size ? (
+                          <span style={{ fontWeight: 600, color: "#111" }}>Size: {pair.size}</span>
+                        ) : (
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 4,
+                              color: "#B45309",
+                              fontWeight: 600,
+                            }}
+                          >
+                            <svg
+                              width="12"
+                              height="12"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              style={{ flexShrink: 0 }}
+                            >
+                              <circle cx="12" cy="12" r="10" />
+                              <line x1="12" y1="8" x2="12" y2="12" />
+                              <line x1="12" y1="16" x2="12.01" y2="16" />
+                            </svg>
+                            Size not selected (Click to choose)
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  <span style={{ fontSize: 12, color: "#888", fontWeight: 600, flexShrink: 0 }}>
-                    Change →
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color: "#666",
+                      fontWeight: 700,
+                      flexShrink: 0,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    Change
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
                   </span>
                 </div>
               ))}
