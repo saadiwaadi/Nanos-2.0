@@ -6,7 +6,7 @@ export const TIKTOK_PIXEL_ID_PK =
   "DB57MQRC77U074LG2QGG";
 
 export const TIKTOK_PIXEL_ID_USA =
-  process.env.NEXT_PUBLIC_TIKTOK_PIXEL_ID_USA || "";
+  process.env.NEXT_PUBLIC_TIKTOK_PIXEL_ID_USA || "DB8HK0BC77UB6E0EAN70";
 
 // Backwards-compatible alias (defaults to PK pixel)
 export const TIKTOK_PIXEL_ID = TIKTOK_PIXEL_ID_PK;

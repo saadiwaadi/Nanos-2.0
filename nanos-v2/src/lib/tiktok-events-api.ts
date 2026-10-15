@@ -108,7 +108,9 @@ export class TikTokEventsApiService {
     let accessToken = "";
 
     if (resolvedMarket === "USA") {
-      pixelId = (process.env.NEXT_PUBLIC_TIKTOK_PIXEL_ID_USA || "").trim();
+      pixelId = (
+        process.env.NEXT_PUBLIC_TIKTOK_PIXEL_ID_USA || "DB8HK0BC77UB6E0EAN70"
+      ).trim();
       accessToken = (process.env.TIKTOK_EVENTS_API_ACCESS_TOKEN_USA || "").trim();
     } else {
       pixelId = (

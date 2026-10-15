@@ -61,6 +61,7 @@ function TikTokPixelInner() {
 
               ${loadCalls}
               ttq.page();
+              ${TIKTOK_PIXEL_ID_USA ? `if (typeof ttq.instance === "function") { ttq.instance('${TIKTOK_PIXEL_ID_USA}').page(); }` : ""}
             }(window, document, 'ttq');
           `,
         }}

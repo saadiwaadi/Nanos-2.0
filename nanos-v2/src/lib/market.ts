@@ -29,7 +29,9 @@ export function getClientMarket(): Market {
       urlParams.get("market") ||
       urlParams.get("country") ||
       urlParams.get("region") ||
-      urlParams.get("tt_country");
+      urlParams.get("tt_country") ||
+      urlParams.get("pixel") ||
+      urlParams.get("tt_pixel");
 
     if (queryMarket) {
       const q = queryMarket.trim().toUpperCase();
