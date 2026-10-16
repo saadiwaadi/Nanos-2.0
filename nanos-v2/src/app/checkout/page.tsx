@@ -42,8 +42,6 @@ export default function CheckoutPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const [promoInput, setPromoInput] = useState("");
-  const [promoMsg, setPromoMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
     // If order was successfully placed, don't trigger the empty cart redirect to home
@@ -559,40 +557,6 @@ export default function CheckoutPage() {
                 <span>{fmtPrice(cart.total)}</span>
               </div>
 
-              {/* Promo Row */}
-              <div className="promo-row">
-                <input
-                  type="text"
-                  placeholder="Promo code"
-                  value={promoInput}
-                  onChange={(e) => setPromoInput(e.target.value)}
-                />
-                <button
-                  type="button"
-                  className="btn btn-outline btn-sm"
-                  onClick={async () => {
-                    const res = await cart.applyPromo(promoInput);
-                    setPromoMsg({ ok: res.ok, text: res.message });
-                    if (res.ok) setPromoInput("");
-                  }}
-                >
-                  Apply
-                </button>
-              </div>
-
-              {promoMsg && (
-                <div
-                  style={{
-                    fontSize: 12.5,
-                    marginTop: -6,
-                    marginBottom: 10,
-                    fontWeight: 600,
-                    color: promoMsg.ok ? "#166534" : "#991b1b",
-                  }}
-                >
-                  {promoMsg.text}
-                </div>
-              )}
 
               {errorMsg && (
                 <div

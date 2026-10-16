@@ -33,6 +33,7 @@ export async function PATCH(
       isTest,
       payment,
       items,
+      customTotal,
     } = body || {};
 
     return await prisma.$transaction(async (tx) => {
@@ -70,7 +71,8 @@ export async function PATCH(
         address !== undefined ||
         city !== undefined ||
         shippingFee !== undefined ||
-        items !== undefined;
+        items !== undefined ||
+        customTotal !== undefined;
 
       if (isActivelyBooked && editingNonNotes) {
         throw new AppError(
@@ -127,6 +129,10 @@ export async function PATCH(
 
       // Handle Item Changes
       if (items && Array.isArray(items)) {
+        if (items.length === 0) {
+          throw new AppError("BAD_REQUEST", "Order must contain at least one product", 400);
+        }
+
         diff.items = { before: order.items, after: items };
 
         // 1. Release old stock
@@ -151,7 +157,7 @@ export async function PATCH(
             );
           }
 
-          const qty = Math.max(1, parseInt(item.qty, 10) || 1);
+          const qty = Math.max(1, parseInt(item.qty, 10) || parseInt(item.quantity, 10) || 1);
           // Preserve original unit price (including multi-pair deal bundle rates) if size or qty is changed
           const existingItemById = item.id ? order.items.find((i) => i.id === item.id) : null;
           const existingItemByAttrs =
@@ -224,7 +230,42 @@ export async function PATCH(
         newDiscount = Math.min(order.discount, newSubtotal);
       }
 
-      const newTotal = newSubtotal - newDiscount + newShipping;
+      let newTotal = newSubtotal - newDiscount + newShipping;
+
+      if (customTotal !== undefined && customTotal !== null && !isNaN(Number(customTotal))) {
+        const calculated = newSubtotal - newDiscount + newShipping;
+        newTotal = Math.max(0, Math.round(Number(customTotal)));
+        diff.total = {
+          before: order.total,
+          after: newTotal,
+          calculatedFormula: calculated,
+          manualOverride: true,
+        };
+        await tx.orderAuditLog.create({
+          data: {
+            orderId: id,
+            action: "PRICE_OVERRIDE",
+            adminUser: adminEmail,
+            note: `Total bill manually overridden to PKR ${newTotal.toLocaleString()} (calculated formula was PKR ${calculated.toLocaleString()})`,
+          },
+        });
+      } else if (customTotal === null && order.total !== newTotal) {
+        diff.total = {
+          before: order.total,
+          after: newTotal,
+          revertedToCalculated: true,
+        };
+        await tx.orderAuditLog.create({
+          data: {
+            orderId: id,
+            action: "PRICE_REVERT",
+            adminUser: adminEmail,
+            note: `Total bill reverted to system calculated formula: PKR ${newTotal.toLocaleString()}`,
+          },
+        });
+      } else if (order.total !== newTotal) {
+        diff.total = { before: order.total, after: newTotal };
+      }
 
       // Handle City Change
       let newCourierBookingStatus = order.courierBookingStatus;

@@ -299,6 +299,14 @@ function IconTrash({ size = 13, className = "", style }: IconProps) {
   );
 }
 
+function IconSwap({ size = 13, className = "", style }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} style={{ display: "inline-block", verticalAlign: "middle", ...style }}>
+      <path d="M7 16V4M7 4L3 8M7 4L11 8M17 8V20M17 20L21 16M17 20L13 16" />
+    </svg>
+  );
+}
+
 
 function getAuthToken(): string {
   if (typeof window === "undefined") return "";
@@ -597,6 +605,7 @@ export default function AdminPage() {
       originalPrice?: number;
       hero?: string;
       availableSizes?: string[];
+      availableColors?: string[];
     }>;
   }>({
     customerName: "",
@@ -612,6 +621,25 @@ export default function AdminPage() {
   });
   const [savingEditOrder, setSavingEditOrder] = useState(false);
   const [editOrderError, setEditOrderError] = useState<string | null>(null);
+
+  // Final Price Override State
+  const [customFinalPrice, setCustomFinalPrice] = useState<number | null>(null);
+  const [isEditingFinalPrice, setIsEditingFinalPrice] = useState(false);
+  const [tempFinalPriceInput, setTempFinalPriceInput] = useState<string>("");
+
+  // Edit Order Item Add / Swap State
+  const [isAddingItemToEditOrder, setIsAddingItemToEditOrder] = useState(false);
+  const [editOrderAddProdId, setEditOrderAddProdId] = useState<string>("");
+  const [editOrderAddColor, setEditOrderAddColor] = useState<string>("Standard");
+  const [editOrderAddSize, setEditOrderAddSize] = useState<string>("Standard");
+  const [editOrderAddQty, setEditOrderAddQty] = useState<number>(1);
+  const [editOrderAddPrice, setEditOrderAddPrice] = useState<string>("");
+
+  const [swappingItemIndex, setSwappingItemIndex] = useState<number | null>(null);
+  const [swapProdId, setSwapProdId] = useState<string>("");
+  const [swapColor, setSwapColor] = useState<string>("Standard");
+  const [swapSize, setSwapSize] = useState<string>("Standard");
+  const [swapPrice, setSwapPrice] = useState<string>("");
 
   // Quick New Order Modal State
   const [showNewOrderModal, setShowNewOrderModal] = useState(false);
@@ -910,6 +938,18 @@ export default function AdminPage() {
     const sInfo = parseShippingInfo(o.shippingInfo);
     setEditingOrder(o);
     setEditOrderError(null);
+    setIsAddingItemToEditOrder(false);
+    setSwappingItemIndex(null);
+
+    // Initialize price override state
+    const calculatedTotal = (o.subtotal || 0) - (o.discount || 0) + (o.shipping || 0);
+    if (typeof o.total === "number" && o.total !== calculatedTotal) {
+      setCustomFinalPrice(o.total);
+    } else {
+      setCustomFinalPrice(null);
+    }
+    setIsEditingFinalPrice(false);
+    setTempFinalPriceInput("");
     setEditOrderForm({
       customerName: o.customerName || sInfo.name || "",
       phone: sInfo.phone || "",
@@ -934,20 +974,168 @@ export default function AdminPage() {
         } else if (prod?.sizes && Array.isArray(prod.sizes) && prod.sizes.length > 0) {
           availableSizes = prod.sizes;
         }
+        let availableColors: string[] = [];
+        if (prod) {
+          availableColors = getProductColors(prod);
+        } else if (item.color) {
+          availableColors = [item.color];
+        }
         return {
           id: item.id,
           productId: item.productId,
           name: item.name || item.product?.name || prod?.name || item.productId,
-          color: item.color || "",
-          size: item.size || "",
+          color: item.color || "Standard",
+          size: item.size || "Standard",
           quantity: item.quantity || 1,
           price: item.price || 0,
           originalPrice,
           hero: item.product?.hero || prod?.hero || "",
           availableSizes,
+          availableColors,
         };
       }),
     });
+  };
+
+  const handleOpenAddItemToEditOrder = () => {
+    const firstProd = products[0];
+    if (firstProd) {
+      setEditOrderAddProdId(firstProd.id);
+      const colors = getProductColors(firstProd);
+      const sizes = getProductSizes(firstProd);
+      setEditOrderAddColor(colors[0] || "Standard");
+      setEditOrderAddSize(sizes[0] || "Standard");
+      setEditOrderAddQty(1);
+      setEditOrderAddPrice(String(firstProd.price || ""));
+    }
+    setIsAddingItemToEditOrder(true);
+  };
+
+  const handleSelectAddProductInEditOrder = (prodId: string) => {
+    setEditOrderAddProdId(prodId);
+    const prod = products.find((p) => p.id === prodId);
+    if (prod) {
+      const colors = getProductColors(prod);
+      const sizes = getProductSizes(prod);
+      setEditOrderAddColor(colors[0] || "Standard");
+      setEditOrderAddSize(sizes[0] || "Standard");
+      setEditOrderAddPrice(String(prod.price || ""));
+    }
+  };
+
+  const handleConfirmAddItemToEditOrder = () => {
+    const prod = products.find((p) => p.id === editOrderAddProdId);
+    if (!prod) {
+      setEditOrderError("Please select a product to add.");
+      return;
+    }
+    const unitPrice =
+      editOrderAddPrice !== "" && !isNaN(Number(editOrderAddPrice))
+        ? Math.max(0, Number(editOrderAddPrice))
+        : prod.price || 0;
+    const qty = Math.max(1, editOrderAddQty || 1);
+    const color = editOrderAddColor || "Standard";
+    const size = editOrderAddSize || "Standard";
+
+    const newItem = {
+      id: `add_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      productId: prod.id,
+      name: prod.name,
+      color,
+      size,
+      quantity: qty,
+      price: unitPrice,
+      originalPrice: prod.price,
+      hero: prod.hero,
+      availableSizes: getProductSizes(prod),
+      availableColors: getProductColors(prod),
+    };
+
+    setEditOrderForm((prev) => ({
+      ...prev,
+      items: [...prev.items, newItem],
+    }));
+    setIsAddingItemToEditOrder(false);
+  };
+
+  const handleRemoveItemFromEditOrder = (index: number) => {
+    if (editOrderForm.items.length <= 1) {
+      setEditOrderError("Order must contain at least one item. To cancel the whole order, please use 'Cancel Order'.");
+      return;
+    }
+    setEditOrderError(null);
+    setEditOrderForm((prev) => ({
+      ...prev,
+      items: prev.items.filter((_, idx) => idx !== index),
+    }));
+    if (swappingItemIndex === index) {
+      setSwappingItemIndex(null);
+    }
+  };
+
+  const handleStartSwapItem = (index: number) => {
+    const it = editOrderForm.items[index];
+    if (!it) return;
+    const otherProd = products.find((p) => p.id !== it.productId) || products[0];
+    const targetProd = otherProd || products.find((p) => p.id === it.productId);
+    if (targetProd) {
+      setSwapProdId(targetProd.id);
+      const colors = getProductColors(targetProd);
+      const sizes = getProductSizes(targetProd);
+      setSwapColor(colors[0] || "Standard");
+      setSwapSize(sizes[0] || "Standard");
+      setSwapPrice(String(targetProd.price || it.price || ""));
+    }
+    setSwappingItemIndex(index);
+  };
+
+  const handleSelectSwapProduct = (prodId: string) => {
+    setSwapProdId(prodId);
+    const prod = products.find((p) => p.id === prodId);
+    if (prod) {
+      const colors = getProductColors(prod);
+      const sizes = getProductSizes(prod);
+      setSwapColor(colors[0] || "Standard");
+      setSwapSize(sizes[0] || "Standard");
+      setSwapPrice(String(prod.price || ""));
+    }
+  };
+
+  const handleConfirmSwapItem = (index: number) => {
+    const prod = products.find((p) => p.id === swapProdId);
+    if (!prod) return;
+    const newPrice =
+      swapPrice !== "" && !isNaN(Number(swapPrice))
+        ? Math.max(0, Number(swapPrice))
+        : prod.price || 0;
+
+    const updated = [...editOrderForm.items];
+    updated[index] = {
+      ...updated[index],
+      productId: prod.id,
+      name: prod.name,
+      hero: prod.hero,
+      color: swapColor || "Standard",
+      size: swapSize || "Standard",
+      price: newPrice,
+      originalPrice: prod.price,
+      availableSizes: getProductSizes(prod),
+      availableColors: getProductColors(prod),
+    };
+    setEditOrderForm((prev) => ({ ...prev, items: updated }));
+    setSwappingItemIndex(null);
+  };
+
+  const handleChangeItemSize = (index: number, newSize: string) => {
+    const updated = [...editOrderForm.items];
+    updated[index] = { ...updated[index], size: newSize };
+    setEditOrderForm((prev) => ({ ...prev, items: updated }));
+  };
+
+  const handleChangeItemColor = (index: number, newColor: string) => {
+    const updated = [...editOrderForm.items];
+    updated[index] = { ...updated[index], color: newColor };
+    setEditOrderForm((prev) => ({ ...prev, items: updated }));
   };
 
   const handleSaveEditOrder = async (e: React.FormEvent) => {
@@ -970,6 +1158,34 @@ export default function AdminPage() {
       setEditOrderError("City is required.");
       return;
     }
+    if (!editOrderForm.items || editOrderForm.items.length === 0) {
+      setEditOrderError("Order must contain at least one item. To cancel the entire order, please use 'Cancel Order'.");
+      return;
+    }
+
+    const currentDealSubtotal = editOrderForm.items.reduce(
+      (sum, it) => sum + it.price * (it.quantity || 1),
+      0
+    );
+    const currentOrderDiscount = Math.min(editingOrder.discount || 0, currentDealSubtotal);
+    const currentShipping = Number(editOrderForm.shippingFee) || 0;
+    const currentCalculatedTotal = Math.max(0, currentDealSubtotal - currentOrderDiscount + currentShipping);
+
+    // Guard against accidental changes: If manual price override is active and differs from formula, confirm explicitly
+    if (customFinalPrice !== null && customFinalPrice !== currentCalculatedTotal) {
+      const diffAmount = customFinalPrice - currentCalculatedTotal;
+      const confirmed = window.confirm(
+        `⚠️ WARNING: MANUAL PRICE OVERRIDE ACTIVE\n\n` +
+        `• Auto-Calculated Formula Total: ${fmtPrice(currentCalculatedTotal)}\n` +
+        `• Overridden Final Total: ${fmtPrice(customFinalPrice)}\n` +
+        `• Difference: ${diffAmount > 0 ? "+" : ""}${fmtPrice(diffAmount)}\n\n` +
+        `The courier rider will collect ${fmtPrice(customFinalPrice)} COD upon delivery.\n\n` +
+        `Are you sure you want to save this order with the price override?`
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
 
     setSavingEditOrder(true);
     setEditOrderError(null);
@@ -986,6 +1202,7 @@ export default function AdminPage() {
         adminNote: editOrderForm.adminNote,
         shippingFee: Number(editOrderForm.shippingFee) || 0,
         payment: editOrderForm.payment,
+        customTotal: customFinalPrice !== null ? customFinalPrice : null,
         items: editOrderForm.items.map((it) => ({
           id: it.id,
           productId: it.productId,
@@ -1010,6 +1227,9 @@ export default function AdminPage() {
 
       showToast("Order updated successfully!", "success");
       setEditingOrder(null);
+      setCustomFinalPrice(null);
+      setIsEditingFinalPrice(false);
+      setTempFinalPriceInput("");
       await loadMainData(true);
     } catch (err: any) {
       setEditOrderError(err.message || "Failed to update order");
@@ -7160,7 +7380,9 @@ export default function AdminPage() {
           liveDealSubtotal > 0 ? Math.round((liveOrderDiscount / liveDealSubtotal) * 100) : 0;
 
         const liveShipping = Number(editOrderForm.shippingFee) || 0;
-        const liveTotalBill = Math.max(0, liveDealSubtotal - liveOrderDiscount + liveShipping);
+        const liveCalculatedTotal = Math.max(0, liveDealSubtotal - liveOrderDiscount + liveShipping);
+        const isCustomTotalActive = customFinalPrice !== null && !isNaN(customFinalPrice);
+        const liveTotalBill = isCustomTotalActive ? customFinalPrice : liveCalculatedTotal;
 
         const totalSavings = liveDealDiscount + liveOrderDiscount;
         const totalSavingsPct =
@@ -7178,6 +7400,14 @@ export default function AdminPage() {
           const prod = products.find((p) => p.id === item.productId);
           const isTrouser = prod?.category === "trousers";
           const defaultFootwearSizes = [
+            "PK 5",
+            "PK 6",
+            "PK 7",
+            "PK 8",
+            "PK 9",
+            "PK 10",
+            "PK 11",
+            "PK 12",
             "UK 6",
             "UK 7",
             "UK 8",
@@ -7189,12 +7419,6 @@ export default function AdminPage() {
             "9/43",
             "10/44",
             "11/45",
-            "PK 6",
-            "PK 7",
-            "PK 8",
-            "PK 9",
-            "PK 10",
-            "PK 11",
           ];
           const defaultTrouserSizes = [
             "28",
@@ -7203,24 +7427,43 @@ export default function AdminPage() {
             "34",
             "36",
             "38",
+            "40",
             "S",
             "M",
             "L",
             "XL",
             "XXL",
           ];
+          const prodSizes = prod ? getProductSizes(prod) : [];
           const baseList =
-            item.availableSizes && item.availableSizes.length > 0
+            prodSizes.length > 0
+              ? prodSizes
+              : item.availableSizes && item.availableSizes.length > 0
               ? item.availableSizes
               : isTrouser
               ? defaultTrouserSizes
               : defaultFootwearSizes;
-          const set = new Set(baseList);
+          const set = new Set([...baseList, ...(isTrouser ? defaultTrouserSizes : defaultFootwearSizes)]);
           if (item.size && item.size.trim()) {
             set.add(item.size.trim());
           }
           return Array.from(set);
         };
+
+        const getItemColorOptions = (item: {
+          color: string;
+          productId: string;
+          availableColors?: string[];
+        }) => {
+          const prod = products.find((p) => p.id === item.productId);
+          const baseColors = prod ? getProductColors(prod) : item.availableColors || ["Standard"];
+          const set = new Set(baseColors);
+          if (item.color && item.color.trim()) {
+            set.add(item.color.trim());
+          }
+          return Array.from(set);
+        };
+
 
         return (
           <div
@@ -7228,6 +7471,8 @@ export default function AdminPage() {
             onClick={() => {
               if (!savingEditOrder) {
                 setEditingOrder(null);
+                setCustomFinalPrice(null);
+                setIsEditingFinalPrice(false);
               }
             }}
           >
@@ -7261,7 +7506,11 @@ export default function AdminPage() {
                   type="button"
                   className="modal-close"
                   disabled={savingEditOrder}
-                  onClick={() => setEditingOrder(null)}
+                  onClick={() => {
+                    setEditingOrder(null);
+                    setCustomFinalPrice(null);
+                    setIsEditingFinalPrice(false);
+                  }}
                   aria-label="Close edit order modal"
                 >
                   ✕
@@ -7523,165 +7772,513 @@ export default function AdminPage() {
                   <div>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 6 }}>
                       <div style={{ fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", color: "var(--admin-accent)" }}>
-                        4. Order Items &amp; Sizes
+                        4. Order Items &amp; Sizes ({editOrderForm.items.length} {editOrderForm.items.length === 1 ? "product" : "products"})
                       </div>
                       <span style={{ fontSize: 11.5, color: "var(--admin-text-soft)" }}>
-                        Change sizes directly here · Deal &amp; bundle pricing is preserved
+                        Change sizes &amp; colors · Swap or cancel items · Add new products of any size
                       </span>
                     </div>
 
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                       {editOrderForm.items.map((item, index) => {
                         const sizeOptions = getItemSizeOptions(item);
+                        const colorOptions = getItemColorOptions(item);
                         const isDiscountedUnit =
                           typeof item.originalPrice === "number" && item.originalPrice > item.price;
+                        const isSwapping = swappingItemIndex === index;
 
                         return (
                           <div
                             key={item.id || index}
                             style={{
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              background: "var(--admin-surface)",
-                              border: "1px solid var(--admin-border)",
+                              background: isSwapping ? "rgba(200, 255, 0, 0.04)" : "var(--admin-surface)",
+                              border: isSwapping ? "1px solid var(--admin-accent)" : "1px solid var(--admin-border)",
                               borderRadius: 8,
-                              padding: "10px 14px",
-                              gap: 12,
-                              flexWrap: "wrap",
+                              padding: "12px 14px",
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: 10,
+                              transition: "all 0.15s ease",
                             }}
                           >
-                            <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 260 }}>
-                              {item.hero && (
-                                /* eslint-disable-next-line @next/next/no-img-element */
-                                <img
-                                  src={item.hero}
-                                  alt=""
-                                  width={42}
-                                  height={42}
-                                  style={{ objectFit: "cover", borderRadius: 6, border: "1px solid var(--admin-border)" }}
-                                />
-                              )}
-                              <div style={{ minWidth: 0, flex: 1 }}>
-                                <strong style={{ fontSize: 13.5, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                  {item.name}
-                                </strong>
+                            {/* Main Item Row */}
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                gap: 12,
+                                flexWrap: "wrap",
+                              }}
+                            >
+                              <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 260 }}>
+                                {item.hero && (
+                                  /* eslint-disable-next-line @next/next/no-img-element */
+                                  <img
+                                    src={item.hero}
+                                    alt=""
+                                    width={44}
+                                    height={44}
+                                    style={{ objectFit: "cover", borderRadius: 6, border: "1px solid var(--admin-border)", flexShrink: 0 }}
+                                  />
+                                )}
+                                <div style={{ minWidth: 0, flex: 1 }}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                                    <strong style={{ fontSize: 13.5, color: "var(--admin-text)", wordBreak: "break-word" }}>
+                                      {item.name}
+                                    </strong>
+                                    {isDiscountedUnit ? (
+                                      <span
+                                        style={{
+                                          fontSize: 10.5,
+                                          fontWeight: 700,
+                                          padding: "1px 6px",
+                                          borderRadius: 4,
+                                          background: "rgba(56, 189, 248, 0.15)",
+                                          color: "#38bdf8",
+                                          border: "1px solid rgba(56, 189, 248, 0.3)",
+                                        }}
+                                      >
+                                        Deal: {fmtPrice(item.price)} (Retail {fmtPrice(item.originalPrice!)})
+                                      </span>
+                                    ) : (
+                                      <span style={{ fontSize: 11.5, color: "var(--admin-text-soft)" }}>
+                                        {fmtPrice(item.price)} each
+                                      </span>
+                                    )}
+                                  </div>
 
-                                <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4, flexWrap: "wrap" }}>
-                                  <span style={{ fontSize: 12, color: "var(--admin-text-soft)" }}>
-                                    Color: <strong>{item.color || "Standard"}</strong>
-                                  </span>
+                                  {/* Selectors for Size & Color */}
+                                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 6, flexWrap: "wrap" }}>
+                                    {/* Direct Interactive Size Selector */}
+                                    <div style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                                      <label
+                                        htmlFor={`edit-order-item-size-${index}`}
+                                        style={{ fontSize: 12, fontWeight: 700, color: "var(--admin-accent)" }}
+                                      >
+                                        Size:
+                                      </label>
+                                      <select
+                                        id={`edit-order-item-size-${index}`}
+                                        value={item.size}
+                                        disabled={savingEditOrder || isBooked}
+                                        onChange={(e) => handleChangeItemSize(index, e.target.value)}
+                                        style={{
+                                          background: "var(--admin-surface-2)",
+                                          color: "var(--admin-text)",
+                                          border: "1px solid var(--admin-accent)",
+                                          borderRadius: 4,
+                                          padding: "3px 8px",
+                                          fontSize: 12.5,
+                                          fontWeight: 700,
+                                          cursor: isBooked ? "not-allowed" : "pointer",
+                                          outline: "none",
+                                        }}
+                                        title="Change size of this footwear / product"
+                                      >
+                                        {sizeOptions.map((s) => (
+                                          <option key={s} value={s}>
+                                            {s}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
 
-                                  {/* Direct Interactive Size Selector */}
-                                  <div style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                                    <label
-                                      htmlFor={`edit-order-item-size-${index}`}
-                                      style={{ fontSize: 12, fontWeight: 700, color: "var(--admin-accent)" }}
-                                    >
-                                      Size:
-                                    </label>
-                                    <select
-                                      id={`edit-order-item-size-${index}`}
-                                      value={item.size}
-                                      disabled={savingEditOrder || isBooked}
-                                      onChange={(e) => {
-                                        const newSize = e.target.value;
+                                    {/* Direct Interactive Color Selector */}
+                                    <div style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                                      <label
+                                        htmlFor={`edit-order-item-color-${index}`}
+                                        style={{ fontSize: 12, fontWeight: 700, color: "var(--admin-text-soft)" }}
+                                      >
+                                        Color:
+                                      </label>
+                                      <select
+                                        id={`edit-order-item-color-${index}`}
+                                        value={item.color || "Standard"}
+                                        disabled={savingEditOrder || isBooked}
+                                        onChange={(e) => handleChangeItemColor(index, e.target.value)}
+                                        style={{
+                                          background: "var(--admin-surface-2)",
+                                          color: "var(--admin-text)",
+                                          border: "1px solid var(--admin-border)",
+                                          borderRadius: 4,
+                                          padding: "3px 8px",
+                                          fontSize: 12,
+                                          fontWeight: 600,
+                                          cursor: isBooked ? "not-allowed" : "pointer",
+                                          outline: "none",
+                                        }}
+                                        title="Change color of this footwear / product"
+                                      >
+                                        {colorOptions.map((c) => (
+                                          <option key={c} value={c}>
+                                            {c}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Quantity control, Item Subtotal & Action Buttons */}
+                              <div style={{ display: "flex", alignItems: "center", gap: 10, marginLeft: "auto", flexWrap: "wrap" }}>
+                                {/* Quantity stepper */}
+                                <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                                  {!isBooked && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-outline btn-sm"
+                                      style={{ width: 26, height: 26, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13 }}
+                                      disabled={savingEditOrder || item.quantity <= 1}
+                                      onClick={() => {
                                         const updated = [...editOrderForm.items];
-                                        updated[index] = { ...updated[index], size: newSize };
+                                        updated[index] = { ...updated[index], quantity: Math.max(1, item.quantity - 1) };
                                         setEditOrderForm({ ...editOrderForm, items: updated });
                                       }}
-                                      style={{
-                                        background: "var(--admin-surface-2)",
-                                        color: "var(--admin-text)",
-                                        border: "1px solid var(--admin-accent)",
-                                        borderRadius: 4,
-                                        padding: "3px 8px",
-                                        fontSize: 12.5,
-                                        fontWeight: 700,
-                                        cursor: isBooked ? "not-allowed" : "pointer",
-                                        outline: "none",
-                                      }}
-                                      title="Change size directly for this item"
+                                      title="Decrease quantity"
                                     >
-                                      {sizeOptions.map((s) => (
-                                        <option key={s} value={s}>
-                                          {s}
+                                      -
+                                    </button>
+                                  )}
+
+                                  <span style={{ fontWeight: 700, minWidth: 22, textAlign: "center", fontSize: 13 }}>
+                                    {item.quantity}
+                                  </span>
+
+                                  {!isBooked && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-outline btn-sm"
+                                      style={{ width: 26, height: 26, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13 }}
+                                      disabled={savingEditOrder}
+                                      onClick={() => {
+                                        const updated = [...editOrderForm.items];
+                                        updated[index] = { ...updated[index], quantity: item.quantity + 1 };
+                                        setEditOrderForm({ ...editOrderForm, items: updated });
+                                      }}
+                                      title="Increase quantity"
+                                    >
+                                      +
+                                    </button>
+                                  )}
+                                </div>
+
+                                <div style={{ minWidth: 80, textAlign: "right", fontWeight: 700, fontSize: 13.5, color: "var(--admin-text)" }}>
+                                  {fmtPrice(item.quantity * item.price)}
+                                </div>
+
+                                {/* Swap Button */}
+                                {!isBooked && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-outline btn-sm"
+                                    style={{
+                                      fontSize: 11.5,
+                                      padding: "4px 8px",
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: 4,
+                                      color: isSwapping ? "var(--admin-accent)" : "var(--admin-text-soft)",
+                                      borderColor: isSwapping ? "var(--admin-accent)" : "var(--admin-border)",
+                                      background: isSwapping ? "rgba(200, 255, 0, 0.1)" : "transparent",
+                                    }}
+                                    onClick={() => {
+                                      if (isSwapping) {
+                                        setSwappingItemIndex(null);
+                                      } else {
+                                        handleStartSwapItem(index);
+                                      }
+                                    }}
+                                    title="Swap this product with another footwear/item"
+                                  >
+                                    <IconSwap size={13} />
+                                    <span>{isSwapping ? "Close Swap" : "Swap Product"}</span>
+                                  </button>
+                                )}
+
+                                {/* Cancel / Remove Product Button */}
+                                {!isBooked && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-outline btn-sm"
+                                    style={{
+                                      fontSize: 11.5,
+                                      padding: "4px 8px",
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: 4,
+                                      color: "var(--admin-danger)",
+                                      borderColor: "rgba(239, 68, 68, 0.35)",
+                                      background: "rgba(239, 68, 68, 0.08)",
+                                      opacity: editOrderForm.items.length <= 1 ? 0.45 : 1,
+                                      cursor: editOrderForm.items.length <= 1 ? "not-allowed" : "pointer",
+                                    }}
+                                    disabled={savingEditOrder || editOrderForm.items.length <= 1}
+                                    onClick={() => handleRemoveItemFromEditOrder(index)}
+                                    title={editOrderForm.items.length <= 1 ? "Cannot remove last item (use 'Cancel Order' to cancel the entire order)" : "Cancel / remove this product from the order"}
+                                  >
+                                    <IconTrash size={12} />
+                                    <span>Cancel Product</span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Inline Swap Panel for this Item */}
+                            {isSwapping && (
+                              <div
+                                style={{
+                                  background: "var(--admin-surface-2)",
+                                  border: "1px dashed var(--admin-accent)",
+                                  borderRadius: 6,
+                                  padding: "12px 14px",
+                                  marginTop: 4,
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: 10,
+                                }}
+                              >
+                                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--admin-accent)", display: "flex", alignItems: "center", gap: 6 }}>
+                                  <IconSwap size={14} />
+                                  <span>Swap Item #{index + 1} with a Different Product:</span>
+                                </div>
+
+                                <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", gap: 10, alignItems: "flex-end" }}>
+                                  <div className="field">
+                                    <label style={{ fontSize: 11, fontWeight: 600 }}>Select New Product</label>
+                                    <select
+                                      value={swapProdId}
+                                      onChange={(e) => handleSelectSwapProduct(e.target.value)}
+                                      style={{ width: "100%", padding: "6px 8px", fontSize: 12.5, borderRadius: 4, background: "var(--admin-surface)", border: "1px solid var(--admin-border)", color: "var(--admin-text)" }}
+                                    >
+                                      {products.map((p) => (
+                                        <option key={p.id} value={p.id}>
+                                          {p.name} — {fmtPrice(p.price)}
                                         </option>
                                       ))}
                                     </select>
                                   </div>
 
-                                  {/* Deal rate indication */}
-                                  {isDiscountedUnit ? (
-                                    <span
-                                      style={{
-                                        fontSize: 11,
-                                        fontWeight: 700,
-                                        padding: "1px 7px",
-                                        borderRadius: 4,
-                                        background: "rgba(56, 189, 248, 0.15)",
-                                        color: "#38bdf8",
-                                        border: "1px solid rgba(56, 189, 248, 0.3)",
-                                      }}
+                                  <div className="field">
+                                    <label style={{ fontSize: 11, fontWeight: 600 }}>New Color</label>
+                                    <select
+                                      value={swapColor}
+                                      onChange={(e) => setSwapColor(e.target.value)}
+                                      style={{ width: "100%", padding: "6px 8px", fontSize: 12.5, borderRadius: 4, background: "var(--admin-surface)", border: "1px solid var(--admin-border)", color: "var(--admin-text)" }}
                                     >
-                                      Deal Rate: {fmtPrice(item.price)} (Retail {fmtPrice(item.originalPrice!)})
-                                    </span>
-                                  ) : (
-                                    <span style={{ fontSize: 11.5, color: "var(--admin-text-soft)" }}>
-                                      {fmtPrice(item.price)} each
-                                    </span>
-                                  )}
+                                      {getProductColors(products.find((p) => p.id === swapProdId)).map((c) => (
+                                        <option key={c} value={c}>{c}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+
+                                  <div className="field">
+                                    <label style={{ fontSize: 11, fontWeight: 600 }}>New Size</label>
+                                    <select
+                                      value={swapSize}
+                                      onChange={(e) => setSwapSize(e.target.value)}
+                                      style={{ width: "100%", padding: "6px 8px", fontSize: 12.5, borderRadius: 4, background: "var(--admin-surface)", border: "1px solid var(--admin-border)", color: "var(--admin-text)" }}
+                                    >
+                                      {(() => {
+                                        const p = products.find((prod) => prod.id === swapProdId);
+                                        const defaultFootwear = ["PK 5", "PK 6", "PK 7", "PK 8", "PK 9", "PK 10", "PK 11", "PK 12", "UK 6", "UK 7", "UK 8", "UK 9", "UK 10", "UK 11", "7/41", "8/42", "9/43", "10/44", "11/45"];
+                                        const defaultTrousers = ["28", "30", "32", "34", "36", "38", "S", "M", "L", "XL", "XXL"];
+                                        const isTr = p?.category === "trousers";
+                                        const pSizes = getProductSizes(p);
+                                        const list = pSizes.length > 0 ? pSizes : isTr ? defaultTrousers : defaultFootwear;
+                                        return Array.from(new Set(list)).map((s) => (
+                                          <option key={s} value={s}>{s}</option>
+                                        ));
+                                      })()}
+                                    </select>
+                                  </div>
+
+                                  <div className="field">
+                                    <label style={{ fontSize: 11, fontWeight: 600 }}>Unit Price (PKR)</label>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      value={swapPrice}
+                                      onChange={(e) => setSwapPrice(e.target.value)}
+                                      style={{ width: "100%", padding: "6px 8px", fontSize: 12.5, borderRadius: 4, background: "var(--admin-surface)", border: "1px solid var(--admin-border)", color: "var(--admin-text)" }}
+                                    />
+                                  </div>
+                                </div>
+
+                                <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 4 }}>
+                                  <button
+                                    type="button"
+                                    className="btn btn-outline btn-sm"
+                                    onClick={() => setSwappingItemIndex(null)}
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn btn-primary btn-sm"
+                                    style={{ fontWeight: 700, padding: "4px 14px", fontSize: 12 }}
+                                    onClick={() => handleConfirmSwapItem(index)}
+                                  >
+                                    Apply Swap ✓
+                                  </button>
                                 </div>
                               </div>
-                            </div>
-
-                            {/* Quantity control & Item Subtotal */}
-                            <div style={{ display: "flex", alignItems: "center", gap: 10, marginLeft: "auto" }}>
-                              {!isBooked && (
-                                <button
-                                  type="button"
-                                  className="btn btn-outline btn-sm"
-                                  style={{ width: 28, height: 28, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}
-                                  disabled={savingEditOrder || item.quantity <= 1}
-                                  onClick={() => {
-                                     const updated = [...editOrderForm.items];
-                                     updated[index] = { ...updated[index], quantity: Math.max(1, item.quantity - 1) };
-                                     setEditOrderForm({ ...editOrderForm, items: updated });
-                                  }}
-                                  title="Decrease quantity"
-                                >
-                                  -
-                                </button>
-                              )}
-
-                              <span style={{ fontWeight: 700, minWidth: 24, textAlign: "center", fontSize: 13.5 }}>
-                                {item.quantity}
-                              </span>
-
-                              {!isBooked && (
-                                <button
-                                  type="button"
-                                  className="btn btn-outline btn-sm"
-                                  style={{ width: 28, height: 28, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}
-                                  disabled={savingEditOrder}
-                                  onClick={() => {
-                                     const updated = [...editOrderForm.items];
-                                     updated[index] = { ...updated[index], quantity: item.quantity + 1 };
-                                     setEditOrderForm({ ...editOrderForm, items: updated });
-                                  }}
-                                  title="Increase quantity"
-                                >
-                                  +
-                                </button>
-                              )}
-
-                              <div style={{ minWidth: 95, textAlign: "right", fontWeight: 700, fontSize: 13.5, color: "var(--admin-text)" }}>
-                                {fmtPrice(item.quantity * item.price)}
-                              </div>
-                            </div>
+                            )}
                           </div>
                         );
                       })}
+
+                      {/* Add Product Panel / Button */}
+                      {!isBooked && (
+                        <div>
+                          {!isAddingItemToEditOrder ? (
+                            <button
+                              type="button"
+                              className="btn btn-outline"
+                              disabled={savingEditOrder}
+                              onClick={handleOpenAddItemToEditOrder}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: 8,
+                                width: "100%",
+                                padding: "10px 14px",
+                                borderRadius: 8,
+                                border: "1px dashed var(--admin-accent)",
+                                background: "rgba(200, 255, 0, 0.05)",
+                                color: "var(--admin-accent)",
+                                fontSize: 13,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                marginTop: 4,
+                              }}
+                            >
+                              <IconPlus size={15} /> Add Another Product / Size to Order
+                            </button>
+                          ) : (
+                            <div
+                              style={{
+                                background: "var(--admin-surface)",
+                                border: "1px solid var(--admin-accent)",
+                                borderRadius: 8,
+                                padding: "14px 16px",
+                                marginTop: 4,
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 12,
+                              }}
+                            >
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--admin-accent)", display: "flex", alignItems: "center", gap: 6 }}>
+                                  <IconPlus size={15} />
+                                  <span>Add Product of Different Size / Color to Order:</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setIsAddingItemToEditOrder(false)}
+                                  style={{ background: "none", border: "none", color: "var(--admin-text-soft)", cursor: "pointer", fontSize: 14 }}
+                                >
+                                  ✕
+                                </button>
+                              </div>
+
+                              <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr", gap: 10, alignItems: "flex-end" }}>
+                                <div className="field">
+                                  <label style={{ fontSize: 11.5, fontWeight: 600 }}>Select Product</label>
+                                  <select
+                                    value={editOrderAddProdId}
+                                    onChange={(e) => handleSelectAddProductInEditOrder(e.target.value)}
+                                    style={{ width: "100%", padding: "7px 8px", fontSize: 12.5, borderRadius: 4, background: "var(--admin-surface-2)", border: "1px solid var(--admin-border)", color: "var(--admin-text)" }}
+                                  >
+                                    {products.map((p) => (
+                                      <option key={p.id} value={p.id}>
+                                        {p.name} — {fmtPrice(p.price)}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div className="field">
+                                  <label style={{ fontSize: 11.5, fontWeight: 600 }}>Select Color</label>
+                                  <select
+                                    value={editOrderAddColor}
+                                    onChange={(e) => setEditOrderAddColor(e.target.value)}
+                                    style={{ width: "100%", padding: "7px 8px", fontSize: 12.5, borderRadius: 4, background: "var(--admin-surface-2)", border: "1px solid var(--admin-border)", color: "var(--admin-text)" }}
+                                  >
+                                    {getProductColors(products.find((p) => p.id === editOrderAddProdId)).map((c) => (
+                                      <option key={c} value={c}>{c}</option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div className="field">
+                                  <label style={{ fontSize: 11.5, fontWeight: 600 }}>Select Size (Each Product)</label>
+                                  <select
+                                    value={editOrderAddSize}
+                                    onChange={(e) => setEditOrderAddSize(e.target.value)}
+                                    style={{ width: "100%", padding: "7px 8px", fontSize: 12.5, borderRadius: 4, background: "var(--admin-surface-2)", border: "1px solid var(--admin-accent)", color: "var(--admin-text)", fontWeight: 700 }}
+                                  >
+                                    {(() => {
+                                      const p = products.find((prod) => prod.id === editOrderAddProdId);
+                                      const defaultFootwear = ["PK 5", "PK 6", "PK 7", "PK 8", "PK 9", "PK 10", "PK 11", "PK 12", "UK 6", "UK 7", "UK 8", "UK 9", "UK 10", "UK 11", "7/41", "8/42", "9/43", "10/44", "11/45"];
+                                      const defaultTrousers = ["28", "30", "32", "34", "36", "38", "S", "M", "L", "XL", "XXL"];
+                                      const isTr = p?.category === "trousers";
+                                      const pSizes = getProductSizes(p);
+                                      const list = pSizes.length > 0 ? pSizes : isTr ? defaultTrousers : defaultFootwear;
+                                      return Array.from(new Set(list)).map((s) => (
+                                        <option key={s} value={s}>{s}</option>
+                                      ));
+                                    })()}
+                                  </select>
+                                </div>
+
+                                <div className="field">
+                                  <label style={{ fontSize: 11.5, fontWeight: 600 }}>Qty</label>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={editOrderAddQty}
+                                    onChange={(e) => setEditOrderAddQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                                    style={{ width: "100%", padding: "7px 8px", fontSize: 12.5, borderRadius: 4, background: "var(--admin-surface-2)", border: "1px solid var(--admin-border)", color: "var(--admin-text)" }}
+                                  />
+                                </div>
+
+                                <div className="field">
+                                  <label style={{ fontSize: 11.5, fontWeight: 600 }}>Unit Price (PKR)</label>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={editOrderAddPrice}
+                                    onChange={(e) => setEditOrderAddPrice(e.target.value)}
+                                    placeholder="Retail price"
+                                    style={{ width: "100%", padding: "7px 8px", fontSize: 12.5, borderRadius: 4, background: "var(--admin-surface-2)", border: "1px solid var(--admin-border)", color: "var(--admin-text)" }}
+                                  />
+                                </div>
+                              </div>
+
+                              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 4 }}>
+                                <button
+                                  type="button"
+                                  className="btn btn-outline btn-sm"
+                                  onClick={() => setIsAddingItemToEditOrder(false)}
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-primary btn-sm"
+                                  style={{ fontWeight: 700, padding: "6px 18px", fontSize: 12.5 }}
+                                  onClick={handleConfirmAddItemToEditOrder}
+                                >
+                                  + Add Item to Order
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -7802,28 +8399,257 @@ export default function AdminPage() {
                     {/* Final TOTAL BILL (Payable by Customer) Callout */}
                     <div
                       style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        background: "rgba(200, 255, 0, 0.1)",
-                        border: "1px solid var(--admin-accent)",
+                        background: isCustomTotalActive ? "rgba(245, 158, 11, 0.08)" : "rgba(200, 255, 0, 0.1)",
+                        border: isCustomTotalActive ? "1px solid #f59e0b" : "1px solid var(--admin-accent)",
                         borderRadius: 6,
-                        padding: "12px 16px",
+                        padding: "14px 16px",
                         marginTop: 6,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 10,
                       }}
                     >
-                      <div>
-                        <div style={{ fontSize: 14, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--admin-accent)" }}>
-                          TOTAL BILL (PAYABLE):
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          flexWrap: "wrap",
+                          gap: 12,
+                        }}
+                      >
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                            <span style={{ fontSize: 14, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.04em", color: isCustomTotalActive ? "#fbbf24" : "var(--admin-accent)" }}>
+                              TOTAL BILL (PAYABLE):
+                            </span>
+                            {isCustomTotalActive && (
+                              <span
+                                style={{
+                                  fontSize: 10.5,
+                                  fontWeight: 800,
+                                  textTransform: "uppercase",
+                                  padding: "2px 7px",
+                                  borderRadius: 4,
+                                  background: "rgba(245, 158, 11, 0.2)",
+                                  color: "#fbbf24",
+                                  border: "1px solid rgba(245, 158, 11, 0.4)",
+                                  letterSpacing: "0.03em",
+                                }}
+                              >
+                                ⚠️ Manual Price Override
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: 11.5, color: "var(--admin-text-soft)", marginTop: 2 }}>
+                            {editOrderForm.payment === "cod" ? "Payable in cash to courier rider upon delivery" : `Payment via ${editOrderForm.payment.toUpperCase()}`}
+                            {" · "}{editOrderForm.items.reduce((s, it) => s + (it.quantity || 1), 0)} items
+                          </div>
                         </div>
-                        <div style={{ fontSize: 11.5, color: "var(--admin-text-soft)", marginTop: 2 }}>
-                          {editOrderForm.payment === "cod" ? "Payable in cash to courier rider upon delivery" : `Payment via ${editOrderForm.payment.toUpperCase()}`}
-                          {" · "}{editOrderForm.items.reduce((s, it) => s + (it.quantity || 1), 0)} items
+
+                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                          <div style={{ textAlign: "right" }}>
+                            <div style={{ fontSize: 22, fontWeight: 800, color: isCustomTotalActive ? "#fbbf24" : "var(--admin-accent)" }}>
+                              {fmtPrice(liveTotalBill)}
+                            </div>
+                            {isCustomTotalActive && (
+                              <div style={{ fontSize: 11, color: "var(--admin-text-soft)", textDecoration: "line-through" }}>
+                                Calculated: {fmtPrice(liveCalculatedTotal)}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Action Buttons: Edit & Revert */}
+                          {!isBooked && (
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              {!isEditingFinalPrice && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setIsEditingFinalPrice(true);
+                                    setTempFinalPriceInput(String(liveTotalBill));
+                                  }}
+                                  title="Edit final bill payable by customer"
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 5,
+                                    fontSize: 11.5,
+                                    fontWeight: 700,
+                                    padding: "5px 10px",
+                                    borderRadius: 4,
+                                    background: "var(--admin-surface-2)",
+                                    border: "1px solid var(--admin-border)",
+                                    color: "var(--admin-text)",
+                                    cursor: "pointer",
+                                    transition: "all 0.15s ease",
+                                  }}
+                                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--admin-accent)")}
+                                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--admin-border)")}
+                                >
+                                  <IconEdit size={12} />
+                                  <span>Edit Price</span>
+                                </button>
+                              )}
+
+                              {isCustomTotalActive && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setCustomFinalPrice(null);
+                                    setIsEditingFinalPrice(false);
+                                    setTempFinalPriceInput("");
+                                    showToast("Reverted to calculated bill", "info");
+                                  }}
+                                  title="Revert back to auto-calculated formula bill"
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 5,
+                                    fontSize: 11.5,
+                                    fontWeight: 700,
+                                    padding: "5px 10px",
+                                    borderRadius: 4,
+                                    background: "rgba(239, 68, 68, 0.12)",
+                                    border: "1px solid rgba(239, 68, 68, 0.35)",
+                                    color: "#f87171",
+                                    cursor: "pointer",
+                                    transition: "all 0.15s ease",
+                                  }}
+                                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(239, 68, 68, 0.2)")}
+                                  onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(239, 68, 68, 0.12)")}
+                                >
+                                  <IconRefresh size={12} />
+                                  <span>↺ Revert</span>
+                                </button>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
-                      <div style={{ fontSize: 20, fontWeight: 800, color: "var(--admin-accent)" }}>
-                        {fmtPrice(liveTotalBill)}
-                      </div>
+
+                      {/* Inline Edit Form for Final Price */}
+                      {isEditingFinalPrice && (
+                        <div
+                          style={{
+                            background: "var(--admin-surface)",
+                            border: "1px solid var(--admin-border)",
+                            borderRadius: 6,
+                            padding: "10px 12px",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 8,
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--admin-text)" }}>
+                              Override Final Bill Amount (PKR):
+                            </span>
+                            <span style={{ fontSize: 11, color: "var(--admin-text-soft)" }}>
+                              Calculated Formula: <strong>{fmtPrice(liveCalculatedTotal)}</strong>
+                            </span>
+                          </div>
+
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                            <div style={{ position: "relative", flex: 1, minWidth: 160 }}>
+                              <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 12, fontWeight: 700, color: "var(--admin-text-soft)" }}>
+                                PKR
+                              </span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="1"
+                                autoFocus
+                                value={tempFinalPriceInput}
+                                onChange={(e) => setTempFinalPriceInput(e.target.value)}
+                                placeholder="Enter custom total amount"
+                                style={{
+                                  width: "100%",
+                                  padding: "7px 10px 7px 42px",
+                                  fontSize: 13,
+                                  fontWeight: 700,
+                                  borderRadius: 4,
+                                  background: "var(--admin-surface-2)",
+                                  border: "1px solid var(--admin-accent)",
+                                  color: "var(--admin-text)",
+                                  outline: "none",
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    const val = Number(tempFinalPriceInput);
+                                    if (!isNaN(val) && val >= 0) {
+                                      const rounded = Math.round(val);
+                                      if (rounded === liveCalculatedTotal) {
+                                        setCustomFinalPrice(null);
+                                      } else {
+                                        setCustomFinalPrice(rounded);
+                                      }
+                                      setIsEditingFinalPrice(false);
+                                    }
+                                  } else if (e.key === "Escape") {
+                                    setIsEditingFinalPrice(false);
+                                  }
+                                }}
+                              />
+                            </div>
+
+                            <button
+                              type="button"
+                              className="btn btn-primary btn-sm"
+                              style={{ fontWeight: 700, padding: "7px 14px", fontSize: 12 }}
+                              onClick={() => {
+                                const val = Number(tempFinalPriceInput);
+                                if (!isNaN(val) && val >= 0) {
+                                  const rounded = Math.round(val);
+                                  if (rounded === liveCalculatedTotal) {
+                                    setCustomFinalPrice(null);
+                                  } else {
+                                    setCustomFinalPrice(rounded);
+                                  }
+                                  setIsEditingFinalPrice(false);
+                                }
+                              }}
+                            >
+                              Apply Override
+                            </button>
+
+                            <button
+                              type="button"
+                              className="btn btn-outline btn-sm"
+                              style={{ fontSize: 12 }}
+                              onClick={() => {
+                                setIsEditingFinalPrice(false);
+                                setTempFinalPriceInput("");
+                              }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Prominent Warning Callout when Override is Active */}
+                      {isCustomTotalActive && (
+                        <div
+                          style={{
+                            background: "rgba(245, 158, 11, 0.12)",
+                            border: "1px solid rgba(245, 158, 11, 0.35)",
+                            borderRadius: 5,
+                            padding: "8px 12px",
+                            fontSize: 12,
+                            color: "#fbbf24",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                          }}
+                        >
+                          <IconAlert size={15} style={{ flexShrink: 0 }} />
+                          <div>
+                            <strong>Warning:</strong> You are overriding the calculated bill ({fmtPrice(liveCalculatedTotal)}) with <strong>{fmtPrice(customFinalPrice)}</strong>. The courier rider will collect exactly {fmtPrice(customFinalPrice)} upon delivery.
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -7835,28 +8661,48 @@ export default function AdminPage() {
                     borderTop: "1px solid var(--admin-border)",
                     padding: "14px 20px",
                     display: "flex",
-                    justifyContent: "flex-end",
+                    justifyContent: "space-between",
+                    alignItems: "center",
                     gap: 10,
                     background: "var(--admin-surface-2)",
+                    flexWrap: "wrap",
                   }}
                 >
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-sm"
-                    disabled={savingEditOrder}
-                    onClick={() => setEditingOrder(null)}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="btn btn-primary btn-sm"
-                    disabled={savingEditOrder}
-                    style={{ fontWeight: 700, padding: "6px 18px", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 6 }}
-                  >
-                    {isCancelled ? <IconRefresh size={14} /> : <IconSave size={14} />}
-                    {savingEditOrder ? (isCancelled ? "Saving & Resending…" : "Saving Changes…") : (isCancelled ? "Save & Resend Order" : "Save Changes")}
-                  </button>
+                  <div style={{ flex: 1, minWidth: 200 }}>
+                    {isCustomTotalActive ? (
+                      <span style={{ fontSize: 12, color: "#fbbf24", display: "inline-flex", alignItems: "center", gap: 5 }}>
+                        <IconAlert size={14} />
+                        <strong>Price Override Active:</strong> Courier will collect {fmtPrice(customFinalPrice)}
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: 11.5, color: "var(--admin-text-soft)" }}>
+                        Standard auto-calculated formula bill active.
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      disabled={savingEditOrder}
+                      onClick={() => {
+                        setEditingOrder(null);
+                        setCustomFinalPrice(null);
+                        setIsEditingFinalPrice(false);
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="btn btn-primary btn-sm"
+                      disabled={savingEditOrder}
+                      style={{ fontWeight: 700, padding: "6px 18px", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 6 }}
+                    >
+                      {isCancelled ? <IconRefresh size={14} /> : <IconSave size={14} />}
+                      {savingEditOrder ? (isCancelled ? "Saving & Resending…" : "Saving Changes…") : (isCancelled ? "Save & Resend Order" : "Save Changes")}
+                    </button>
+                  </div>
                 </div>
               </form>
             </div>

@@ -123,11 +123,11 @@ export function Footer() {
           <div className="footer-col footer-newsletter-col">
             <h4>STAY IN THE LOOP</h4>
             <p style={{ fontSize: 13, color: "#999", lineHeight: 1.5, marginBottom: 14 }}>
-              Get 10% off your first order plus early access to drops.
+              Get updates on new drops, restocks, and exclusive releases.
             </p>
             {submitted ? (
               <div className="newsletter-success-msg">
-                ✓ You&apos;re subscribed! Use code <strong style={{ color: "var(--lime)" }}>NANOS10</strong> for 10% off.
+                ✓ You&apos;re subscribed! Welcome to the loop.
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="newsletter-form">

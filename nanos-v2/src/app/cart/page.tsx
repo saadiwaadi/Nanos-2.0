@@ -9,8 +9,6 @@ import { fmtPrice } from "@/lib/cart";
 export default function CartPage() {
   const router = useRouter();
   const cart = useCart();
-  const [promoInput, setPromoInput] = useState("");
-  const [promoMsg, setPromoMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   if (cart.items.length === 0) {
     return (
@@ -168,39 +166,6 @@ export default function CartPage() {
               </div>
             )}
 
-            <div className="promo-row">
-              <input
-                type="text"
-                placeholder="Promo code"
-                value={promoInput}
-                onChange={(e) => setPromoInput(e.target.value)}
-              />
-              <button
-                type="button"
-                className="btn btn-outline btn-sm"
-                onClick={async () => {
-                  const res = await cart.applyPromo(promoInput);
-                  setPromoMsg({ ok: res.ok, text: res.message });
-                  if (res.ok) setPromoInput("");
-                }}
-              >
-                Apply
-              </button>
-            </div>
-
-            {promoMsg && (
-              <div
-                style={{
-                  fontSize: 12.5,
-                  marginTop: -6,
-                  marginBottom: 10,
-                  fontWeight: 600,
-                  color: promoMsg.ok ? "#166534" : "#991b1b",
-                }}
-              >
-                {promoMsg.text}
-              </div>
-            )}
 
             <div className="summary-row total">
               <span>Total</span>
