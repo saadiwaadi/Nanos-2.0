@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, Suspense } from "react";
+import { useEffect, useState, Suspense } from "react";
 import Script from "next/script";
 import { usePathname, useSearchParams } from "next/navigation";
 import { META_PIXEL_ID, shouldSuppressPixel, trackMeta } from "@/lib/fpixel";
+import { useAuth } from "@/lib/auth";
 
 function MetaPixelNavigation() {
   const pathname = usePathname();
@@ -21,6 +22,21 @@ function MetaPixelNavigation() {
 function MetaPixelInner() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { user } = useAuth();
+  const [scriptLoaded, setScriptLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!META_PIXEL_ID) return;
+    if (!user?.email) return;
+
+    const w = window as any;
+    if (typeof w !== "undefined" && typeof w.fbq === "function") {
+      w.fbq("init", META_PIXEL_ID, {
+        em: user.email,
+        ph: (user as any).phone || undefined,
+      });
+    }
+  }, [user, scriptLoaded]);
 
   if (!META_PIXEL_ID || shouldSuppressPixel(pathname, searchParams)) {
     return null;
@@ -31,6 +47,7 @@ function MetaPixelInner() {
       <Script
         id="fb-pixel"
         strategy="afterInteractive"
+        onLoad={() => setScriptLoaded(true)}
         dangerouslySetInnerHTML={{
           __html: `
             !function(f,b,e,v,n,t,s)
