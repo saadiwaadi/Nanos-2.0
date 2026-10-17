@@ -69,6 +69,18 @@ export class MetaCapiService {
       return;
     }
 
+    if (process.env.NODE_ENV !== "production") {
+      if (!process.env.META_TEST_EVENT_CODE) {
+        console.log(
+          `[Meta CAPI] Skipping ${eventName} in non-production mode (NODE_ENV=${process.env.NODE_ENV}). Set META_TEST_EVENT_CODE to test.`
+        );
+        return;
+      }
+      console.log(
+        `[Meta CAPI] Non-production mode: sending ${eventName} tagged with test_event_code: ${process.env.META_TEST_EVENT_CODE}`
+      );
+    }
+
     try {
       const { firstName, lastName } = splitName(userData.name);
       const hashedEmail = hashField(userData.email);
