@@ -81,6 +81,17 @@ export class MetaCapiService {
       );
     }
 
+    if (
+      eventName === "Purchase" &&
+      (customData?.value === undefined ||
+        customData?.value === null ||
+        !customData?.currency)
+    ) {
+      console.warn("[Meta CAPI] WARNING: Purchase event missing value/currency", {
+        orderId: eventId,
+      });
+    }
+
     try {
       const { firstName, lastName } = splitName(userData.name);
       const hashedEmail = hashField(userData.email);
