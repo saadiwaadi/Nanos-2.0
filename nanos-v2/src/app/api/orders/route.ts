@@ -18,6 +18,27 @@ export const memoryOrders = new Map<string, any>();
 
 export async function POST(request: Request) {
   try {
+    const origin = request.headers.get("origin");
+    if (origin) {
+      const isAllowed =
+        origin === "https://nanos.pk" ||
+        origin === "https://www.nanos.pk" ||
+        (process.env.NODE_ENV !== "production" &&
+          (origin.startsWith("http://localhost:") ||
+            origin.startsWith("http://127.0.0.1:") ||
+            origin.endsWith(".vercel.app")));
+
+      if (!isAllowed) {
+        console.warn(`[api/orders] Rejected request with unauthorized origin: ${origin}`);
+        return NextResponse.json(
+          { error: { code: "FORBIDDEN", message: "Invalid request origin." } },
+          { status: 403 }
+        );
+      }
+    } else {
+      console.log("[api/orders] Request received without Origin header");
+    }
+
     const authPayload = await verifyToken(request);
     const candidateUserId = authPayload?.sub || null;
 
