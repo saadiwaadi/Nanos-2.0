@@ -241,6 +241,15 @@ export default function CheckoutPage() {
         headers["Authorization"] = `Bearer ${currentToken}`;
       }
 
+      const fbcCookie = getCookie("_fbc");
+      const fbclidFromUrl =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("fbclid")
+          : undefined;
+      const fbc =
+        fbcCookie ||
+        (fbclidFromUrl ? `fb.1.${Date.now()}.${fbclidFromUrl}` : undefined);
+
       const orderPayload = {
         items: cart.items.map((i) => ({
           productId: i.productId,
@@ -263,7 +272,7 @@ export default function CheckoutPage() {
         guestEmail: currentToken ? undefined : (trimmedEmail || undefined),
         guestName: currentToken ? undefined : name.trim(),
         fbp: getCookie("_fbp"),
-        fbc: getCookie("_fbc"),
+        fbc,
         ttp: getCookie("_ttp"),
         ttclid:
           getCookie("ttclid") ||
