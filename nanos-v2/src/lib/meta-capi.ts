@@ -81,15 +81,27 @@ export class MetaCapiService {
       );
     }
 
-    if (
-      eventName === "Purchase" &&
-      (customData?.value === undefined ||
-        customData?.value === null ||
-        !customData?.currency)
-    ) {
-      console.warn("[Meta CAPI] WARNING: Purchase event missing value/currency", {
-        orderId: eventId,
-      });
+    const rawValue = customData?.value;
+    let numericValue: number | undefined = undefined;
+    if (typeof rawValue === "number" && !isNaN(rawValue)) {
+      numericValue = rawValue;
+    } else if (typeof rawValue === "string" && !isNaN(parseFloat(rawValue))) {
+      numericValue = parseFloat(rawValue);
+    }
+
+    if (eventName === "Purchase") {
+      if (
+        numericValue === undefined ||
+        numericValue === null ||
+        numericValue === 0 ||
+        !customData?.currency
+      ) {
+        console.warn("[MetaCAPI] Purchase event missing value", {
+          orderId: eventId,
+          value: rawValue,
+          currency: customData?.currency || "PKR",
+        });
+      }
     }
 
     try {
@@ -121,9 +133,12 @@ export class MetaCapiService {
         action_source: "website",
         user_data: payloadUserData,
         custom_data: {
+          value:
+            eventName === "Purchase"
+              ? (numericValue !== undefined ? numericValue : 0)
+              : numericValue,
           currency: customData?.currency || "PKR",
           content_type: customData?.content_type || "product",
-          value: customData?.value,
           content_ids: customData?.content_ids,
           contents: customData?.contents,
           num_items: customData?.num_items,
