@@ -76,13 +76,24 @@ export default function ConfirmationPage({
         const data = await res.json();
         setOrder(data);
 
-        // Fire Purchase Meta & TikTok Pixel Events
+        // Fire Purchase Meta & TikTok Pixel Events (only for freshly created orders)
         try {
+          const orderCreatedAt = data.createdAt ? new Date(data.createdAt).getTime() : 0;
+          const orderAgeMs = Date.now() - orderCreatedAt;
+          const MAX_PURCHASE_WINDOW_MS = 20 * 60 * 1000; // 20 minutes
+
+          // Only fire if order was created within the last 20 minutes (with 5-minute clock drift margin)
+          const isFreshOrder =
+            orderCreatedAt > 0 &&
+            !isNaN(orderCreatedAt) &&
+            orderAgeMs >= -5 * 60 * 1000 &&
+            orderAgeMs <= MAX_PURCHASE_WINDOW_MS;
+
           const storageKey = `meta_purchase_fired_${data.id}`;
           const isSessionFired =
             typeof window !== "undefined" && Boolean(sessionStorage.getItem(storageKey));
 
-          if (!purchaseFiredRef.current && !isSessionFired) {
+          if (isFreshOrder && !purchaseFiredRef.current && !isSessionFired) {
             purchaseFiredRef.current = true;
             if (typeof window !== "undefined") {
               sessionStorage.setItem(storageKey, "true");
