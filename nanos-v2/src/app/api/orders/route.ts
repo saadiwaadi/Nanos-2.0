@@ -268,8 +268,7 @@ export async function POST(request: Request) {
         request.headers.get("x-real-ip") ||
         null;
       const clientUserAgent = request.headers.get("user-agent") || null;
-      const eventSourceUrl =
-        request.headers.get("referer") || "https://nanos.pk/checkout";
+      const eventSourceUrl = "https://nanos.pk/checkout";
 
       const userData = {
         email: userEmail || null,
