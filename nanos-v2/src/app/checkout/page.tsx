@@ -24,6 +24,26 @@ export default function CheckoutPage() {
   const [initiateCheckoutEventId] = useState(() => crypto.randomUUID());
   const hasTrackedRef = useRef(false);
 
+  // Capture fbclid and exact timestamp when first observed on page load
+  const [initialFbclidData] = useState(() => {
+    if (typeof window === "undefined") return null;
+    const urlFbclid = new URLSearchParams(window.location.search).get("fbclid");
+    if (urlFbclid) {
+      const data = { fbclid: urlFbclid, observedAt: Date.now() };
+      try {
+        sessionStorage.setItem("nanos_fbclid_observed", JSON.stringify(data));
+      } catch {}
+      return data;
+    }
+    try {
+      const stored = sessionStorage.getItem("nanos_fbclid_observed");
+      if (stored) {
+        return JSON.parse(stored) as { fbclid: string; observedAt: number };
+      }
+    } catch {}
+    return null;
+  });
+
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -240,13 +260,24 @@ export default function CheckoutPage() {
       }
 
       const fbcCookie = getCookie("_fbc");
-      const fbclidFromUrl =
-        typeof window !== "undefined"
-          ? new URLSearchParams(window.location.search).get("fbclid")
-          : undefined;
-      const fbc =
-        fbcCookie ||
-        (fbclidFromUrl ? `fb.1.${Date.now()}.${fbclidFromUrl}` : undefined);
+      let fallbackFbc: string | undefined = undefined;
+
+      if (!fbcCookie && typeof window !== "undefined") {
+        const currentFbclid =
+          initialFbclidData?.fbclid ||
+          new URLSearchParams(window.location.search).get("fbclid");
+
+        if (currentFbclid) {
+          const creationTime = initialFbclidData?.observedAt || Date.now();
+          const hostname = window.location.hostname.toLowerCase();
+          // Meta spec: 'com' = 0, 'example.com' = 1, 'www.example.com' = 2
+          const subdomainIndex =
+            hostname === "www.nanos.pk" || hostname.startsWith("www.") ? 2 : 1;
+          fallbackFbc = `fb.${subdomainIndex}.${creationTime}.${currentFbclid}`;
+        }
+      }
+
+      const fbc = fbcCookie || fallbackFbc;
 
       const orderPayload = {
         items: cart.items.map((i) => ({
