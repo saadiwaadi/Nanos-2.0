@@ -60,24 +60,31 @@ export class MetaCapiService {
     eventId: string,
     eventSourceUrl: string,
     userData: CapiUserData,
-    customData?: CapiCustomData
-  ): Promise<void> {
+    customData?: CapiCustomData,
+    testEventCode?: string
+  ): Promise<any> {
     const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID;
     const accessToken = process.env.META_CAPI_ACCESS_TOKEN;
 
     if (!pixelId || !accessToken) {
+      console.warn("[Meta CAPI] Missing NEXT_PUBLIC_META_PIXEL_ID or META_CAPI_ACCESS_TOKEN");
       return;
     }
 
+    const effectiveTestEventCode =
+      testEventCode ||
+      (customData as any)?.test_event_code ||
+      process.env.META_TEST_EVENT_CODE;
+
     if (process.env.NODE_ENV !== "production") {
-      if (!process.env.META_TEST_EVENT_CODE) {
+      if (!effectiveTestEventCode) {
         console.log(
           `[Meta CAPI] Skipping ${eventName} in non-production mode (NODE_ENV=${process.env.NODE_ENV}). Set META_TEST_EVENT_CODE to test.`
         );
         return;
       }
       console.log(
-        `[Meta CAPI] Non-production mode: sending ${eventName} tagged with test_event_code: ${process.env.META_TEST_EVENT_CODE}`
+        `[Meta CAPI] Non-production mode: sending ${eventName} tagged with test_event_code: ${effectiveTestEventCode}`
       );
     }
 
@@ -90,17 +97,35 @@ export class MetaCapiService {
     }
 
     if (eventName === "Purchase") {
-      if (
-        numericValue === undefined ||
-        numericValue === null ||
-        numericValue === 0 ||
-        !customData?.currency
-      ) {
-        console.warn("[MetaCAPI] Purchase event missing value", {
-          orderId: eventId,
-          value: rawValue,
-          currency: customData?.currency || "PKR",
-        });
+      const isValidPositiveValue =
+        numericValue !== undefined &&
+        numericValue !== null &&
+        !isNaN(numericValue) &&
+        numericValue > 0;
+
+      if (!isValidPositiveValue || !customData?.currency) {
+        console.error(
+          "[Meta CAPI] ERROR: Purchase event skipped - missing, invalid, or non-positive value",
+          {
+            event_id: eventId,
+            order_id: (customData as any)?.order_id || eventId,
+            value: rawValue,
+            currency: customData?.currency || "PKR",
+          }
+        );
+        return {
+          ok: false,
+          skipped: true,
+          reason: !isValidPositiveValue
+            ? "missing_or_non_positive_value"
+            : "missing_currency",
+          status: 400,
+          error: `Purchase event skipped: ${
+            !isValidPositiveValue
+              ? `value must be a valid positive number (received ${rawValue})`
+              : "currency is required"
+          }`,
+        };
       }
     }
 
@@ -133,10 +158,7 @@ export class MetaCapiService {
         action_source: "website",
         user_data: payloadUserData,
         custom_data: {
-          value:
-            eventName === "Purchase"
-              ? (numericValue !== undefined ? numericValue : 0)
-              : numericValue,
+          value: numericValue,
           currency: customData?.currency || "PKR",
           content_type: customData?.content_type || "product",
           content_ids: customData?.content_ids,
@@ -149,8 +171,8 @@ export class MetaCapiService {
         data: [eventItem],
       };
 
-      if (process.env.META_TEST_EVENT_CODE) {
-        body.test_event_code = process.env.META_TEST_EVENT_CODE;
+      if (effectiveTestEventCode) {
+        body.test_event_code = effectiveTestEventCode;
       }
 
       const graphVersion = process.env.META_GRAPH_VERSION || "v22.0";
@@ -165,12 +187,25 @@ export class MetaCapiService {
         signal: AbortSignal.timeout(4000),
       });
 
-      if (!res.ok) {
-        const errText = await res.text();
-        console.error("Meta CAPI response error:", res.status, errText);
+      const resText = await res.text();
+      let resJson: any;
+      try {
+        resJson = JSON.parse(resText);
+      } catch {
+        resJson = resText;
       }
+
+      if (!res.ok) {
+        console.error("Meta CAPI response error:", res.status, resText);
+      } else if (effectiveTestEventCode || process.env.NODE_ENV !== "production") {
+        console.log(`[Meta CAPI] Response status: ${res.status}`);
+        console.log(`[Meta CAPI] Response body:`, JSON.stringify(resJson, null, 2));
+      }
+
+      return { ok: res.ok, status: res.status, body: resJson };
     } catch (err: any) {
       console.error("Meta CAPI error:", err?.message || err);
+      return { ok: false, status: 0, error: err?.message || err };
     }
   }
 }
