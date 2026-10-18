@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from "react";
 import Script from "next/script";
 import { usePathname, useSearchParams } from "next/navigation";
-import { META_PIXEL_ID, shouldSuppressPixel, trackMeta } from "@/lib/fpixel";
+import { META_PIXEL_ID, isTrackingEnvironment, shouldSuppressPixel, trackMeta } from "@/lib/fpixel";
 import { useAuth } from "@/lib/auth";
 
 function MetaPixelNavigation() {
@@ -11,7 +11,7 @@ function MetaPixelNavigation() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    if (!META_PIXEL_ID) return;
+    if (!META_PIXEL_ID || !isTrackingEnvironment()) return;
     if (shouldSuppressPixel(pathname, searchParams)) return;
     trackMeta("PageView");
   }, [pathname, searchParams]);
@@ -24,9 +24,14 @@ function MetaPixelInner() {
   const searchParams = useSearchParams();
   const { user } = useAuth();
   const [scriptLoaded, setScriptLoaded] = useState(false);
+  const [isAllowedHost, setIsAllowedHost] = useState(false);
 
   useEffect(() => {
-    if (!META_PIXEL_ID) return;
+    setIsAllowedHost(isTrackingEnvironment());
+  }, []);
+
+  useEffect(() => {
+    if (!META_PIXEL_ID || !isAllowedHost) return;
     if (!user?.email) return;
 
     const w = window as any;
@@ -36,9 +41,9 @@ function MetaPixelInner() {
         ph: (user as any).phone || undefined,
       });
     }
-  }, [user, scriptLoaded]);
+  }, [user, scriptLoaded, isAllowedHost]);
 
-  if (!META_PIXEL_ID || shouldSuppressPixel(pathname, searchParams)) {
+  if (!META_PIXEL_ID || !isAllowedHost || shouldSuppressPixel(pathname, searchParams)) {
     return null;
   }
 

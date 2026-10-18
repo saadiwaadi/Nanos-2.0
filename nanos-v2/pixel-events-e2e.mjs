@@ -11,6 +11,7 @@ const capturedEvents = [];
 
 // Mock window and fbq
 global.window = {
+  location: { hostname: "nanos.pk" },
   fbq: function (action, eventName, payload, options) {
     capturedEvents.push({ action, eventName, payload, options });
   }
