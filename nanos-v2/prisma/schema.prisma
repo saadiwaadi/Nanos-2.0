@@ -154,6 +154,7 @@ model Order {
   stockReserved        Boolean   @default(false)
   isTest               Boolean   @default(false)
   version              Int       @default(0)
+  idempotencyKey       String?   @unique
 
   user        User?              @relation(fields: [userId], references: [id])
   items       OrderItem[]

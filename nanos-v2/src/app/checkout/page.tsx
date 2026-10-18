@@ -22,6 +22,7 @@ export default function CheckoutPage() {
   const auth = useAuth();
 
   const [initiateCheckoutEventId] = useState(() => crypto.randomUUID());
+  const [idempotencyKey] = useState(() => crypto.randomUUID());
   const hasTrackedRef = useRef(false);
 
   // Capture fbclid and exact timestamp when first observed on page load
@@ -309,6 +310,7 @@ export default function CheckoutPage() {
             ? new URLSearchParams(window.location.search).get("ttclid") || undefined
             : undefined),
         eventId: initiateCheckoutEventId,
+        idempotencyKey,
         market: getClientMarket(),
       };
 

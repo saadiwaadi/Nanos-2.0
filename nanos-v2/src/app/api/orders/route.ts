@@ -17,6 +17,7 @@ import { getServerMarket } from "@/lib/market";
 export const memoryOrders = new Map<string, any>();
 
 export async function POST(request: Request) {
+  let sanitizedIdempotencyKey: string | null = null;
   try {
     const origin = request.headers.get("origin");
     if (origin) {
@@ -69,8 +70,41 @@ export async function POST(request: Request) {
       ttp,
       ttclid,
       eventId,
+      idempotencyKey,
       market: clientMarket,
     } = body || {};
+
+    sanitizedIdempotencyKey =
+      typeof idempotencyKey === "string" && idempotencyKey.trim().length > 0
+        ? idempotencyKey.trim()
+        : null;
+
+    if (sanitizedIdempotencyKey) {
+      const existingOrder = await prisma.order.findUnique({
+        where: { idempotencyKey: sanitizedIdempotencyKey },
+        select: {
+          id: true,
+          total: true,
+          status: true,
+          createdAt: true,
+        },
+      });
+
+      if (existingOrder) {
+        console.log(
+          `[Orders API] Idempotent request detected. Returning existing order ${existingOrder.id} for idempotencyKey: ${sanitizedIdempotencyKey}`
+        );
+        return NextResponse.json(
+          {
+            id: existingOrder.id,
+            total: existingOrder.total,
+            status: existingOrder.status,
+            createdAt: existingOrder.createdAt,
+          },
+          { status: 200 }
+        );
+      }
+    }
 
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
@@ -225,6 +259,7 @@ export async function POST(request: Request) {
           data: {
             id: orderId,
             userId: validUserId,
+            idempotencyKey: sanitizedIdempotencyKey,
             guestEmail: validUserId ? null : (userEmail || null),
             guestName: validUserId ? null : (guestName || shippingInfo.name || null),
             customerName: shippingInfo.name || guestName || null,
@@ -427,7 +462,36 @@ export async function POST(request: Request) {
       },
       { status: 201 }
     );
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.code === "P2002" && sanitizedIdempotencyKey) {
+      try {
+        const existingOrder = await prisma.order.findUnique({
+          where: { idempotencyKey: sanitizedIdempotencyKey },
+          select: {
+            id: true,
+            total: true,
+            status: true,
+            createdAt: true,
+          },
+        });
+        if (existingOrder) {
+          console.log(
+            `[Orders API] Concurrent duplicate caught by unique constraint. Returning existing order ${existingOrder.id}`
+          );
+          return NextResponse.json(
+            {
+              id: existingOrder.id,
+              total: existingOrder.total,
+              status: existingOrder.status,
+              createdAt: existingOrder.createdAt,
+            },
+            { status: 200 }
+          );
+        }
+      } catch (lookupErr) {
+        console.error("Failed to lookup existing idempotent order after P2002:", lookupErr);
+      }
+    }
     console.error("Create order error:", error);
     return NextResponse.json(
       { error: { code: "SERVER_ERROR", message: "Failed to place order." } },
