@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { allowedNext, OrderStatus } from "@/lib/order-state";
 import { HomePageManager } from "@/components/admin/HomePageManager";
+import { matchPhone } from "@/lib/phone";
 
 // ─── TYPES ──────────────────────────────────────────────
 
@@ -2853,7 +2854,10 @@ export default function AdminPage() {
         const mEmail = o.customerEmail?.toLowerCase().includes(q) ?? false;
         const mId = o.id.toLowerCase().includes(q);
         const mTracking = (o.trackingNumber || o.postexTrackingNumber)?.toLowerCase().includes(q) ?? false;
-        if (!mName && !mEmail && !mId && !mTracking) return false;
+        const sInfo = typeof o.shippingInfo === "object" && o.shippingInfo !== null ? o.shippingInfo : parseShippingInfo(o.shippingInfo);
+        const orderPhone = sInfo?.phone || (o as any).phone || (o as any).customerPhone || "";
+        const mPhone = matchPhone(orderPhone, orderQuery);
+        if (!mName && !mEmail && !mId && !mTracking && !mPhone) return false;
       }
 
       return true;
@@ -2881,7 +2885,11 @@ export default function AdminPage() {
         const mName = o.customerName?.toLowerCase().includes(q) ?? false;
         const mEmail = o.customerEmail?.toLowerCase().includes(q) ?? false;
         const mId = o.id.toLowerCase().includes(q);
-        if (!mName && !mEmail && !mId) return false;
+        const mTracking = (o.trackingNumber || o.postexTrackingNumber)?.toLowerCase().includes(q) ?? false;
+        const sInfo = typeof o.shippingInfo === "object" && o.shippingInfo !== null ? o.shippingInfo : parseShippingInfo(o.shippingInfo);
+        const orderPhone = sInfo?.phone || (o as any).phone || (o as any).customerPhone || "";
+        const mPhone = matchPhone(orderPhone, deliveredQuery);
+        if (!mName && !mEmail && !mId && !mTracking && !mPhone) return false;
       }
 
       return true;
@@ -4860,7 +4868,7 @@ export default function AdminPage() {
                 <div className="panel-body" style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-end" }}>
                   <div>
                     <label style={{ display: "block", fontSize: 11, fontWeight: 700, marginBottom: 4 }}>SEARCH</label>
-                    <input type="text" placeholder="Search name, email, ID…" value={deliveredQuery} onChange={(e) => setDeliveredQuery(e.target.value)} />
+                    <input type="text" placeholder="Search customer, phone, ID, tracking #…" value={deliveredQuery} onChange={(e) => setDeliveredQuery(e.target.value)} />
                   </div>
                   <div>
                     <label style={{ display: "block", fontSize: 11, fontWeight: 700, marginBottom: 4 }}>DATE PRESETS</label>

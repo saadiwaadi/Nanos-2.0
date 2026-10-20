@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { memoryOrders } from "@/app/api/orders/route";
 import { reserveStock } from "@/lib/stock";
 import { AppError } from "@/lib/order-state";
+import { getPhoneSearchVariants, matchPhone } from "@/lib/phone";
 
 export const dynamic = "force-dynamic";
 
@@ -14,8 +15,33 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status });
   }
 
+  const { searchParams } = new URL(request.url);
+  const search = (searchParams.get("search") || searchParams.get("q") || "").trim();
+
   try {
+    let whereClause: any = undefined;
+    if (search) {
+      const searchVariants = getPhoneSearchVariants(search);
+      const phoneConditions = searchVariants.map((v) => ({
+        shippingInfo: { contains: v, mode: "insensitive" as const },
+      }));
+
+      whereClause = {
+        OR: [
+          { id: { contains: search, mode: "insensitive" as const } },
+          { customerName: { contains: search, mode: "insensitive" as const } },
+          { customerEmail: { contains: search, mode: "insensitive" as const } },
+          { guestName: { contains: search, mode: "insensitive" as const } },
+          { guestEmail: { contains: search, mode: "insensitive" as const } },
+          { trackingNumber: { contains: search, mode: "insensitive" as const } },
+          { postexTrackingNumber: { contains: search, mode: "insensitive" as const } },
+          ...phoneConditions,
+        ],
+      };
+    }
+
     const dbOrders = await prisma.order.findMany({
+      where: whereClause,
       orderBy: { createdAt: "desc" },
       include: {
         items: {
@@ -110,9 +136,26 @@ export async function GET(request: Request) {
     return NextResponse.json({ orders });
   } catch {
     // Fallback to memoryOrders
-    const memList = Array.from(memoryOrders.values()).sort(
+    let memList = Array.from(memoryOrders.values()).sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
+
+    if (search) {
+      const q = search.toLowerCase();
+      memList = memList.filter((o) => {
+        const mName = (o.customerName || o.guestName || "")?.toLowerCase().includes(q);
+        const mEmail = (o.customerEmail || o.guestEmail || "")?.toLowerCase().includes(q);
+        const mId = o.id?.toLowerCase().includes(q);
+        const mTracking = (o.trackingNumber || o.postexTrackingNumber)?.toLowerCase().includes(q);
+        let phone = "";
+        try {
+          const s = typeof o.shippingInfo === "string" ? JSON.parse(o.shippingInfo) : o.shippingInfo;
+          phone = s?.phone || "";
+        } catch {}
+        const mPhone = matchPhone(phone, search);
+        return mName || mEmail || mId || mTracking || mPhone;
+      });
+    }
 
     const orders = memList.map((o) => ({
       id: o.id,
